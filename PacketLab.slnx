@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PacketLab.Cli/PacketLab.Cli.csproj" />
+    <Project Path="src/PacketLab.Pcap/PacketLab.Pcap.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="AGENTS.md" />
+  </Folder>
+  <Folder Name="/tests/E2E/">
+    <Project Path="tests/E2E/PacketLab.Cli.E2ETests/PacketLab.Cli.E2ETests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Integration/">
+    <Project Path="tests/Integration/PacketLab.Pcap.IntegrationTests/PacketLab.Pcap.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Unit/">
+    <Project Path="tests/Unit/PacketLab.Pcap.UnitTests/PacketLab.Pcap.UnitTests.csproj" />
+  </Folder>
+</Solution>

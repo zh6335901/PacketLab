@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../../src/PacketLab.Cli/PacketLab.Cli.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <Target Name="CopyCli" AfterTargets="Build">
+    <ItemGroup>
+      <CliFiles Include="../../../src/PacketLab.Cli/bin/$(Configuration)/$(TargetFramework)/PacketLab.Cli.dll;../../../src/PacketLab.Cli/bin/$(Configuration)/$(TargetFramework)/PacketLab.Cli.deps.json;../../../src/PacketLab.Cli/bin/$(Configuration)/$(TargetFramework)/PacketLab.Cli.runtimeconfig.json;../../../src/PacketLab.Cli/bin/$(Configuration)/$(TargetFramework)/PacketLab.Pcap.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CliFiles)" DestinationFolder="$(OutDir)cli" />
+  </Target>
+</Project>
