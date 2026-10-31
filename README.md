@@ -22,5 +22,3 @@ These are long-term directions, not commitments for the first release.
 ## Status
 
 Early development.
-
-The first milestone is a minimal PCAP reader with automated tests.
