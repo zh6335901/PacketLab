@@ -1,6 +1,8 @@
+using System.Text;
 using ConsoleAppFramework;
 using PacketLab.Cli;
 
+Console.OutputEncoding = Encoding.UTF8;
 ConsoleApp.LogError = Console.Error.WriteLine;
 // The framework also shows help for missing arguments and unknown commands.
 var helpRequested = args

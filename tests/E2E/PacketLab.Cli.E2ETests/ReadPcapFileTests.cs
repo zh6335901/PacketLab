@@ -55,10 +55,6 @@ public class ReadPcapFileTests
 
     private static async Task<ProcessResult> Run(params string[] args)
     {
-        // A Windows console process started without a console uses the system code page.
-        // TUnit's UTF-8 console setting in the parent does not change the child's encoding.
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        var encoding = Encoding.GetEncoding(0);
         var executable = Environment.GetEnvironmentVariable("PACKETLAB_CLI_EXECUTABLE");
         var start = new ProcessStartInfo
         {
@@ -66,8 +62,8 @@ public class ReadPcapFileTests
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            StandardOutputEncoding = encoding,
-            StandardErrorEncoding = encoding,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
             CreateNoWindow = true,
             WorkingDirectory = AppContext.BaseDirectory
         };
