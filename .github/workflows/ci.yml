@@ -17,10 +17,47 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes requiring tests
+        id: changes
+        shell: pwsh
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $runTests = $true
+          if ($env:BASE_SHA -and $env:BASE_SHA -notmatch '^0+$') {
+            $range = if ($env:GITHUB_EVENT_NAME -eq 'pull_request') {
+              "$($env:BASE_SHA)...$($env:HEAD_SHA)"
+            } else {
+              "$($env:BASE_SHA)..$($env:HEAD_SHA)"
+            }
+            $files = git -c core.quotepath=false diff --name-only --no-renames $range --
+            if ($LASTEXITCODE -eq 0) {
+              $patterns = @(
+                '^(src|tests|samples)/'
+                '^\.github/workflows/'
+                '^[^/]+\.(sln|slnx|slnf|props|targets|rsp)$'
+                '^(global\.json|nuget\.config|packages\.lock\.json)$'
+                '^\.config/dotnet-tools\.json$'
+              )
+              $runTests = @($files | Where-Object { $_ -match ($patterns -join '|') }).Count -gt 0
+            }
+          }
+          "run_tests=$($runTests.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          exit 0
 
       - uses: actions/setup-dotnet@v6
+        if: steps.changes.outputs.run_tests == 'true'
         with:
           global-json-file: global.json
 
       - name: Build and test
+        if: steps.changes.outputs.run_tests == 'true'
         run: dotnet test --solution PacketLab.slnx --configuration Release
+
+      - name: Skip tests
+        if: steps.changes.outputs.run_tests == 'false'
+        run: Write-Output 'No source, test, workflow, or build configuration changes; skipping tests.'
