@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,7 +8,6 @@
 
   <ItemGroup>
     <PackageReference Include="ConsoleAppFramework" Version="5.8.0" />
-    <ProjectReference Include="../PacketLab.Ethernet/PacketLab.Ethernet.csproj" />
-    <ProjectReference Include="../PacketLab.Pcap/PacketLab.Pcap.csproj" />
+    <ProjectReference Include="../PacketLab.Analysis/PacketLab.Analysis.csproj" />
   </ItemGroup>
 </Project>

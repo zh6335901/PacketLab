@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <Compile Include="../../Shared/PcapResultAssertions.cs" Link="PcapResultAssertions.cs" />
     <ProjectReference Include="../../../src/PacketLab.Pcap/PacketLab.Pcap.csproj" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,6 @@
-namespace PacketLab.Ethernet.UnitTests;
+using PacketLab.Protocols.Ethernet;
+
+namespace PacketLab.Protocols.UnitTests.Ethernet;
 
 public class ParseEthernetFrameTests
 {
@@ -17,8 +19,12 @@ public class ParseEthernetFrameTests
     [Arguments("05DC", 1500)]
     public async Task Length_fields_are_recognized_as_IEEE_802_3(string hex, int length)
     {
-        var result = EthernetParser.Parse(Convert.FromHexString("00112233445566778899AABB" + hex));
-        await Assert.That(result is EthernetParseResult.Ieee8023Length field && field.Length == length).IsTrue();
+        var result = EthernetParser.Parse(Convert.FromHexString("00112233445566778899AABB" + hex + "CAFE"));
+        var field = result is EthernetParseResult.Ieee8023Length parsed ? parsed : throw new InvalidOperationException("Expected a length field.");
+        await Assert.That(field.Length).IsEqualTo((ushort)length);
+        await Assert.That(field.Destination.ToString()).IsEqualTo("00:11:22:33:44:55");
+        await Assert.That(field.Source.ToString()).IsEqualTo("66:77:88:99:AA:BB");
+        await Assert.That(Convert.ToHexString(field.RemainingBytes.Span)).IsEqualTo("CAFE");
     }
 
     [Test]
@@ -26,8 +32,12 @@ public class ParseEthernetFrameTests
     [Arguments("05FF", 1535)]
     public async Task Reserved_fields_report_the_invalid_value(string hex, int value)
     {
-        var result = EthernetParser.Parse(Convert.FromHexString("00112233445566778899AABB" + hex));
-        await Assert.That(result is EthernetParseResult.InvalidLengthOrType field && field.Value == value).IsTrue();
+        var result = EthernetParser.Parse(Convert.FromHexString("00112233445566778899AABB" + hex + "CAFE"));
+        var field = result is EthernetParseResult.InvalidLengthOrType parsed ? parsed : throw new InvalidOperationException("Expected an invalid field.");
+        await Assert.That(field.Value).IsEqualTo((ushort)value);
+        await Assert.That(field.Destination.ToString()).IsEqualTo("00:11:22:33:44:55");
+        await Assert.That(field.Source.ToString()).IsEqualTo("66:77:88:99:AA:BB");
+        await Assert.That(Convert.ToHexString(field.RemainingBytes.Span)).IsEqualTo("CAFE");
     }
 
     [Test]

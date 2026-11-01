@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../../src/PacketLab.Analysis/PacketLab.Analysis.csproj" />
+  </ItemGroup>
+</Project>

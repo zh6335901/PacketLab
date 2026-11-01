@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../../src/PacketLab.Protocols/PacketLab.Protocols.csproj" />
+  </ItemGroup>
+</Project>

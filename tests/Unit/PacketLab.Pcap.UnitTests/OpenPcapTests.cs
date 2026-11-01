@@ -1,4 +1,3 @@
-using PacketLab.Tests;
 using static PacketLab.Pcap.UnitTests.ReaderAssertions;
 
 namespace PacketLab.Pcap.UnitTests;

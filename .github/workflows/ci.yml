@@ -37,7 +37,7 @@ jobs:
             $files = git -c core.quotepath=false diff --name-only --no-renames $range --
             if ($LASTEXITCODE -eq 0) {
               $patterns = @(
-                '^(src|tests|samples|benchmarks|scripts)/'
+                '^(src|tests|benchmarks|scripts)/'
                 '^\.github/workflows/'
                 '^[^/]+\.(sln|slnx|slnf|props|targets|rsp)$'
                 '^(global\.json|nuget\.config|packages\.lock\.json)$'
@@ -61,3 +61,12 @@ jobs:
       - name: Skip tests
         if: steps.changes.outputs.run_tests == 'false'
         run: Write-Output 'No source, test, workflow, or build configuration changes; skipping tests.'
+
+      - name: Publish and run Native AOT smoke test
+        if: steps.changes.outputs.run_tests == 'true'
+        shell: pwsh
+        run: |
+          dotnet publish tests/NativeAot/PacketLab.AotSmoke.csproj --configuration Release --runtime win-x64 --output artifacts/aot-smoke
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./artifacts/aot-smoke/PacketLab.AotSmoke.exe
+          exit $LASTEXITCODE
