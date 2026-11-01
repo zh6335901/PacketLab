@@ -3,8 +3,9 @@
     <Project Path="benchmarks/PacketLab.Pcap.Benchmarks/PacketLab.Pcap.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/PacketLab.Analysis/PacketLab.Analysis.csproj" />
     <Project Path="src/PacketLab.Cli/PacketLab.Cli.csproj" />
-    <Project Path="src/PacketLab.Ethernet/PacketLab.Ethernet.csproj" />
+    <Project Path="src/PacketLab.Protocols/PacketLab.Protocols.csproj" />
     <Project Path="src/PacketLab.Pcap/PacketLab.Pcap.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
@@ -14,10 +15,12 @@
     <Project Path="tests/E2E/PacketLab.Cli.E2ETests/PacketLab.Cli.E2ETests.csproj" />
   </Folder>
   <Folder Name="/tests/Integration/">
+    <Project Path="tests/Integration/PacketLab.Analysis.IntegrationTests/PacketLab.Analysis.IntegrationTests.csproj" />
     <Project Path="tests/Integration/PacketLab.Pcap.IntegrationTests/PacketLab.Pcap.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/Unit/">
-    <Project Path="tests/Unit/PacketLab.Ethernet.UnitTests/PacketLab.Ethernet.UnitTests.csproj" />
+    <Project Path="tests/Unit/PacketLab.Analysis.UnitTests/PacketLab.Analysis.UnitTests.csproj" />
+    <Project Path="tests/Unit/PacketLab.Protocols.UnitTests/PacketLab.Protocols.UnitTests.csproj" />
     <Project Path="tests/Unit/PacketLab.Pcap.UnitTests/PacketLab.Pcap.UnitTests.csproj" />
   </Folder>
 </Solution>

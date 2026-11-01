@@ -1,5 +1,7 @@
 using ConsoleAppFramework;
-using PacketLab.Ethernet;
+using PacketLab.Analysis;
+using PacketLab.Protocols;
+using PacketLab.Protocols.Ethernet;
 using PacketLab.Pcap;
 
 namespace PacketLab.Cli;
@@ -25,9 +27,17 @@ internal static class PcapCommands
         try
         {
             using var stream = File.OpenRead(file);
+            if (inspect)
+                return PcapAnalysisReader.Open(stream) switch
+                {
+                    PcapAnalysisReader reader => InspectFile(reader),
+                    PcapError error => PrintError(error),
+                    null => throw new InvalidOperationException("Open returned an uninitialized result.")
+                };
+
             return PcapReader.Open(stream) switch
             {
-                PcapReader reader => ReadFile(reader, inspect),
+                PcapReader reader => ReadFile(reader),
                 PcapError error => PrintError(error),
                 null => throw new InvalidOperationException("Open returned an uninitialized result.")
             };
@@ -39,26 +49,23 @@ internal static class PcapCommands
         }
     }
 
-    private static int ReadFile(PcapReader reader, bool inspect)
+    private static int InspectFile(PcapAnalysisReader reader)
     {
-        if (inspect && reader.Header.LinkType != 1)
+        if (reader.LinkLayer == LinkLayerProtocol.Unsupported)
         {
             Console.Error.WriteLine($"Unsupported link type {reader.Header.LinkType}. Ethernet inspection requires LinkType 1.");
             return 1;
         }
 
-        long count = 0;
         while (true)
         {
             switch (reader.ReadNext())
             {
-                case PcapPacket packet:
-                    count++;
-                    if (inspect)
-                        PrintFrame(count, packet.Data);
+                case AnalyzedPacket packet:
+                    PrintFrame(packet);
                     break;
                 case PcapEndOfFile:
-                    return inspect ? 0 : PrintSummary(reader.Header, count);
+                    return 0;
                 case PcapError error:
                     return PrintError(error);
                 default:
@@ -67,18 +74,45 @@ internal static class PcapCommands
         }
     }
 
-    private static void PrintFrame(long recordNumber, ReadOnlyMemory<byte> bytes)
+    private static int ReadFile(PcapReader reader)
     {
-        var description = EthernetParser.Parse(bytes) switch
+        long count = 0;
+        while (true)
         {
-            EthernetFrame frame => $"src {frame.Source} dst {frame.Destination} EtherType 0x{frame.EtherType:X4}{TypeName(frame.EtherType)}",
-            EthernetParseResult.IncompleteHeader shortHeader => $"Incomplete Ethernet header: expected 14 bytes, captured {shortHeader.CapturedLength}.",
-            EthernetParseResult.Ieee8023Length field => $"Unsupported IEEE 802.3 length encapsulation (length {field.Length}).",
-            EthernetParseResult.InvalidLengthOrType field => $"Invalid Length/Type field: 0x{field.Value:X4}.",
-            null => throw new InvalidOperationException("Uninitialized Ethernet parse result.")
-        };
-        Console.WriteLine($"Record {recordNumber}: {description}");
+            switch (reader.ReadNext())
+            {
+                case PcapPacket:
+                    count++;
+                    break;
+                case PcapEndOfFile:
+                    return PrintSummary(reader.Header, count);
+                case PcapError error:
+                    return PrintError(error);
+                default:
+                    throw new InvalidOperationException("ReadNext returned an uninitialized result.");
+            }
+        }
     }
+
+    private static void PrintFrame(AnalyzedPacket packet)
+    {
+        var description = packet.Decoding switch
+        {
+            EthernetParseResult ethernet => DescribeEthernet(ethernet),
+            ProtocolDecodeResult.UnsupportedLinkLayer => "Unsupported link layer.",
+            null => throw new InvalidOperationException("Uninitialized protocol decode result.")
+        };
+        Console.WriteLine($"Record {packet.RecordNumber}: {description}");
+    }
+
+    private static string DescribeEthernet(EthernetParseResult result) => result switch
+    {
+        EthernetFrame frame => $"src {frame.Source} dst {frame.Destination} EtherType 0x{frame.EtherType:X4}{TypeName(frame.EtherType)}",
+        EthernetParseResult.IncompleteHeader shortHeader => $"Incomplete Ethernet header: expected 14 bytes, captured {shortHeader.CapturedLength}.",
+        EthernetParseResult.Ieee8023Length field => $"Unsupported IEEE 802.3 length encapsulation (length {field.Length}).",
+        EthernetParseResult.InvalidLengthOrType field => $"Invalid Length/Type field: 0x{field.Value:X4}.",
+        null => throw new InvalidOperationException("Uninitialized Ethernet parse result.")
+    };
 
     private static string TypeName(ushort etherType) => etherType switch
     {

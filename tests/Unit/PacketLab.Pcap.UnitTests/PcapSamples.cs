@@ -1,4 +1,4 @@
-namespace PacketLab.Tests;
+namespace PacketLab.Pcap.UnitTests;
 
 internal static class PcapSamples
 {

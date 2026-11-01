@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PacketLab.Pcap/PacketLab.Pcap.csproj" />
+    <ProjectReference Include="../PacketLab.Protocols/PacketLab.Protocols.csproj" />
+  </ItemGroup>
+</Project>

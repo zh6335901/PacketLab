@@ -1,5 +1,4 @@
 using static PacketLab.Cli.E2ETests.CliProcess;
-using PacketLab.Tests;
 
 namespace PacketLab.Cli.E2ETests;
 
@@ -8,7 +7,7 @@ public class ReadPcapFileTests
     [Test]
     public async Task Cli_reads_entire_file_and_prints_accurate_summary()
     {
-        var bytes = PcapSamples.Replace(Convert.FromHexString(PcapSamples.Multiple), 16, "03000000FFFF0000");
+        var bytes = PcapSamples.Replace(PcapSamples.Multiple(), 16, "03000000FFFF0000");
         using var input = new InputFile(bytes);
         var result = await Run("pcap", "read", input.Path);
         await Assert.That(result.ExitCode).IsEqualTo(0);
@@ -43,7 +42,7 @@ public class ReadPcapFileTests
     [Test]
     public async Task Failure_after_a_packet_reports_location_without_a_success_summary()
     {
-        using var input = new InputFile(Convert.FromHexString(PcapSamples.Multiple)[..60]);
+        using var input = new InputFile(PcapSamples.Multiple()[..60]);
         var result = await Run("pcap", "read", input.Path);
         await Assert.That(result.ExitCode).IsEqualTo(1);
         await Assert.That(result.Output).IsEqualTo("");

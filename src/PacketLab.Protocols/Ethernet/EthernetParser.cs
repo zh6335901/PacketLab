@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 
-namespace PacketLab.Ethernet;
+namespace PacketLab.Protocols.Ethernet;
 
 public readonly record struct MacAddress(byte Octet0, byte Octet1, byte Octet2, byte Octet3, byte Octet4, byte Octet5)
 {
@@ -15,9 +15,12 @@ public sealed record EthernetFrame(MacAddress Destination, MacAddress Source, us
 public union EthernetParseResult(EthernetFrame, EthernetParseResult.IncompleteHeader,
     EthernetParseResult.Ieee8023Length, EthernetParseResult.InvalidLengthOrType)
 {
-    public sealed record IncompleteHeader(int CapturedLength);
-    public sealed record Ieee8023Length(ushort Length);
-    public sealed record InvalidLengthOrType(ushort Value);
+    public sealed record IncompleteHeader(ReadOnlyMemory<byte> RemainingBytes)
+    {
+        public int CapturedLength => RemainingBytes.Length;
+    }
+    public sealed record Ieee8023Length(ushort Length, MacAddress Destination, MacAddress Source, ReadOnlyMemory<byte> RemainingBytes);
+    public sealed record InvalidLengthOrType(ushort Value, MacAddress Destination, MacAddress Source, ReadOnlyMemory<byte> RemainingBytes);
 }
 
 public static class EthernetParser
@@ -26,15 +29,18 @@ public static class EthernetParser
     {
         const int headerLength = 14;
         if (data.Length < headerLength)
-            return new EthernetParseResult.IncompleteHeader(data.Length);
+            return new EthernetParseResult.IncompleteHeader(data);
 
         var bytes = data.Span;
         var field = BinaryPrimitives.ReadUInt16BigEndian(bytes[12..]);
+        var destination = MacAddress.Read(bytes);
+        var source = MacAddress.Read(bytes[6..]);
+        var remaining = data[headerLength..];
         return field switch
         {
-            <= 1500 => new EthernetParseResult.Ieee8023Length(field),
-            < 0x0600 => new EthernetParseResult.InvalidLengthOrType(field),
-            _ => new EthernetFrame(MacAddress.Read(bytes), MacAddress.Read(bytes[6..]), field, data[headerLength..])
+            <= 1500 => new EthernetParseResult.Ieee8023Length(field, destination, source, remaining),
+            < 0x0600 => new EthernetParseResult.InvalidLengthOrType(field, destination, source, remaining),
+            _ => new EthernetFrame(destination, source, field, remaining)
         };
     }
 }

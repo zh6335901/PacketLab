@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../../src/PacketLab.Analysis/PacketLab.Analysis.csproj" />
+    <None Include="../../TestData/Pcap/ethernet-*.pcap" Link="TestData/Pcap/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

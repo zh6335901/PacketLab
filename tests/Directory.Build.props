@@ -6,6 +6,5 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="TUnit" Version="1.76.45" />
-    <Compile Include="$(MSBuildThisFileDirectory)Shared/PcapSamples.cs" Link="PcapSamples.cs" />
   </ItemGroup>
 </Project>
