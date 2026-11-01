@@ -5,8 +5,9 @@
     <PublishAot>true</PublishAot>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/PacketLab.Ethernet/PacketLab.Ethernet.csproj" />
     <ProjectReference Include="../../src/PacketLab.Pcap/PacketLab.Pcap.csproj" />
-    <None Include="../../samples/multiple.pcap" Link="samples/multiple.pcap"
+    <None Include="../../samples/multiple.pcap;../../samples/ethernet-little.pcap" Link="samples/%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
