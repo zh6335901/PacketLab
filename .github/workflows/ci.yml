@@ -37,7 +37,7 @@ jobs:
             $files = git -c core.quotepath=false diff --name-only --no-renames $range --
             if ($LASTEXITCODE -eq 0) {
               $patterns = @(
-                '^(src|tests|samples)/'
+                '^(src|tests|samples|benchmarks|scripts)/'
                 '^\.github/workflows/'
                 '^[^/]+\.(sln|slnx|slnf|props|targets|rsp)$'
                 '^(global\.json|nuget\.config|packages\.lock\.json)$'

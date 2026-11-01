@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/PacketLab.Pcap.Benchmarks/PacketLab.Pcap.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/PacketLab.Cli/PacketLab.Cli.csproj" />
     <Project Path="src/PacketLab.Pcap/PacketLab.Pcap.csproj" />
@@ -13,6 +16,7 @@
     <Project Path="tests/Integration/PacketLab.Pcap.IntegrationTests/PacketLab.Pcap.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/Unit/">
+    <Project Path="tests/Unit/PacketLab.Pcap.Benchmarks.UnitTests/PacketLab.Pcap.Benchmarks.UnitTests.csproj" />
     <Project Path="tests/Unit/PacketLab.Pcap.UnitTests/PacketLab.Pcap.UnitTests.csproj" />
   </Folder>
 </Solution>
