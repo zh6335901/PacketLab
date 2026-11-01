@@ -1,0 +1,6 @@
+[
+  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.ReadToEnd(FrameSize: 64)",
+  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.AnalyzeToEnd(FrameSize: 64)",
+  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.ReadToEnd(FrameSize: 1500)",
+  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.AnalyzeToEnd(FrameSize: 1500)"
+]

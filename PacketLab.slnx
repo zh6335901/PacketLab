@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/PacketLab.Analysis.Benchmarks/PacketLab.Analysis.Benchmarks.csproj" />
     <Project Path="benchmarks/PacketLab.Pcap.Benchmarks/PacketLab.Pcap.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/src/">
