@@ -42,8 +42,10 @@ jobs:
           CANDIDATE_REF: ${{ inputs.candidate || github.sha }}
         run: |
           New-Item -ItemType Directory -Force artifacts/benchmarks | Out-Null
+          "Project=$env:BENCHMARK_PROJECT Base=$env:BASE_REF Candidate=$env:CANDIDATE_REF" |
+            Set-Content artifacts/benchmarks/comparison.log
           dotnet fsi scripts/Compare-Benchmarks.fsx $env:BENCHMARK_PROJECT $env:BASE_REF $env:CANDIDATE_REF 2>&1 |
-            Tee-Object -FilePath artifacts/benchmarks/comparison.log
+            Tee-Object -FilePath artifacts/benchmarks/comparison.log -Append
           exit $LASTEXITCODE
 
       - name: Upload report, logs and raw measurements
