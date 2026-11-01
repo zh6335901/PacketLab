@@ -72,9 +72,9 @@ internal static class PcapCommands
         var description = EthernetParser.Parse(bytes) switch
         {
             EthernetFrame frame => $"src {frame.Source} dst {frame.Destination} EtherType 0x{frame.EtherType:X4}{TypeName(frame.EtherType)}",
-            EthernetParseResult.IncompleteHeader shortHeader => $"帧头不完整（捕获 {shortHeader.CapturedLength} 字节）",
-            EthernetParseResult.Ieee8023Length field => $"暂不支持 IEEE 802.3 长度封装（长度 {field.Length}）",
-            EthernetParseResult.InvalidLengthOrType field => $"无效的 Length/Type 字段 0x{field.Value:X4}",
+            EthernetParseResult.IncompleteHeader shortHeader => $"Incomplete Ethernet header: expected 14 bytes, captured {shortHeader.CapturedLength}.",
+            EthernetParseResult.Ieee8023Length field => $"Unsupported IEEE 802.3 length encapsulation (length {field.Length}).",
+            EthernetParseResult.InvalidLengthOrType field => $"Invalid Length/Type field: 0x{field.Value:X4}.",
             null => throw new InvalidOperationException("Uninitialized Ethernet parse result.")
         };
         Console.WriteLine($"Record {recordNumber}: {description}");

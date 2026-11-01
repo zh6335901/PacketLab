@@ -15,9 +15,9 @@ public class InspectPcapFileTests
         await Assert.That(result.Error).IsEqualTo("");
         await Assert.That(result.Output.ReplaceLineEndings()).IsEqualTo("""
             Record 1: src 02:00:00:00:00:01 dst FF:FF:FF:FF:FF:FF EtherType 0x0806 (ARP)
-            Record 2: 帧头不完整（捕获 3 字节）
-            Record 3: 暂不支持 IEEE 802.3 长度封装（长度 1500）
-            Record 4: 无效的 Length/Type 字段 0x05DD
+            Record 2: Incomplete Ethernet header: expected 14 bytes, captured 3.
+            Record 3: Unsupported IEEE 802.3 length encapsulation (length 1500).
+            Record 4: Invalid Length/Type field: 0x05DD.
             Record 5: src 66:55:44:33:22:11 dst 00:11:22:33:44:55 EtherType 0x8100
             """.ReplaceLineEndings() + Environment.NewLine);
     }
@@ -38,7 +38,7 @@ public class InspectPcapFileTests
         using var input = new InputFile(Convert.FromHexString(PcapSamples.Multiple)[..60]);
         var result = await Run("pcap", "inspect", input.Path);
         await Assert.That(result.ExitCode).IsEqualTo(1);
-        await Assert.That(result.Output.TrimEnd()).IsEqualTo("Record 1: 帧头不完整（捕获 3 字节）");
+        await Assert.That(result.Output.TrimEnd()).IsEqualTo("Record 1: Incomplete Ethernet header: expected 14 bytes, captured 3.");
         await Assert.That(result.Error).Contains("Error at byte 60, record 2: Incomplete packet data");
     }
 }
