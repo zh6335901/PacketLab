@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <PacketLabProductRoot Condition="'$(PacketLabProductRoot)' == ''">$(MSBuildThisFileDirectory)../..</PacketLabProductRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(PacketLabProductRoot)/src/PacketLab.Pcap/PacketLab.Pcap.csproj" />
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+  </ItemGroup>
+</Project>
