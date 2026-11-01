@@ -37,7 +37,7 @@ public class PcapReaderBenchmarks
     }
 
     [Benchmark]
-    public (int Packets, long Bytes) ReadToEnd()
+    public void ReadToEnd()
     {
         capture.Position = 0;
         var reader = PcapReader.Open(capture) switch
@@ -57,7 +57,7 @@ public class PcapReaderBenchmarks
                     bytes += packet.Data.Length;
                     break;
                 case PcapEndOfFile when packets == PacketCount && bytes == (long)PacketCount * PayloadSize:
-                    return (packets, bytes);
+                    return;
                 case PcapEndOfFile:
                     throw new InvalidDataException($"Unexpected EOF after {packets} packets and {bytes} bytes.");
                 case PcapError error:
