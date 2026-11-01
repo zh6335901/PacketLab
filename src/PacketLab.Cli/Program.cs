@@ -22,4 +22,5 @@ ConsoleApp.Log = message =>
 
 var app = ConsoleApp.Create();
 app.Add("pcap read", PcapCommands.Read);
+app.Add("pcap inspect", PcapCommands.Inspect);
 app.Run(args);
