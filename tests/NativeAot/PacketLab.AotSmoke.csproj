@@ -6,7 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PacketLab.Analysis/PacketLab.Analysis.csproj" />
-    <None Include="../TestData/Pcap/multiple.pcap;../TestData/Pcap/ethernet-little.pcap" Link="TestData/Pcap/%(Filename)%(Extension)"
+    <None Include="../TestData/Pcap/ethernet-little.pcap" Link="TestData/Pcap/%(Filename)%(Extension)"
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
