@@ -13,7 +13,7 @@ public class InspectPcapFileTests
         await Assert.That(result.ExitCode).IsEqualTo(0);
         await Assert.That(result.Error).IsEqualTo("");
         await Assert.That(result.Output.ReplaceLineEndings()).IsEqualTo("""
-            Record 1: src 02:00:00:00:00:01 dst FF:FF:FF:FF:FF:FF EtherType 0x0806 (ARP)
+            Record 1: src 02:00:00:00:00:01 dst FF:FF:FF:FF:FF:FF EtherType 0x0806 (ARP); Incomplete ARP header: expected 8 bytes, captured 0.
             Record 2: Incomplete Ethernet header: expected 14 bytes, captured 3.
             Record 3: Unsupported IEEE 802.3 length encapsulation (length 1500).
             Record 4: Invalid Length/Type field: 0x05DD.

@@ -1,4 +1,5 @@
 using ConsoleAppFramework;
+using PacketLab.Protocols.Arp;
 using PacketLab.Analysis;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Ethernet;
@@ -98,6 +99,7 @@ internal static class PcapCommands
     {
         var description = packet.Decoding switch
         {
+            ProtocolDecodeResult.EthernetArp arp => $"{DescribeEthernet(arp.Ethernet)}; {DescribeArp(arp.Arp)}",
             EthernetParseResult ethernet => DescribeEthernet(ethernet),
             ProtocolDecodeResult.UnsupportedLinkLayer => "Unsupported link layer.",
             null => throw new InvalidOperationException("Uninitialized protocol decode result.")
@@ -113,6 +115,30 @@ internal static class PcapCommands
         EthernetParseResult.InvalidLengthOrType field => $"Invalid Length/Type field: 0x{field.Value:X4}.",
         null => throw new InvalidOperationException("Uninitialized Ethernet parse result.")
     };
+
+    private static string DescribeArp(ArpParseResult result) => result switch
+    {
+        ArpPacket arp => $"ARP {OperationName(arp.Operation)} sender hardware {HardwareAddress(arp, arp.SenderHardwareAddress)} protocol {ProtocolAddress(arp, arp.SenderProtocolAddress)} target hardware {HardwareAddress(arp, arp.TargetHardwareAddress)} protocol {ProtocolAddress(arp, arp.TargetProtocolAddress)}",
+        ArpParseResult.IncompleteHeader incomplete => $"Incomplete ARP header: expected {incomplete.RequiredLength} bytes, captured {incomplete.CapturedLength}.",
+        null => throw new InvalidOperationException("Uninitialized ARP parse result.")
+    };
+
+    private static string OperationName(ushort operation) => operation switch
+    {
+        1 => "Request",
+        2 => "Reply",
+        _ => operation.ToString(System.Globalization.CultureInfo.InvariantCulture)
+    };
+
+    private static string HardwareAddress(ArpPacket arp, ReadOnlyMemory<byte> address) =>
+        arp.HardwareType == 1 && arp.HardwareAddressLength == 6
+            ? string.Join(":", address.ToArray().Select(value => value.ToString("X2")))
+            : Convert.ToHexString(address.Span);
+
+    private static string ProtocolAddress(ArpPacket arp, ReadOnlyMemory<byte> address) =>
+        arp.ProtocolType == 0x0800 && arp.ProtocolAddressLength == 4
+            ? $"{address.Span[0]}.{address.Span[1]}.{address.Span[2]}.{address.Span[3]}"
+            : Convert.ToHexString(address.Span);
 
     private static string TypeName(ushort etherType) => etherType switch
     {

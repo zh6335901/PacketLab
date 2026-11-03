@@ -1,4 +1,5 @@
 using PacketLab.Pcap;
+using PacketLab.Protocols.Arp;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Ethernet;
 using TUnit.Assertions.Exceptions;
@@ -22,12 +23,14 @@ public class AnalyzePcapFileTests
         var arpPacket = ReadPacket(reader);
         await AssertMetadata(arpPacket, recordNumber: 1, seconds: 1, capturedLength: 14, originalLength: 60,
             payload: "FFFFFFFFFFFF0200000000010806");
-        var frame = arpPacket.Decoding is EthernetParseResult arpResult && arpResult is EthernetFrame arp
-            ? arp : throw new AssertionException("Expected an ARP frame.");
+        var frame = arpPacket.Decoding is ProtocolDecodeResult.EthernetArp arp
+            ? arp.Ethernet : throw new AssertionException("Expected an ARP frame.");
         await Assert.That(frame.EtherType).IsEqualTo((ushort)0x0806);
         await Assert.That(frame.Destination.ToString()).IsEqualTo("FF:FF:FF:FF:FF:FF");
         await Assert.That(frame.Source.ToString()).IsEqualTo("02:00:00:00:00:01");
         await Assert.That(frame.RemainingBytes.IsEmpty).IsTrue();
+        await Assert.That(arpPacket.Decoding is ProtocolDecodeResult.EthernetArp decoded &&
+            decoded.Arp is ArpParseResult.IncompleteHeader { RequiredLength: 8, CapturedLength: 0 }).IsTrue();
 
         var shortHeaderPacket = ReadPacket(reader);
         await AssertMetadata(shortHeaderPacket, recordNumber: 2, seconds: 2, capturedLength: 3, originalLength: 3,

@@ -32,8 +32,8 @@ public class AnalyzeCaptureTests
         }
 
         await Assert.That(Convert.ToHexString(first.Packet.Data.Span)).IsEqualTo("FFFFFFFFFFFF0200000000010806AABB");
-        var frame = first.Decoding is EthernetParseResult ethernet && ethernet is EthernetFrame parsed
-            ? parsed : throw new AssertionException("Expected an Ethernet frame.");
+        var frame = first.Decoding is ProtocolDecodeResult.EthernetArp parsed
+            ? parsed.Ethernet : throw new AssertionException("Expected an Ethernet frame.");
         await Assert.That(Convert.ToHexString(frame.RemainingBytes.Span)).IsEqualTo("AABB");
     }
 
@@ -75,7 +75,7 @@ public class AnalyzeCaptureTests
         await Assert.That(reader.ReadNext() is PcapPacket).IsTrue();
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
         var decoding = PcapAnalysis.Decode(reader.Header, packet);
-        await Assert.That(decoding is EthernetParseResult ethernet && ethernet is EthernetFrame { EtherType: 0x0806 }).IsTrue();
+        await Assert.That(decoding is ProtocolDecodeResult.EthernetArp { Ethernet.EtherType: 0x0806 }).IsTrue();
     }
 
     [Test]
