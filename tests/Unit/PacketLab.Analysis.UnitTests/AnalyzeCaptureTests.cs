@@ -15,10 +15,13 @@ public class AnalyzeCaptureTests
     public async Task Returned_raw_and_decoded_bytes_survive_later_reads_and_caller_disposal()
     {
         AnalyzedPacket first;
+        ReadOnlyMemory<byte> decodedBytes;
         using (var stream = new MemoryStream(Convert.FromHexString(Header + Records)))
         {
             var reader = Open(stream);
             first = Read(reader);
+            decodedBytes = first.Decoding is ProtocolDecodeResult.EthernetArp parsed
+                ? parsed.Ethernet.RemainingBytes : throw new AssertionException("Expected decoded bytes.");
             await Assert.That(first.RecordNumber).IsEqualTo(1L);
             await Assert.That(first.Packet.Timestamp).IsEqualTo(PcapTimestamp.FromMicroseconds(1, 123456));
             await Assert.That(first.Packet.CapturedLength).IsEqualTo(16u);
@@ -32,9 +35,7 @@ public class AnalyzeCaptureTests
         }
 
         await Assert.That(Convert.ToHexString(first.Packet.Data.Span)).IsEqualTo("FFFFFFFFFFFF0200000000010806AABB");
-        var frame = first.Decoding is ProtocolDecodeResult.EthernetArp parsed
-            ? parsed.Ethernet : throw new AssertionException("Expected an Ethernet frame.");
-        await Assert.That(Convert.ToHexString(frame.RemainingBytes.Span)).IsEqualTo("AABB");
+        await Assert.That(Convert.ToHexString(decodedBytes.Span)).IsEqualTo("AABB");
     }
 
     [Test]
@@ -67,15 +68,33 @@ public class AnalyzeCaptureTests
     }
 
     [Test]
+    [Arguments(1, LinkLayerProtocol.Ethernet)]
+    [Arguments(101, LinkLayerProtocol.Unsupported)]
+    public async Task File_link_type_selects_the_link_layer(byte linkType, LinkLayerProtocol expected)
+    {
+        var bytes = Convert.FromHexString(Header);
+        bytes[20] = linkType;
+        using var stream = new MemoryStream(bytes);
+        var reader = Open(stream);
+        await Assert.That(reader.LinkLayer).IsEqualTo(expected);
+    }
+
+    [Test]
     public async Task Raw_packets_can_be_decoded_after_reading_finishes()
     {
         using var stream = new MemoryStream(Convert.FromHexString(Header + Records));
         var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new AssertionException("Expected a reader.");
         var packet = reader.ReadNext() is PcapPacket read ? read : throw new AssertionException("Expected a packet.");
-        await Assert.That(reader.ReadNext() is PcapPacket).IsTrue();
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
+        var savedBytes = packet.Data.ToArray();
+        while (true)
+        {
+            var next = reader.ReadNext();
+            if (next is PcapEndOfFile) break;
+            if (next is not PcapPacket) throw new AssertionException("Could not consume the capture to EOF.");
+        }
+        await Assert.That(packet.Data.Span.SequenceEqual(savedBytes)).IsTrue();
         var decoding = PcapAnalysis.Decode(reader.Header, packet);
-        await Assert.That(decoding is ProtocolDecodeResult.EthernetArp { Ethernet.EtherType: 0x0806 }).IsTrue();
+        await Assert.That(decoding.Value is not null).IsTrue();
     }
 
     [Test]

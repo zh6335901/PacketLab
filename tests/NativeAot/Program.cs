@@ -1,24 +1,34 @@
 using System.Runtime.CompilerServices;
 using PacketLab.Analysis;
-using PacketLab.Protocols;
-using PacketLab.Protocols.Arp;
+using PacketLab.Pcap;
 
 try
 {
     if (RuntimeFeature.IsDynamicCodeSupported)
         throw new InvalidOperationException("Run the published Native AOT executable.");
 
-    using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", "arp-little.pcap"));
-    if (PcapAnalysisReader.Open(stream) is not PcapAnalysisReader reader)
-        throw new InvalidOperationException("Could not open the PCAP sample.");
+    string[] samples = ["little-micro.pcap", "big-micro.pcap", "little-nano.pcap", "big-nano.pcap",
+        "arp-little.pcap", "arp-big.pcap", "ethernet-little.pcap"];
+    foreach (var sample in samples)
+    {
+        using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample));
+        if (PcapAnalysisReader.Open(stream) is not PcapAnalysisReader reader)
+            throw new InvalidOperationException($"Could not open {sample}.");
 
-    if (reader.ReadNext() is not AnalyzedPacket packet)
-        throw new InvalidOperationException("Could not read the first packet.");
+        var sawPacket = false;
+        while (true)
+        {
+            var result = reader.ReadNext();
+            if (result is PcapEndOfFile) break;
+            if (result is not AnalyzedPacket packet || packet.Decoding.Value is null)
+                throw new InvalidOperationException($"Could not read and decode {sample}.");
+            sawPacket = true;
+        }
+        if (!sawPacket)
+            throw new InvalidOperationException($"No records exercised decoding in {sample}.");
+        Console.WriteLine($"PASS: Native AOT consumed {sample}.");
+    }
 
-    if (packet.Decoding is not ProtocolDecodeResult.EthernetArp parsed || parsed.Arp is not ArpPacket)
-        throw new InvalidOperationException("The first packet did not decode to an ARP packet.");
-
-    Console.WriteLine("PASS: Native AOT read and decoded an ARP packet.");
     return 0;
 }
 catch (Exception error)

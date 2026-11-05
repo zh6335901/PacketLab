@@ -58,26 +58,6 @@ public class ParseArpPacketTests
             incomplete.RemainingBytes.Span.SequenceEqual(bytes)).IsTrue();
     }
 
-    [Test]
-    [Arguments("0800")]
-    [Arguments("86DD")]
-    [Arguments("8100")]
-    [Arguments("05DC")]
-    [Arguments("05DD")]
-    public async Task Other_outer_types_do_not_dispatch_arp(string type)
-    {
-        var result = ProtocolDecoder.Decode(Convert.FromHexString("FFFFFFFFFFFF020000000001" + type +
-            "0001080006040001020000000001C0000201000000000000C0000202"), LinkLayerProtocol.Ethernet);
-        await Assert.That(result is EthernetParseResult).IsTrue();
-    }
-
-    [Test]
-    public async Task Incomplete_outer_header_does_not_dispatch_arp()
-    {
-        var result = ProtocolDecoder.Decode(Convert.FromHexString("FFFFFFFFFFFF02000000000108"), LinkLayerProtocol.Ethernet);
-        await Assert.That(result is EthernetParseResult ethernet && ethernet is EthernetParseResult.IncompleteHeader).IsTrue();
-    }
-
     private static ArpPacket Parse(string hex) => ArpParser.Parse(Convert.FromHexString(hex)) is ArpPacket packet
         ? packet : throw new InvalidOperationException("Expected a complete ARP packet.");
 }

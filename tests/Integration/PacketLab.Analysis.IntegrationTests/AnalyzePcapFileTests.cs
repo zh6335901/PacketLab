@@ -1,89 +1,105 @@
 using PacketLab.Pcap;
-using PacketLab.Protocols.Arp;
 using PacketLab.Protocols;
+using PacketLab.Protocols.Arp;
 using PacketLab.Protocols.Ethernet;
-using TUnit.Assertions.Exceptions;
 
 namespace PacketLab.Analysis.IntegrationTests;
 
 public class AnalyzePcapFileTests
 {
     [Test]
-    [Arguments("ethernet-little.pcap", PcapByteOrder.LittleEndian)]
-    [Arguments("ethernet-big.pcap", PcapByteOrder.BigEndian)]
-    public async Task Analysis_preserves_metadata_bytes_and_diagnostics_across_mixed_records(string file, PcapByteOrder byteOrder)
+    [Arguments("arp-little", "arp", PcapByteOrder.LittleEndian)]
+    [Arguments("arp-big", "arp", PcapByteOrder.BigEndian)]
+    [Arguments("ethernet-little", "ethernet", PcapByteOrder.LittleEndian)]
+    [Arguments("ethernet-big", "ethernet", PcapByteOrder.BigEndian)]
+    [Arguments("arp-truncated", "arp-truncated", PcapByteOrder.LittleEndian)]
+    [Arguments("record-truncated", "record-truncated", PcapByteOrder.LittleEndian)]
+    public async Task Analysis_matches_expected_file_records(string sample, string expectation, PcapByteOrder byteOrder)
     {
-        using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", file));
+        using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
         var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened
-            ? opened : throw new AssertionException("Expected an analysis reader.");
+            ? opened : throw new InvalidOperationException("Expected an analysis reader.");
         await Assert.That(reader.Header.ByteOrder).IsEqualTo(byteOrder);
-        await Assert.That(reader.Header.LinkType).IsEqualTo((ushort)1);
-        await Assert.That(reader.LinkLayer).IsEqualTo(LinkLayerProtocol.Ethernet);
-
-        var arpPacket = ReadPacket(reader);
-        await AssertMetadata(arpPacket, recordNumber: 1, seconds: 1, capturedLength: 14, originalLength: 60,
-            payload: "FFFFFFFFFFFF0200000000010806");
-        var frame = arpPacket.Decoding is ProtocolDecodeResult.EthernetArp arp
-            ? arp.Ethernet : throw new AssertionException("Expected an ARP frame.");
-        await Assert.That(frame.EtherType).IsEqualTo((ushort)0x0806);
-        await Assert.That(frame.Destination.ToString()).IsEqualTo("FF:FF:FF:FF:FF:FF");
-        await Assert.That(frame.Source.ToString()).IsEqualTo("02:00:00:00:00:01");
-        await Assert.That(frame.RemainingBytes.IsEmpty).IsTrue();
-        await Assert.That(arpPacket.Decoding is ProtocolDecodeResult.EthernetArp decoded &&
-            decoded.Arp is ArpParseResult.IncompleteHeader { RequiredLength: 8, CapturedLength: 0 }).IsTrue();
-
-        var shortHeaderPacket = ReadPacket(reader);
-        await AssertMetadata(shortHeaderPacket, recordNumber: 2, seconds: 2, capturedLength: 3, originalLength: 3,
-            payload: "010203");
-        var shortHeader = shortHeaderPacket.Decoding is EthernetParseResult shortResult && shortResult is EthernetParseResult.IncompleteHeader incomplete
-            ? incomplete : throw new AssertionException("Expected an incomplete header.");
-        await Assert.That(shortHeader.CapturedLength).IsEqualTo(3);
-        await Assert.That(Convert.ToHexString(shortHeader.RemainingBytes.Span)).IsEqualTo("010203");
-
-        var unsupportedPacket = ReadPacket(reader);
-        await AssertMetadata(unsupportedPacket, recordNumber: 3, seconds: 3, capturedLength: 14, originalLength: 1514,
-            payload: "00112233445566554433221105DC");
-        var length = unsupportedPacket.Decoding is EthernetParseResult lengthResult && lengthResult is EthernetParseResult.Ieee8023Length unsupported
-            ? unsupported : throw new AssertionException("Expected IEEE 802.3 encapsulation.");
-        await Assert.That(length.Length).IsEqualTo((ushort)1500);
-        await Assert.That(length.Destination.ToString()).IsEqualTo("00:11:22:33:44:55");
-        await Assert.That(length.Source.ToString()).IsEqualTo("66:55:44:33:22:11");
-        await Assert.That(length.RemainingBytes.IsEmpty).IsTrue();
-
-        var invalidPacket = ReadPacket(reader);
-        await AssertMetadata(invalidPacket, recordNumber: 4, seconds: 4, capturedLength: 14, originalLength: 14,
-            payload: "00112233445566554433221105DD");
-        var invalid = invalidPacket.Decoding is EthernetParseResult invalidResult && invalidResult is EthernetParseResult.InvalidLengthOrType field
-            ? field : throw new AssertionException("Expected an invalid Length/Type field.");
-        await Assert.That(invalid.Value).IsEqualTo((ushort)1501);
-        await Assert.That(invalid.Destination.ToString()).IsEqualTo("00:11:22:33:44:55");
-        await Assert.That(invalid.Source.ToString()).IsEqualTo("66:55:44:33:22:11");
-        await Assert.That(invalid.RemainingBytes.IsEmpty).IsTrue();
-
-        var taggedPacket = ReadPacket(reader);
-        await AssertMetadata(taggedPacket, recordNumber: 5, seconds: 5, capturedLength: 22, originalLength: 60,
-            payload: "0011223344556655443322118100002A0800ABCD0000");
-        var tagged = taggedPacket.Decoding is EthernetParseResult taggedResult && taggedResult is EthernetFrame vlan
-            ? vlan : throw new AssertionException("Expected an Ethernet frame after errors.");
-        await Assert.That(tagged.EtherType).IsEqualTo((ushort)0x8100);
-        await Assert.That(tagged.Destination.ToString()).IsEqualTo("00:11:22:33:44:55");
-        await Assert.That(tagged.Source.ToString()).IsEqualTo("66:55:44:33:22:11");
-        await Assert.That(Convert.ToHexString(tagged.RemainingBytes.Span)).IsEqualTo("002A0800ABCD0000");
-
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
-        await Assert.That(stream.CanRead).IsTrue();
+        var expectedRecords = ExpectedRecords(expectation);
+        for (var i = 0; i < expectedRecords.Length; i++)
+        {
+            var packet = reader.ReadNext() is AnalyzedPacket read
+                ? read : throw new InvalidOperationException($"Expected record {i + 1}.");
+            await Assert.That(packet.RecordNumber).IsEqualTo((long)i + 1);
+            var actual = new RecordSnapshot(packet.Packet.Timestamp, packet.Packet.CapturedLength,
+                packet.Packet.OriginalLength, Hex(packet.Packet.Data), Snapshot(packet.Decoding));
+            await Assert.That(actual).IsEqualTo(expectedRecords[i]);
+        }
+        var end = reader.ReadNext();
+        if (expectation == "record-truncated")
+            await Assert.That(end is PcapError error && error is PcapError.IncompletePacketData
+                { DataOffset: 59, RecordNumber: 2, ExpectedBytes: 2, ReadBytes: 1 }).IsTrue();
+        else
+            await Assert.That(end is PcapEndOfFile).IsTrue();
     }
 
-    private static AnalyzedPacket ReadPacket(PcapAnalysisReader reader) => reader.ReadNext() is AnalyzedPacket packet
-        ? packet : throw new AssertionException("Expected an analyzed packet.");
+    private sealed record RecordSnapshot(PcapTimestamp Timestamp, uint Captured, uint Original, string Bytes, DecodedSnapshot Decoding);
+    private sealed record DecodedSnapshot(string Kind, string Destination, string Source, int Value, string Bytes, ArpSnapshot? Arp = null);
+    private sealed record ArpSnapshot(string Kind, int HardwareType, int ProtocolType, int HardwareLength, int ProtocolLength,
+        int Operation, string SenderHardware, string SenderProtocol, string TargetHardware, string TargetProtocol,
+        string RemainingBytes, int RequiredLength = 0);
 
-    private static async Task AssertMetadata(AnalyzedPacket packet, long recordNumber, uint seconds,
-        uint capturedLength, uint originalLength, string payload)
+    private static DecodedSnapshot Snapshot(ProtocolDecodeResult result) => result switch
     {
-        await Assert.That(packet.RecordNumber).IsEqualTo(recordNumber);
-        await Assert.That(packet.Packet.Timestamp).IsEqualTo(PcapTimestamp.FromMicroseconds(seconds, 0));
-        await Assert.That(packet.Packet.CapturedLength).IsEqualTo(capturedLength);
-        await Assert.That(packet.Packet.OriginalLength).IsEqualTo(originalLength);
-        await Assert.That(Convert.ToHexString(packet.Packet.Data.Span)).IsEqualTo(payload);
+        EthernetParseResult ethernet => SnapshotEthernet(ethernet),
+        ProtocolDecodeResult.EthernetArp arp => SnapshotEthernet(arp.Ethernet) with { Arp = SnapshotArp(arp.Arp) },
+        ProtocolDecodeResult.UnsupportedLinkLayer unsupported => new("Unsupported", "", "", 0, Hex(unsupported.RemainingBytes)),
+        null => throw new InvalidOperationException("Uninitialized decoding.")
+    };
+
+    private static DecodedSnapshot SnapshotEthernet(EthernetParseResult result) => result switch
+    {
+        EthernetFrame frame => new("Ethernet", frame.Destination.ToString(), frame.Source.ToString(), frame.EtherType, Hex(frame.RemainingBytes)),
+        EthernetParseResult.IncompleteHeader incomplete => new("Incomplete", "", "", incomplete.CapturedLength, Hex(incomplete.RemainingBytes)),
+        EthernetParseResult.Ieee8023Length length => new("Length", length.Destination.ToString(), length.Source.ToString(), length.Length, Hex(length.RemainingBytes)),
+        EthernetParseResult.InvalidLengthOrType invalid => new("Invalid", invalid.Destination.ToString(), invalid.Source.ToString(), invalid.Value, Hex(invalid.RemainingBytes)),
+        null => throw new InvalidOperationException("Uninitialized Ethernet result.")
+    };
+
+    private static ArpSnapshot SnapshotArp(ArpParseResult result) => result switch
+    {
+        ArpPacket arp => new("Complete", arp.HardwareType, arp.ProtocolType, arp.HardwareAddressLength, arp.ProtocolAddressLength,
+            arp.Operation, Hex(arp.SenderHardwareAddress), Hex(arp.SenderProtocolAddress), Hex(arp.TargetHardwareAddress),
+            Hex(arp.TargetProtocolAddress), Hex(arp.RemainingBytes)),
+        ArpParseResult.IncompleteHeader incomplete => IncompleteArp(incomplete.RequiredLength, Hex(incomplete.RemainingBytes)),
+        null => throw new InvalidOperationException("Uninitialized ARP result.")
+    };
+
+    private static ArpSnapshot IncompleteArp(int required, string bytes) => new("Incomplete", 0, 0, 0, 0, 0, "", "", "", "", bytes, required);
+    private static string Hex(ReadOnlyMemory<byte> bytes) => Convert.ToHexString(bytes.Span);
+    private static RecordSnapshot Record(uint seconds, uint captured, uint original, string bytes, DecodedSnapshot decoding) =>
+        new(PcapTimestamp.FromMicroseconds(seconds, 0), captured, original, bytes, decoding);
+
+    private static RecordSnapshot[] ExpectedRecords(string sample)
+    {
+        const string outer = "FFFFFFFFFFFF0200000000010806";
+        const string request = "000108000604000102000000000100000000000000000000C0000202";
+        const string reply = "0001080006040002102030405060C0000202020000000001C0000201";
+        const string nonzero = "0001080006040001020000000001C0000201102030405060C0000202";
+        var requestResult = new ArpSnapshot("Complete", 1, 0x0800, 6, 4, 1, "020000000001", "00000000", "000000000000", "C0000202", "");
+        var replyResult = new ArpSnapshot("Complete", 1, 0x0800, 6, 4, 2, "102030405060", "C0000202", "020000000001", "C0000201", "");
+        return sample switch
+        {
+            "arp" => [
+                Record(1, 42, 60, outer + request, new("Ethernet", "FF:FF:FF:FF:FF:FF", "02:00:00:00:00:01", 0x0806, request, requestResult)),
+                Record(2, 42, 60, "0200000000011020304050600806" + reply, new("Ethernet", "02:00:00:00:00:01", "10:20:30:40:50:60", 0x0806, reply, replyResult))],
+            "ethernet" => [
+                Record(1, 14, 60, outer, new("Ethernet", "FF:FF:FF:FF:FF:FF", "02:00:00:00:00:01", 0x0806, "", IncompleteArp(8, ""))),
+                Record(2, 3, 3, "010203", new("Incomplete", "", "", 3, "010203")),
+                Record(3, 14, 1514, "00112233445566554433221105DC", new("Length", "00:11:22:33:44:55", "66:55:44:33:22:11", 1500, "")),
+                Record(4, 14, 14, "00112233445566554433221105DD", new("Invalid", "00:11:22:33:44:55", "66:55:44:33:22:11", 1501, "")),
+                Record(5, 22, 60, "0011223344556655443322118100002A0800ABCD0000", new("Ethernet", "00:11:22:33:44:55", "66:55:44:33:22:11", 0x8100, "002A0800ABCD0000"))],
+            "arp-truncated" => [
+                Record(1, 41, 60, outer + nonzero[..^2], new("Ethernet", "FF:FF:FF:FF:FF:FF", "02:00:00:00:00:01", 0x0806, nonzero[..^2], IncompleteArp(28, nonzero[..^2]))),
+                Record(2, 42, 60, outer + nonzero, new("Ethernet", "FF:FF:FF:FF:FF:FF", "02:00:00:00:00:01", 0x0806, nonzero,
+                    requestResult with { SenderProtocol = "C0000201", TargetHardware = "102030405060" }))],
+            "record-truncated" => [new(PcapTimestamp.FromMicroseconds(100, 1500000), 3, 5, "DEADBE", new("Incomplete", "", "", 3, "DEADBE"))],
+            _ => throw new ArgumentOutOfRangeException(nameof(sample))
+        };
     }
 }

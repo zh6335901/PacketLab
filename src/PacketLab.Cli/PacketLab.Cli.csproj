@@ -10,4 +10,7 @@
     <PackageReference Include="ConsoleAppFramework" Version="5.8.0" />
     <ProjectReference Include="../PacketLab.Analysis/PacketLab.Analysis.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PacketLab.Cli.UnitTests" />
+  </ItemGroup>
 </Project>

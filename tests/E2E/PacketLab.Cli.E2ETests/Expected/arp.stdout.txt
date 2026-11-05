@@ -1,0 +1,2 @@
+Record 1: src 02:00:00:00:00:01 dst FF:FF:FF:FF:FF:FF EtherType 0x0806 (ARP); ARP Request sender hardware 02:00:00:00:00:01 protocol 0.0.0.0 target hardware 00:00:00:00:00:00 protocol 192.0.2.2
+Record 2: src 10:20:30:40:50:60 dst 02:00:00:00:00:01 EtherType 0x0806 (ARP); ARP Reply sender hardware 10:20:30:40:50:60 protocol 192.0.2.2 target hardware 02:00:00:00:00:01 protocol 192.0.2.1
