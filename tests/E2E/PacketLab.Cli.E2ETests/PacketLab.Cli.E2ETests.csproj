@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <None Include="../../TestData/Pcap/ethernet-*.pcap;../../TestData/Pcap/multiple.pcap" Link="TestData/Pcap/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Update="Expected/*.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../TestData/Pcap/*.pcap" Link="TestData/Pcap/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <ProjectReference Include="../../../src/PacketLab.Cli/PacketLab.Cli.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <Target Name="CopyCli" AfterTargets="Build">

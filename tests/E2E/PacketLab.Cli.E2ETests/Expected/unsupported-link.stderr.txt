@@ -1,0 +1,1 @@
+Unsupported link type 101. Ethernet inspection requires LinkType 1.

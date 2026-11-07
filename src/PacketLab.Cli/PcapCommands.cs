@@ -1,7 +1,6 @@
 using ConsoleAppFramework;
 using PacketLab.Analysis;
 using PacketLab.Protocols;
-using PacketLab.Protocols.Ethernet;
 using PacketLab.Pcap;
 
 namespace PacketLab.Cli;
@@ -96,31 +95,8 @@ internal static class PcapCommands
 
     private static void PrintFrame(AnalyzedPacket packet)
     {
-        var description = packet.Decoding switch
-        {
-            EthernetParseResult ethernet => DescribeEthernet(ethernet),
-            ProtocolDecodeResult.UnsupportedLinkLayer => "Unsupported link layer.",
-            null => throw new InvalidOperationException("Uninitialized protocol decode result.")
-        };
-        Console.WriteLine($"Record {packet.RecordNumber}: {description}");
+        Console.WriteLine($"Record {packet.RecordNumber}: {ProtocolFormatter.Describe(packet.Decoding)}");
     }
-
-    private static string DescribeEthernet(EthernetParseResult result) => result switch
-    {
-        EthernetFrame frame => $"src {frame.Source} dst {frame.Destination} EtherType 0x{frame.EtherType:X4}{TypeName(frame.EtherType)}",
-        EthernetParseResult.IncompleteHeader shortHeader => $"Incomplete Ethernet header: expected 14 bytes, captured {shortHeader.CapturedLength}.",
-        EthernetParseResult.Ieee8023Length field => $"Unsupported IEEE 802.3 length encapsulation (length {field.Length}).",
-        EthernetParseResult.InvalidLengthOrType field => $"Invalid Length/Type field: 0x{field.Value:X4}.",
-        null => throw new InvalidOperationException("Uninitialized Ethernet parse result.")
-    };
-
-    private static string TypeName(ushort etherType) => etherType switch
-    {
-        0x0800 => " (IPv4)",
-        0x0806 => " (ARP)",
-        0x86DD => " (IPv6)",
-        _ => ""
-    };
 
     private static int PrintSummary(PcapFileHeader header, long count)
     {
