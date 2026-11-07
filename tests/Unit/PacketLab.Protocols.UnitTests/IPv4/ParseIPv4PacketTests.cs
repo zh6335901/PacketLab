@@ -4,7 +4,7 @@ namespace PacketLab.Protocols.UnitTests.IPv4;
 
 public class ParseIPv4PacketTests
 {
-    private const string Datagram = "45AB0018BEEFA1237FFDEDF3C0000201C6336402CAFE0102";
+    private const string Datagram = "45AB0018BEEF21237FFD6DF4C0000201C6336402CAFE0102";
     private const string WithOptions = "46AB001CBEEFA1237FFDEBEEC0000201C633640201010000CAFE0102";
 
     [Test]
@@ -19,15 +19,15 @@ public class ParseIPv4PacketTests
         await Assert.That(header.Ecn).IsEqualTo((byte)3);
         await Assert.That(header.TotalLength).IsEqualTo((ushort)24);
         await Assert.That(header.Identification).IsEqualTo((ushort)0xbeef);
-        await Assert.That(header.Flags).IsEqualTo((byte)5);
-        await Assert.That(header.ReservedFlag).IsTrue();
+        await Assert.That(header.Flags).IsEqualTo((byte)1);
+        await Assert.That(header.ReservedFlag).IsFalse();
         await Assert.That(header.DontFragment).IsFalse();
         await Assert.That(header.MoreFragments).IsTrue();
         await Assert.That(header.FragmentOffset).IsEqualTo((ushort)0x123);
         await Assert.That(header.FragmentOffsetBytes).IsEqualTo(2328);
         await Assert.That(header.Ttl).IsEqualTo((byte)127);
         await Assert.That(header.Protocol).IsEqualTo((byte)253);
-        await Assert.That(header.HeaderChecksum).IsEqualTo((ushort)0xedf3);
+        await Assert.That(header.HeaderChecksum).IsEqualTo((ushort)0x6df4);
         await Assert.That(header.Source.ToString()).IsEqualTo("192.0.2.1");
         await Assert.That(header.Destination.ToString()).IsEqualTo("198.51.100.2");
         await Assert.That(header.Options.IsEmpty).IsTrue();
@@ -49,8 +49,8 @@ public class ParseIPv4PacketTests
     [Test]
     public async Task Maximum_header_accepts_all_option_bytes_and_empty_payload()
     {
-        var options = new string('F', 80);
-        var packet = Parse("4F00003C1234400040113246C0000201C6336402" + options);
+        const string options = "0102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F202122232425262728";
+        var packet = Parse("4F00003C123440004011A0A0C0000201C6336402" + options);
         await Assert.That(packet.Header.HeaderLength).IsEqualTo(60);
         await Assert.That(Convert.ToHexString(packet.Header.Options.Span)).IsEqualTo(options);
         await Assert.That(packet.Payload.IsEmpty).IsTrue();
