@@ -1,0 +1,5 @@
+Record 1: src 02:00:00:00:00:01 dst FF:FF:FF:FF:FF:FF EtherType 0x0806 (ARP); ARP Request sender hardware 020000000001 protocol 192.0.2.1 target hardware 000000000000 protocol 192.0.2.2
+Record 2: src 02:00:00:00:00:01 dst FF:FF:FF:FF:FF:FF EtherType 0x0806 (ARP); ARP Request sender hardware 02:00:00:00:00:01 protocol C0000201 target hardware 00:00:00:00:00:00 protocol C0000202
+Record 3: src 02:00:00:00:00:01 dst FF:FF:FF:FF:FF:FF EtherType 0x0806 (ARP); ARP 43981 sender hardware 0102 protocol 192.0.2.1 target hardware 0304 protocol 192.0.2.2
+Record 4: src 02:00:00:00:00:01 dst FF:FF:FF:FF:FF:FF EtherType 0x0806 (ARP); ARP Request sender hardware 02:00:00:00:00:01 protocol 010203 target hardware 10:20:30:40:50:60 protocol 040506
+Record 5: src 02:00:00:00:00:01 dst FF:FF:FF:FF:FF:FF EtherType 0x0806 (ARP); Incomplete ARP header: expected 8 bytes, captured 7.

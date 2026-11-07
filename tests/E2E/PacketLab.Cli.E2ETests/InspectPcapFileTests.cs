@@ -9,6 +9,7 @@ public class InspectPcapFileTests
     [Arguments("ethernet-big", "ethernet", 0)]
     [Arguments("arp-little", "arp", 0)]
     [Arguments("arp-big", "arp", 0)]
+    [Arguments("arp-variants", "arp-variants", 0)]
     [Arguments("arp-truncated", "arp-truncated", 0)]
     [Arguments("record-truncated", "record-truncated", 1)]
     [Arguments("unsupported-link", "unsupported-link", 1)]
