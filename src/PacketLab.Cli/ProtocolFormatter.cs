@@ -1,6 +1,7 @@
 using PacketLab.Protocols;
 using PacketLab.Protocols.Arp;
 using PacketLab.Protocols.Ethernet;
+using PacketLab.Protocols.IPv4;
 
 namespace PacketLab.Cli;
 
@@ -9,6 +10,7 @@ internal static class ProtocolFormatter
     internal static string Describe(ProtocolDecodeResult result) => result switch
     {
         ProtocolDecodeResult.EthernetArp arp => $"{DescribeEthernet(arp.Ethernet)}; {DescribeArp(arp.Arp)}",
+        ProtocolDecodeResult.EthernetIPv4 ip => $"{DescribeEthernet(ip.Ethernet)}; {DescribeIPv4(ip.IPv4)}",
         EthernetParseResult ethernet => DescribeEthernet(ethernet),
         ProtocolDecodeResult.UnsupportedLinkLayer => "Unsupported link layer.",
         null => throw new InvalidOperationException("Uninitialized protocol decode result.")
@@ -36,6 +38,36 @@ internal static class ProtocolFormatter
         2 => "Reply",
         _ => operation.ToString(System.Globalization.CultureInfo.InvariantCulture)
     };
+
+    private static string DescribeIPv4(IPv4ParseResult result) => result switch
+    {
+        IPv4Packet packet => DescribeIPv4Packet(packet),
+        IPv4ParseResult.IncompleteHeader incomplete => $"Incomplete IPv4 header: expected {incomplete.RequiredLength} bytes, captured {incomplete.CapturedLength}; checksum unavailable.",
+        IPv4ParseResult.InvalidVersion invalid => $"Invalid IPv4 version: expected 4, found {invalid.Version}; checksum unavailable.",
+        IPv4ParseResult.InvalidHeaderLength invalid => $"Invalid IPv4 IHL: expected at least 5, found {invalid.Ihl}; checksum unavailable.",
+        IPv4ParseResult.InvalidTotalLength invalid => $"Invalid IPv4 Total Length: {invalid.TotalLength} bytes is less than header length {invalid.HeaderLength}; checksum unavailable.",
+        null => throw new InvalidOperationException("Uninitialized IPv4 parse result.")
+    };
+
+    private static string DescribeIPv4Packet(IPv4Packet packet)
+    {
+        var header = packet.Header;
+        var capture = packet.IsDatagramComplete ? "complete" : "incomplete";
+        var options = header.Options.IsEmpty ? "none" : Convert.ToHexString(header.Options.Span);
+        var checksum = packet.ChecksumStatus switch
+        {
+            IPv4ChecksumStatus.Match => "match",
+            IPv4ChecksumStatus.Mismatch => "mismatch (captured header bytes fail checksum; outbound capture may precede checksum offload, but neither offload nor on-wire corruption is established)",
+            _ => "unavailable"
+        };
+        return $"IPv4 src {header.Source} dst {header.Destination} Version {header.Version} IHL {header.Ihl} DSCP {header.Dscp} ECN {header.Ecn} Protocol {header.Protocol} TTL {header.Ttl}"
+            + $"; header complete: {header.HeaderLength} bytes, datagram {capture}: declared {header.TotalLength} bytes, captured {packet.CapturedLength} bytes"
+            + $"; Identification 0x{header.Identification:X4} Flags 0x{header.Flags:X1} (reserved {Bit(header.ReservedFlag)} DF {Bit(header.DontFragment)} MF {Bit(header.MoreFragments)}) Fragment Offset {header.FragmentOffset} (8-byte units, {header.FragmentOffsetBytes} bytes)"
+            + $"; Options {options}; payload {packet.Payload.Length} bytes, trailing {packet.TrailingBytes.Length} bytes"
+            + $"; Header Checksum 0x{header.HeaderChecksum:X4}: {checksum}.";
+    }
+
+    private static int Bit(bool value) => value ? 1 : 0;
 
     private static string HardwareAddress(ArpPacket arp, ReadOnlyMemory<byte> address) =>
         arp.HardwareType == 1 && arp.HardwareAddressLength == 6
