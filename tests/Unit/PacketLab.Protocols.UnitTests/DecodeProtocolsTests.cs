@@ -26,6 +26,19 @@ public class DecodeProtocolsTests
     }
 
     [Test]
+    [Arguments("0806")]
+    [Arguments("86DD")]
+    [Arguments("8100")]
+    [Arguments("05DC")]
+    [Arguments("05DD")]
+    public async Task Other_outer_types_do_not_dispatch_ipv4(string type)
+    {
+        var result = ProtocolDecoder.Decode(Convert.FromHexString("FFFFFFFFFFFF020000000001" + type +
+            "450000141234400040113C6EC0000201C6336402"), LinkLayerProtocol.Ethernet);
+        await Assert.That(result is ProtocolDecodeResult.EthernetIPv4).IsFalse();
+    }
+
+    [Test]
     [Arguments(true)]
     [Arguments(false)]
     public async Task Arp_dispatch_preserves_outer_frame_and_inner_result(bool complete)

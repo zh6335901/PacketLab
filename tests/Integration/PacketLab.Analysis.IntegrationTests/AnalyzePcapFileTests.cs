@@ -49,6 +49,7 @@ public class AnalyzePcapFileTests
         EthernetParseResult ethernet => SnapshotEthernet(ethernet),
         ProtocolDecodeResult.EthernetArp arp => SnapshotEthernet(arp.Ethernet) with { Arp = SnapshotArp(arp.Arp) },
         ProtocolDecodeResult.UnsupportedLinkLayer unsupported => new("Unsupported", "", "", 0, Hex(unsupported.RemainingBytes)),
+        ProtocolDecodeResult.EthernetIPv4 => throw new InvalidOperationException("Unexpected IPv4 in an Ethernet/ARP fixture."),
         null => throw new InvalidOperationException("Uninitialized decoding.")
     };
 

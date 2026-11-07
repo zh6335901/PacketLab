@@ -11,7 +11,7 @@ internal static class PcapCommands
     /// <param name="file">Path to the local PCAP file.</param>
     public static int Read([Argument] string file) => ProcessFile(file, inspect: false);
 
-    /// <summary>Inspect the outer Ethernet II header of each classic PCAP record.</summary>
+    /// <summary>Inspect Ethernet II, ARP and IPv4 headers in each classic PCAP record.</summary>
     /// <param name="file">Path to the local PCAP file.</param>
     public static int Inspect([Argument] string file) => ProcessFile(file, inspect: true);
 
