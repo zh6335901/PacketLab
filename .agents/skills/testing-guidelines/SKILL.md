@@ -7,16 +7,16 @@ description: Use when writing, changing, organizing, or reviewing tests.
 
 ## Test Design
 
-- Verify a clear contract in each test. Avoid asserting unrelated details or coupling tests to internal implementation.
+- Keep tests focused on the behavior being verified; avoid unrelated assertions and dependencies.
 - Add tests only when they provide additional verification value. Avoid redundant coverage, unnecessary test projects, and helper abstractions.
 - Cover meaningful success, failure, and boundary cases.
 - Avoid speculative or low-value tests.
-- Keep tests focused and readable; avoid unnecessary fixtures and abstractions.
+- Keep tests readable; avoid unnecessary fixtures and abstractions.
 - Name test methods as behavior statements using snake_case, e.g., `Login_fails_when_password_is_invalid`.
 
 ## Test Organization
 
-- Choose test boundaries based on behavior and risk, not project layers. Prefer unit tests for internal decision logic and integration tests for interactions between components.
+- Choose test scope based on where correctness risks lie: prefer unit tests for decision-heavy behavior and integration tests for component interactions.
 - Use TUnit with Microsoft.Testing.Platform.
 - Separate Unit and Integration tests into independent projects.
 - Group tests by use case or capability, keeping success, failure, and boundary cases together.
