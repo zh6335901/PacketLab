@@ -39,11 +39,20 @@ public class ParseIPv4PacketTests
     public async Task Options_and_padding_are_preserved_and_payload_starts_after_them()
     {
         var packet = Parse(WithOptions);
+        await Assert.That(packet.Header.ReservedFlag).IsTrue();
         await Assert.That(packet.Header.Ihl).IsEqualTo((byte)6);
         await Assert.That(packet.Header.HeaderLength).IsEqualTo(24);
         await Assert.That(Convert.ToHexString(packet.Header.Options.Span)).IsEqualTo("01010000");
         await Assert.That(Convert.ToHexString(packet.Payload.Span)).IsEqualTo("CAFE0102");
         await Assert.That(packet.ChecksumStatus).IsEqualTo(IPv4ChecksumStatus.Match);
+    }
+
+    [Test]
+    public async Task Fragment_offset_preserves_the_high_bit_of_its_13_bit_value()
+    {
+        var packet = Parse("45AB0018BEEF31237FFD5DF4C0000201C6336402CAFE0102");
+        await Assert.That(packet.Header.FragmentOffset).IsEqualTo((ushort)0x1123);
+        await Assert.That(packet.Header.FragmentOffsetBytes).IsEqualTo(35096);
     }
 
     [Test]
@@ -79,6 +88,7 @@ public class ParseIPv4PacketTests
 
     [Test]
     [Arguments("65AB0018BEEFA1237FFDEDF3C0000201C6336402", "version")]
+    [Arguments("35AB0018BEEFA1237FFDEDF3C0000201C6336402", "version-below")]
     [Arguments("44AB0018BEEFA1237FFDEDF3C0000201C6336402", "ihl")]
     [Arguments("45AB0013BEEFA1237FFDEDF3C0000201C6336402", "total")]
     [Arguments("46AB0014BEEFA1237FFDEDF3C0000201C6336402", "options-total")]
@@ -89,6 +99,7 @@ public class ParseIPv4PacketTests
         ReadOnlyMemory<byte> retained = (kind, result.Value) switch
         {
             ("version", IPv4ParseResult.InvalidVersion { Version: 6 } invalid) => invalid.RemainingBytes,
+            ("version-below", IPv4ParseResult.InvalidVersion { Version: 3 } invalid) => invalid.RemainingBytes,
             ("ihl", IPv4ParseResult.InvalidHeaderLength { Ihl: 4 } invalid) => invalid.RemainingBytes,
             ("total", IPv4ParseResult.InvalidTotalLength { TotalLength: 19, HeaderLength: 20 } invalid) => invalid.RemainingBytes,
             ("options-total", IPv4ParseResult.InvalidTotalLength { TotalLength: 20, HeaderLength: 24 } invalid) => invalid.RemainingBytes,
