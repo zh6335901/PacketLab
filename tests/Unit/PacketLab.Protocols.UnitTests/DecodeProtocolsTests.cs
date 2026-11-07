@@ -1,5 +1,6 @@
 using PacketLab.Protocols.Arp;
 using PacketLab.Protocols.Ethernet;
+using PacketLab.Protocols.IPv4;
 
 namespace PacketLab.Protocols.UnitTests;
 
@@ -36,6 +37,20 @@ public class DecodeProtocolsTests
         var result = ProtocolDecoder.Decode(Convert.FromHexString("FFFFFFFFFFFF020000000001" + type +
             "450000141234400040113C6EC0000201C6336402"), LinkLayerProtocol.Ethernet);
         await Assert.That(result is ProtocolDecodeResult.EthernetIPv4).IsFalse();
+    }
+
+    [Test]
+    public async Task Ipv4_dispatch_preserves_outer_frame_and_decodes_its_payload()
+    {
+        const string payload = "450000141234400040113C6EC0000201C6336402";
+        var result = ProtocolDecoder.Decode(Convert.FromHexString("FFFFFFFFFFFF0200000000010800" + payload), LinkLayerProtocol.Ethernet);
+        var decoded = result is ProtocolDecodeResult.EthernetIPv4 ip ? ip
+            : throw new InvalidOperationException("Expected IPv4 dispatch.");
+        await Assert.That(decoded.Ethernet.Source.ToString()).IsEqualTo("02:00:00:00:00:01");
+        await Assert.That(Convert.ToHexString(decoded.Ethernet.RemainingBytes.Span)).IsEqualTo(payload);
+        var packet = decoded.IPv4 is IPv4Packet parsed ? parsed
+            : throw new InvalidOperationException("Expected a decoded IPv4 packet.");
+        await Assert.That(packet.Header.Source.ToString()).IsEqualTo("192.0.2.1");
     }
 
     [Test]
