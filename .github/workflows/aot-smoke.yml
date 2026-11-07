@@ -1,0 +1,33 @@
+name: Native AOT smoke
+
+on:
+  schedule:
+    # 00:00 Asia/Shanghai (UTC+8).
+    - cron: '0 16 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  aot-smoke:
+    name: Native AOT smoke
+    runs-on: windows-2025
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Publish and run Native AOT smoke test
+        shell: pwsh
+        run: |
+          dotnet publish tests/NativeAot/PacketLab.AotSmoke.csproj --configuration Release --runtime win-x64 --output artifacts/aot-smoke
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./artifacts/aot-smoke/PacketLab.AotSmoke.exe
+          exit $LASTEXITCODE
