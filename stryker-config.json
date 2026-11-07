@@ -1,0 +1,7 @@
+{
+  "stryker-config": {
+    "test-runner": "mtp",
+    "language-version": "preview",
+    "reporters": ["progress", "html", "json"]
+  }
+}
