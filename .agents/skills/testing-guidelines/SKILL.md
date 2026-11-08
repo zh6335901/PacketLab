@@ -7,24 +7,25 @@ description: Use when writing, changing, organizing, or reviewing tests.
 
 ## Test Design
 
-- Keep tests focused on the behavior being verified; avoid unrelated assertions and dependencies.
-- Add tests only when they provide additional verification value. Avoid redundant coverage, unnecessary test projects, and helper abstractions.
-- Cover meaningful success, failure, and boundary cases.
-- Avoid speculative or low-value tests.
-- Keep tests readable; avoid unnecessary fixtures and abstractions.
-- Name test methods as behavior statements using snake_case, e.g., `Login_fails_when_password_is_invalid`.
+- Keep each test focused on its purpose.
+- Add tests only when they provide additional verification value; avoid redundant or speculative coverage.
+- For correctness checks, assert observable behavior rather than implementation details.
+- Keep tests and fixtures simple. Prefer explicit expected data over logic that reconstructs the expected result; allow small duplication rather than unnecessary abstractions.
+
+## Test Scope
+
+- Unit tests: verify independent logic, including meaningful success, failure, and boundary cases. Keep them fast, deterministic, and independent of external infrastructure.
+- Integration and E2E tests: exercise real component boundaries or user workflows and verify outputs. Prefer representative inputs over exhaustive variations.
+- Native AOT smoke tests: use known samples to exercise intended paths and verify successful execution under Native AOT. Leave functional correctness to unit and integration tests.
+- Choose the smallest scope that reliably verifies the requirement, without omitting necessary higher-level tests.
 
 ## Test Organization
 
-- Choose test scope based on where correctness risks lie: prefer unit tests for decision-heavy behavior and integration tests for component interactions.
 - Use TUnit with Microsoft.Testing.Platform.
 - Separate Unit and Integration tests into independent projects.
 - Group tests by use case or capability, keeping success, failure, and boundary cases together.
 - Prefer verb-object class names, e.g., `LoginTests`, with matching filenames.
-- Keep Unit tests fast, deterministic, and independent of external infrastructure.
-- Use Integration tests to verify real integration boundaries.
-- Focus integration and E2E tests on representative workflows. Avoid expanding them into a checklist of interface features and input variations.
-- Choose the smallest test scope that reliably verifies behavior, without omitting necessary higher-level tests.
+- Name test methods as behavior statements using snake_case, e.g., `Login_fails_when_password_is_invalid`.
 
 ## Mutation Testing
 
