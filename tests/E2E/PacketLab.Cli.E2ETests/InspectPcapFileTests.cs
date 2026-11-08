@@ -14,6 +14,8 @@ public class InspectPcapFileTests
     [Arguments("ipv4-mixed", "ipv4-mixed", 0)]
     [Arguments("ipv6-little", "ipv6-mixed", 0)]
     [Arguments("ipv6-big", "ipv6-mixed", 0)]
+    [Arguments("ipv6-extensions-little", "ipv6-extensions", 0)]
+    [Arguments("ipv6-extensions-big", "ipv6-extensions", 0)]
     [Arguments("record-truncated", "record-truncated", 1)]
     [Arguments("unsupported-link", "unsupported-link", 1)]
     public async Task Inspect_matches_expected_file_output(string sample, string expectation, int exitCode)

@@ -20,19 +20,19 @@ public readonly record struct IPv6Address(ulong High, ulong Low)
 public sealed record IPv6Header(byte Version, byte TrafficClass, uint FlowLabel, ushort PayloadLength,
     byte NextHeader, byte HopLimit, IPv6Address Source, IPv6Address Destination);
 
-public union IPv6Payload(IPv6Payload.KnownLength, IPv6Payload.UncheckedJumboPayload)
+public union IPv6Payload(IPv6Payload.KnownLength, IPv6Payload.UndeterminedLength)
 {
-    public sealed record KnownLength(ushort DeclaredLength, ReadOnlyMemory<byte> Bytes, ReadOnlyMemory<byte> TrailingBytes)
+    public sealed record KnownLength(uint DeclaredLength, ReadOnlyMemory<byte> Bytes, ReadOnlyMemory<byte> TrailingBytes)
     {
-        public int DeclaredDatagramLength => 40 + DeclaredLength;
+        public ulong DeclaredDatagramLength => 40UL + DeclaredLength;
         public bool IsDatagramComplete => Bytes.Length == DeclaredLength;
     }
 
-    // Payload Length=0 with Next Header=0 needs the Jumbo Payload option to establish boundaries.
-    public sealed record UncheckedJumboPayload(ReadOnlyMemory<byte> CapturedBytes);
+    // A missing or invalid Jumbo Payload option cannot establish a declared boundary.
+    public sealed record UndeterminedLength(ReadOnlyMemory<byte> CapturedBytes);
 }
 
-public sealed record IPv6Packet(IPv6Header Header, IPv6Payload Payload);
+public sealed record IPv6Packet(IPv6Header Header, IPv6Payload Payload, IPv6ExtensionChain Extensions);
 
 public union IPv6ParseResult(IPv6Packet, IPv6ParseResult.IncompleteHeader, IPv6ParseResult.InvalidVersion)
 {
@@ -59,11 +59,6 @@ public static class IPv6Parser
         var header = new IPv6Header(version, (byte)((fields >> 20) & 0xff), fields & 0xfffff,
             BinaryPrimitives.ReadUInt16BigEndian(bytes[4..]), bytes[6], bytes[7],
             IPv6Address.Read(bytes[8..]), IPv6Address.Read(bytes[24..]));
-        if (header.PayloadLength == 0 && header.NextHeader == 0)
-            return new IPv6Packet(header, new IPv6Payload.UncheckedJumboPayload(data[40..]));
-
-        var capturedEnd = Math.Min(data.Length, 40 + header.PayloadLength);
-        return new IPv6Packet(header, new IPv6Payload.KnownLength(header.PayloadLength,
-            data[40..capturedEnd], data[capturedEnd..]));
+        return IPv6ExtensionParser.Parse(header, data[40..]);
     }
 }

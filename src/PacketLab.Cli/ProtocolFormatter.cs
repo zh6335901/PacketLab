@@ -84,14 +84,33 @@ internal static class ProtocolFormatter
         {
             IPv6Payload.KnownLength known => $"datagram {(known.IsDatagramComplete ? "complete" : "incomplete")}: declared {known.DeclaredDatagramLength} bytes, available {40 + known.Bytes.Length} bytes"
                 + $"; payload declared {known.DeclaredLength} bytes, available {known.Bytes.Length} bytes, trailing {known.TrailingBytes.Length} bytes",
-            IPv6Payload.UncheckedJumboPayload unknown => "effective payload length undetermined: Hop-by-Hop Jumbo Payload option not checked"
+            IPv6Payload.UndeterminedLength unknown => "effective payload length undetermined: no valid Jumbo Payload option"
                 + $"; {unknown.CapturedBytes.Length} bytes captured after fixed header; datagram completeness undetermined",
             null => throw new InvalidOperationException("Uninitialized IPv6 payload result.")
         };
         return $"IPv6 src {header.Source} dst {header.Destination} Version {header.Version} Traffic Class {header.TrafficClass} Flow Label 0x{header.FlowLabel:X5}"
             + $" Next Header {header.NextHeader} Hop Limit {header.HopLimit} Payload Length {header.PayloadLength}"
-            + $"; header complete: 40 bytes; {payload}.";
+            + $"; header complete: 40 bytes; {payload}; {DescribeIPv6Extensions(packet.Extensions)}.";
     }
+
+    private static string DescribeIPv6Extensions(IPv6ExtensionChain chain)
+    {
+        var headers = chain.Headers.IsEmpty ? "none" : string.Join(" -> ", chain.Headers.Select(header =>
+            $"{ExtensionName(header.Type)}({header.Type}) offset {header.Offset} length {header.Length} next {header.NextHeader}"
+            + (header.Fragment is { } fragment
+                ? $" [offset {fragment.Offset} (8-byte units, {fragment.OffsetBytes} bytes) M {Bit(fragment.MoreFragments)} ID 0x{fragment.Identification:X8} {(fragment.IsAtomic ? "atomic" : "reassembly required")}]" : "")));
+        var upper = chain.UpperLayer is { } layer
+            ? $"upper protocol {layer.Protocol} offset {layer.Offset} declared {layer.DeclaredLength} bytes, available {layer.Bytes.Length} bytes"
+            : $"upper layer {chain.Status}";
+        var diagnostics = string.Join("", chain.Diagnostics.Select(d => $"; {d.Code} at IPv6 offset {d.Offset}: {d.Message}"));
+        return $"extensions {headers}; {upper}; remaining offset {chain.RemainingOffset}, {chain.RemainingBytes.Length} bytes"
+            + $"; upper checksum context {(chain.ChecksumContext is null ? "unavailable" : "available (not validated)")}{diagnostics}";
+    }
+
+    private static string ExtensionName(byte type) => type switch
+    {
+        0 => "Hop-by-Hop", 60 => "Destination", 43 => "Routing", 44 => "Fragment", 51 => "AH", _ => type.ToString()
+    };
 
     private static int Bit(bool value) => value ? 1 : 0;
 
