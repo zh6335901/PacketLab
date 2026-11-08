@@ -2,6 +2,7 @@ using PacketLab.Protocols;
 using PacketLab.Protocols.Arp;
 using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.IPv4;
+using PacketLab.Protocols.IPv6;
 
 namespace PacketLab.Cli;
 
@@ -11,6 +12,7 @@ internal static class ProtocolFormatter
     {
         ProtocolDecodeResult.EthernetArp arp => $"{DescribeEthernet(arp.Ethernet)}; {DescribeArp(arp.Arp)}",
         ProtocolDecodeResult.EthernetIPv4 ip => $"{DescribeEthernet(ip.Ethernet)}; {DescribeIPv4(ip.IPv4)}",
+        ProtocolDecodeResult.EthernetIPv6 ip => $"{DescribeEthernet(ip.Ethernet)}; {DescribeIPv6(ip.IPv6)}",
         EthernetParseResult ethernet => DescribeEthernet(ethernet),
         ProtocolDecodeResult.UnsupportedLinkLayer => "Unsupported link layer.",
         null => throw new InvalidOperationException("Uninitialized protocol decode result.")
@@ -65,6 +67,30 @@ internal static class ProtocolFormatter
             + $"; Identification 0x{header.Identification:X4} Flags 0x{header.Flags:X1} (reserved {Bit(header.ReservedFlag)} DF {Bit(header.DontFragment)} MF {Bit(header.MoreFragments)}) Fragment Offset {header.FragmentOffset} (8-byte units, {header.FragmentOffsetBytes} bytes)"
             + $"; Options {options}; payload {packet.Payload.Length} bytes, trailing {packet.TrailingBytes.Length} bytes"
             + $"; Header Checksum 0x{header.HeaderChecksum:X4}: {checksum}.";
+    }
+
+    private static string DescribeIPv6(IPv6ParseResult result) => result switch
+    {
+        IPv6Packet packet => DescribeIPv6Packet(packet),
+        IPv6ParseResult.IncompleteHeader incomplete => $"Incomplete IPv6 header: expected {incomplete.RequiredLength} bytes, captured {incomplete.CapturedLength}.",
+        IPv6ParseResult.InvalidVersion invalid => $"Invalid IPv6 version: expected 6, found {invalid.Version}.",
+        null => throw new InvalidOperationException("Uninitialized IPv6 parse result.")
+    };
+
+    private static string DescribeIPv6Packet(IPv6Packet packet)
+    {
+        var header = packet.Header;
+        var payload = packet.Payload switch
+        {
+            IPv6Payload.KnownLength known => $"datagram {(known.IsDatagramComplete ? "complete" : "incomplete")}: declared {known.DeclaredDatagramLength} bytes, available {40 + known.Bytes.Length} bytes"
+                + $"; payload declared {known.DeclaredLength} bytes, available {known.Bytes.Length} bytes, trailing {known.TrailingBytes.Length} bytes",
+            IPv6Payload.UncheckedJumboPayload unknown => "effective payload length undetermined: Hop-by-Hop Jumbo Payload option not checked"
+                + $"; {unknown.CapturedBytes.Length} bytes captured after fixed header; datagram completeness undetermined",
+            null => throw new InvalidOperationException("Uninitialized IPv6 payload result.")
+        };
+        return $"IPv6 src {header.Source} dst {header.Destination} Version {header.Version} Traffic Class {header.TrafficClass} Flow Label 0x{header.FlowLabel:X5}"
+            + $" Next Header {header.NextHeader} Hop Limit {header.HopLimit} Payload Length {header.PayloadLength}"
+            + $"; header complete: 40 bytes; {payload}.";
     }
 
     private static int Bit(bool value) => value ? 1 : 0;
