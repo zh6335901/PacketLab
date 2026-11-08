@@ -14,15 +14,15 @@ description: Use when writing, changing, organizing, or reviewing tests.
 
 ## Test Scope
 
-- Unit tests: verify independent logic, including meaningful success, failure, and boundary cases. Keep them fast, deterministic, and independent of external infrastructure.
-- Integration and E2E tests: exercise real component boundaries or user workflows and verify outputs. Prefer representative inputs over exhaustive variations.
+- Unit tests: verify independent logic, especially decision-heavy behavior, including meaningful success, failure, and boundary cases. Keep them fast, deterministic, and independent of external infrastructure.
+- Integration and E2E tests: exercise real component boundaries or user workflows and verify outputs for representative success, failure, and boundary cases. Avoid exhaustive input variations.
 - Native AOT smoke tests: use known samples to exercise intended paths and verify successful execution under Native AOT. Leave functional correctness to unit and integration tests.
-- Choose the smallest scope that reliably verifies the requirement, without omitting necessary higher-level tests.
+- Choose the smallest scope that covers the relevant risks, without omitting necessary higher-level tests.
 
 ## Test Organization
 
 - Use TUnit with Microsoft.Testing.Platform.
-- Separate Unit and Integration tests into independent projects.
+- Separate Unit and Integration tests into independent projects; avoid unnecessary additional projects.
 - Group tests by use case or capability, keeping success, failure, and boundary cases together.
 - Prefer verb-object class names, e.g., `LoginTests`, with matching filenames.
 - Name test methods as behavior statements using snake_case, e.g., `Login_fails_when_password_is_invalid`.
