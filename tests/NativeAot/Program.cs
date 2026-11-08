@@ -1,6 +1,8 @@
 using System.Runtime.CompilerServices;
 using PacketLab.Analysis;
 using PacketLab.Pcap;
+using PacketLab.Protocols;
+using PacketLab.Protocols.IPv6;
 
 try
 {
@@ -8,7 +10,7 @@ try
         throw new InvalidOperationException("Run the published Native AOT executable.");
 
     string[] samples = ["little-micro.pcap", "big-micro.pcap", "little-nano.pcap", "big-nano.pcap",
-        "arp-little.pcap", "arp-big.pcap", "ethernet-little.pcap", "ipv4-mixed.pcap"];
+        "arp-little.pcap", "arp-big.pcap", "ethernet-little.pcap", "ipv4-mixed.pcap", "ipv6-little.pcap", "ipv6-big.pcap"];
     foreach (var sample in samples)
     {
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample));
@@ -22,6 +24,9 @@ try
             if (result is PcapEndOfFile) break;
             if (result is not AnalyzedPacket packet || packet.Decoding.Value is null)
                 throw new InvalidOperationException($"Could not read and decode {sample}.");
+            if (packet.Decoding is ProtocolDecodeResult.EthernetIPv6 ipv6 && ipv6.IPv6 is IPv6Packet datagram
+                && (datagram.Header.Source.ToString() != "2001:db8::1" || datagram.Header.Destination.ToString() != "ff02::2"))
+                throw new InvalidOperationException($"Unexpected IPv6 address formatting in {sample}.");
             sawPacket = true;
         }
         if (!sawPacket)

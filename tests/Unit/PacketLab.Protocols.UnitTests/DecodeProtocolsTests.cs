@@ -8,6 +8,30 @@ public class DecodeProtocolsTests
 {
     [Test]
     [Arguments("0800")]
+    [Arguments("0806")]
+    [Arguments("8100")]
+    [Arguments("05DC")]
+    [Arguments("05DD")]
+    [Arguments("88B5")]
+    public async Task Other_outer_types_do_not_dispatch_ipv6(string type)
+    {
+        var result = ProtocolDecoder.Decode(Convert.FromHexString("FFFFFFFFFFFF020000000001" + type +
+            "6000000000003B4020010DB8000000000000000000000001FF020000000000000000000000000002"), LinkLayerProtocol.Ethernet);
+        await Assert.That(result is ProtocolDecodeResult.EthernetIPv6).IsFalse();
+    }
+
+    [Test]
+    public async Task Incomplete_ethernet_and_unsupported_link_layer_do_not_dispatch_ipv6()
+    {
+        var frame = Convert.FromHexString("FFFFFFFFFFFF02000000000186DD");
+        var shortHeader = ProtocolDecoder.Decode(frame.AsMemory(0, 13), LinkLayerProtocol.Ethernet);
+        await Assert.That(shortHeader is EthernetParseResult ethernet && ethernet is EthernetParseResult.IncompleteHeader).IsTrue();
+        var unsupported = ProtocolDecoder.Decode(frame, LinkLayerProtocol.Unsupported);
+        await Assert.That(unsupported is ProtocolDecodeResult.UnsupportedLinkLayer).IsTrue();
+    }
+
+    [Test]
+    [Arguments("0800")]
     [Arguments("86DD")]
     [Arguments("8100")]
     [Arguments("05DC")]
