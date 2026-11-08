@@ -99,7 +99,7 @@ public class ParseIPv6PacketTests
     [Arguments(50)]
     [Arguments(51)]
     [Arguments(60)]
-    public async Task Extension_headers_remain_opaque_even_when_their_contents_are_invalid(byte nextHeader)
+    public async Task Invalid_extension_headers_preserve_fixed_header_and_payload(byte nextHeader)
     {
         var packet = Parse("600000000004" + nextHeader.ToString("X2") + "40" + Addresses + "FFFFFFFF");
         await Assert.That(packet.Header.NextHeader).IsEqualTo(nextHeader);
@@ -124,7 +124,6 @@ public class ParseIPv6PacketTests
 
     [Test]
     [Arguments("")]
-    [Arguments("1100C20400010000")]
     [Arguments("FFFFFFFF")]
     public async Task Zero_length_with_hop_by_hop_preserves_capture_without_asserting_length_or_completeness(string remaining)
     {
@@ -133,7 +132,7 @@ public class ParseIPv6PacketTests
             : throw new InvalidOperationException("Expected a complete header.");
         await Assert.That(packet.Header).IsEqualTo(new IPv6Header(6, 0xab, 0xcdef0, 0, 0, 127,
             new IPv6Address(0x20010db800000000, 1), new IPv6Address(0xff02000000000000, 2)));
-        var payload = packet.Payload is IPv6Payload.UncheckedJumboPayload unknown ? unknown
+        var payload = packet.Payload is IPv6Payload.UndeterminedLength unknown ? unknown
             : throw new InvalidOperationException("Expected undetermined payload length.");
         await Assert.That(Convert.ToHexString(payload.CapturedBytes.Span)).IsEqualTo(remaining);
         await Assert.That(payload.CapturedBytes.Equals(bytes.AsMemory(40))).IsTrue();

@@ -35,7 +35,7 @@ public class AnalyzeIPv6CaptureTests
     private sealed record IPv6Snapshot(string Kind, IPv6Header? Header = null, PayloadSnapshot? Payload = null,
         int? RequiredLength = null, int? CapturedLength = null, byte? InvalidVersion = null, string? RemainingBytes = null);
     private sealed record PayloadSnapshot(string Kind, string Bytes, string? TrailingBytes = null,
-        ushort? DeclaredLength = null, int? DeclaredDatagramLength = null, bool? IsDatagramComplete = null);
+        uint? DeclaredLength = null, ulong? DeclaredDatagramLength = null, bool? IsDatagramComplete = null);
 
     private static IPv6Snapshot Snapshot(IPv6ParseResult result) => result switch
     {
@@ -51,7 +51,7 @@ public class AnalyzeIPv6CaptureTests
     {
         IPv6Payload.KnownLength known => new("KnownLength", Convert.ToHexString(known.Bytes.Span),
             Convert.ToHexString(known.TrailingBytes.Span), known.DeclaredLength, known.DeclaredDatagramLength, known.IsDatagramComplete),
-        IPv6Payload.UncheckedJumboPayload unknown => new("UncheckedJumboPayload", Convert.ToHexString(unknown.CapturedBytes.Span)),
+        IPv6Payload.UndeterminedLength unknown => new("UndeterminedLength", Convert.ToHexString(unknown.CapturedBytes.Span)),
         null => throw new InvalidOperationException("Uninitialized IPv6 payload result.")
     };
 
@@ -78,7 +78,7 @@ public class AnalyzeIPv6CaptureTests
         new(6, 62, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
             new("Packet", new IPv6Header(6, 0xab, 0xcdef0, 0, 0, 127,
                     new IPv6Address(0x20010db800000000, 1), new IPv6Address(0xff02000000000000, 2)),
-                new("UncheckedJumboPayload", "1100C20400010000"))),
+                new("KnownLength", "1100C20400010000", "", DeclaredLength: 65536, DeclaredDatagramLength: 65576, IsDatagramComplete: false))),
         new(7, 58, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
             new("Packet", new IPv6Header(6, 0, 0, 4, 43, 64,
                     new IPv6Address(0x20010db800000000, 1), new IPv6Address(0xff02000000000000, 2)),
