@@ -1,8 +1,6 @@
 using System.Runtime.CompilerServices;
 using PacketLab.Analysis;
 using PacketLab.Pcap;
-using PacketLab.Protocols;
-using PacketLab.Protocols.IPv6;
 
 try
 {
@@ -24,11 +22,6 @@ try
             if (result is PcapEndOfFile) break;
             if (result is not AnalyzedPacket packet || packet.Decoding.Value is null)
                 throw new InvalidOperationException($"Could not read and decode {sample}.");
-            if (packet.Decoding is ProtocolDecodeResult.EthernetIPv6 ipv6 && ipv6.IPv6 is IPv6Packet datagram)
-            {
-                _ = datagram.Header.Source.ToString();
-                _ = datagram.Header.Destination.ToString();
-            }
             sawPacket = true;
         }
         if (!sawPacket)
