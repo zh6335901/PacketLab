@@ -126,7 +126,7 @@ public class AnalyzeIPv6CaptureTests
         new(IPv6ChainStatus.Unsupported, "", 40, "DEAD", null, null, false, "EncryptedEsp@40"),
         new(IPv6ChainStatus.Unsupported, "", 40, "DEAD", null, null, false, "UnsupportedNextHeader@40"),
         new(IPv6ChainStatus.NoNextHeader, "", 40, "DEAD", null, null, false, ""),
-        new(IPv6ChainStatus.UpperLayer, "0@40+8>17:1100C20400010000", 48, "", 17, 65528, false, "PayloadTruncated@48"),
+        new(IPv6ChainStatus.UpperLayer, "0@40+8>17:1100C20400010000", 48, "", 17, 65528, true, "PayloadTruncated@48"),
         new(IPv6ChainStatus.Invalid, "0@40+8>17:1100000000000000", 48, "", null, null, false, "MissingJumboPayload@40"),
         new(IPv6ChainStatus.UpperLayer, "", 40, "CAFE0102", 17, 4, true, "")
     ];

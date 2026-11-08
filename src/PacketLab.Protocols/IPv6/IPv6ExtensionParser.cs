@@ -26,7 +26,8 @@ internal static class IPv6ExtensionParser
                 : new IPv6Payload.UndeterminedLength(captured);
             if (declared is uint expected && captured.Length < expected)
                 Diagnose(IPv6DiagnosticCode.PayloadTruncated, end, $"payload declared {expected} bytes, captured {captured.Length}");
-            var context = upper is { IsComplete: true } && addressesKnown
+            // A transport checksum can cover less than the IP payload (for example, UDP surplus).
+            var context = upper is not null && addressesKnown
                 ? new IPv6ChecksumContext(header.Source, header.Destination, upper.Protocol, upper.DeclaredLength) : null;
             return new(header, payload, new(headers.ToImmutable(), status, 40 + offset, captured[offset..end],
                 upper, context, diagnostics.ToImmutable()));

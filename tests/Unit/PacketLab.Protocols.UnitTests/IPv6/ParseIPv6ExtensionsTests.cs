@@ -143,13 +143,13 @@ public class ParseIPv6ExtensionsTests
     }
 
     [Test]
-    public async Task Incomplete_upper_payload_has_declared_length_but_no_checksum_context()
+    public async Task Incomplete_upper_payload_retains_pseudo_header_context_and_capture_diagnostic()
     {
         var packet = Parse(60, "1100000000000000CAFE", 12);
         await Assert.That(packet.Extensions.UpperLayer!.DeclaredLength).IsEqualTo(4u);
         await Assert.That(packet.Extensions.UpperLayer.IsComplete).IsFalse();
         await Assert.That(Hex(packet.Extensions.UpperLayer.Bytes)).IsEqualTo("CAFE");
-        await Assert.That(packet.Extensions.ChecksumContext is null).IsTrue();
+        await Assert.That(packet.Extensions.ChecksumContext is not null).IsTrue();
         await Assert.That(packet.Extensions.Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.PayloadTruncated);
     }
 
@@ -164,7 +164,7 @@ public class ParseIPv6ExtensionsTests
         await Assert.That(Known(packet).IsDatagramComplete).IsFalse();
         await Assert.That(packet.Extensions.UpperLayer!.DeclaredLength).IsEqualTo(expected - 8);
         await Assert.That(packet.Extensions.UpperLayer.Offset).IsEqualTo(48);
-        await Assert.That(packet.Extensions.ChecksumContext is null).IsTrue();
+        await Assert.That(packet.Extensions.ChecksumContext is not null).IsTrue();
         await Assert.That(packet.Extensions.Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.PayloadTruncated);
     }
 

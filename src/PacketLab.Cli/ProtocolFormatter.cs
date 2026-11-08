@@ -3,6 +3,7 @@ using PacketLab.Protocols.Arp;
 using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.IPv4;
 using PacketLab.Protocols.IPv6;
+using PacketLab.Protocols.Udp;
 
 namespace PacketLab.Cli;
 
@@ -11,11 +12,32 @@ internal static class ProtocolFormatter
     internal static string Describe(ProtocolDecodeResult result) => result switch
     {
         ProtocolDecodeResult.EthernetArp arp => $"{DescribeEthernet(arp.Ethernet)}; {DescribeArp(arp.Arp)}",
-        ProtocolDecodeResult.EthernetIPv4 ip => $"{DescribeEthernet(ip.Ethernet)}; {DescribeIPv4(ip.IPv4)}",
-        ProtocolDecodeResult.EthernetIPv6 ip => $"{DescribeEthernet(ip.Ethernet)}; {DescribeIPv6(ip.IPv6)}",
+        ProtocolDecodeResult.EthernetIPv4 ip => $"{DescribeEthernet(ip.Ethernet)}; {DescribeIPv4(ip.IPv4)}{DescribeUdp(ip.Udp)}",
+        ProtocolDecodeResult.EthernetIPv6 ip => $"{DescribeEthernet(ip.Ethernet)}; {DescribeIPv6(ip.IPv6)}{DescribeUdp(ip.Udp)}",
         EthernetParseResult ethernet => DescribeEthernet(ethernet),
         ProtocolDecodeResult.UnsupportedLinkLayer => "Unsupported link layer.",
         null => throw new InvalidOperationException("Uninitialized protocol decode result.")
+    };
+
+    private static string DescribeUdp(UdpParseResult? result) => result?.Value switch
+    {
+        UdpDatagram udp => $"; UDP src port {udp.Header.SourcePort} dst port {udp.Header.DestinationPort} Length {udp.Header.Length} effective {udp.EffectiveLength}"
+            + $"; payload {udp.Payload.Length} bytes ({(udp.IsComplete ? "complete" : "incomplete")})"
+            + $"; surplus declared {udp.DeclaredSurplusLength} bytes, available {udp.SurplusArea.Length} bytes"
+            + $"; Checksum 0x{udp.Header.Checksum:X4}: {DescribeUdpChecksum(udp.Checksum)}.",
+        UdpParseResult.Unavailable unavailable => "; UDP "
+            + (unavailable.Header is { } header ? $"src port {header.SourcePort} dst port {header.DestinationPort} Length {header.Length} Checksum 0x{header.Checksum:X4}; " : "")
+            + $"{unavailable.Reason}: IP upper layer declared {unavailable.DeclaredUpperLayerLength} bytes, available {unavailable.RemainingBytes.Length} bytes; checksum unavailable.",
+        _ => ""
+    };
+
+    private static string DescribeUdpChecksum(UdpChecksum checksum) => checksum.Status switch
+    {
+        UdpChecksumStatus.NotPresent => "not present (IPv4)",
+        UdpChecksumStatus.Match => "match",
+        UdpChecksumStatus.Mismatch => "mismatch (captured bytes fail checksum; capture may precede checksum offload, but neither offload nor on-wire corruption is established)",
+        UdpChecksumStatus.ZeroNotAllowed => "zero not allowed for ordinary IPv6 UDP; RFC 6935/6936 tunnel exception not established",
+        _ => $"unavailable ({checksum.Reason})"
     };
 
     private static string DescribeEthernet(EthernetParseResult result) => result switch
