@@ -10,13 +10,13 @@ description: Use when writing, changing, organizing, or reviewing tests.
 - Keep each test focused on its purpose.
 - Add tests only when they provide additional verification value; avoid redundant or speculative coverage.
 - For correctness checks, assert observable behavior rather than implementation details.
-- Keep tests and fixtures simple. Prefer explicit expected data over logic that reconstructs the expected result; allow small duplication rather than unnecessary abstractions.
+- Keep tests and fixtures simple, allowing small duplication rather than unnecessary abstractions. Prefer explicit expected data; do not duplicate production logic to compute expected results.
 
 ## Test Scope
 
 - Unit tests: verify independent logic, especially decision-heavy behavior, including meaningful success, failure, and boundary cases. Keep them fast, deterministic, and independent of external infrastructure.
 - Integration and E2E tests: exercise real component boundaries or user workflows and verify outputs for representative success, failure, and boundary cases. Avoid exhaustive input variations.
-- Native AOT smoke tests: use known samples to exercise intended paths and verify successful execution under Native AOT. Leave functional correctness to unit and integration tests.
+- Native AOT smoke tests: use known samples to exercise intended paths and verify successful execution under Native AOT. Leave functional correctness to unit, integration, and E2E tests.
 - Choose the smallest scope that covers the relevant risks, without omitting necessary higher-level tests.
 
 ## Test Organization
