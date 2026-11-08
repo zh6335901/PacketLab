@@ -90,10 +90,10 @@ internal static class ProtocolFormatter
         };
         return $"IPv6 src {header.Source} dst {header.Destination} Version {header.Version} Traffic Class {header.TrafficClass} Flow Label 0x{header.FlowLabel:X5}"
             + $" Next Header {header.NextHeader} Hop Limit {header.HopLimit} Payload Length {header.PayloadLength}"
-            + $"; header complete: 40 bytes; {payload}; {DescribeExtensions(packet.Extensions)}.";
+            + $"; header complete: 40 bytes; {payload}; {DescribeIPv6Extensions(packet.Extensions)}.";
     }
 
-    private static string DescribeExtensions(IPv6ExtensionChain chain)
+    private static string DescribeIPv6Extensions(IPv6ExtensionChain chain)
     {
         var headers = chain.Headers.IsEmpty ? "none" : string.Join(" -> ", chain.Headers.Select(header =>
             $"{ExtensionName(header.Type)}({header.Type}) offset {header.Offset} length {header.Length} next {header.NextHeader}"
