@@ -14,15 +14,15 @@ public sealed class StateModelAnalyzer : DiagnosticAnalyzer
 
     private static readonly DiagnosticDescriptor ImplicitStates = new(
         ImplicitStatesId, "Possible implicit states",
-        "Type '{0}' stores optional members ({1}) that may encode dependent or mutually exclusive states; consider separate union cases",
+        "Type '{0}' stores optional members ({1}) that may encode dependent or mutually exclusive states; consider separate union cases, or use [TransportModel] only for a data carrier that does not own domain state invariants",
         "Design", DiagnosticSeverity.Warning, isEnabledByDefault: true,
-        description: "Multiple optional members, or an optional member with a boolean or enum discriminator, may permit unintended state combinations. Independent optional data can be locally suppressed with a justification.");
+        description: "Multiple optional members, or an optional member with a boolean or enum discriminator, may permit unintended state combinations. Model dependent or mutually exclusive states as separate union cases. Use [TransportModel] only when the type carries data and does not own domain state invariants.");
 
     private static readonly DiagnosticDescriptor UnprotectedStates = new(
         UnprotectedStatesId, "Observed state combinations are not protected",
-        "Type '{0}' constructs different state combinations ({1}), but exposes independent construction or mutation of their members",
+        "Type '{0}' constructs different state combinations ({1}), but exposes independent construction or mutation of their members; protect the relationships with union cases or controlled construction, or use [TransportModel] only for a data carrier that intentionally permits these combinations",
         "Design", DiagnosticSeverity.Warning, isEnabledByDefault: true,
-        description: "Constructor or factory paths suggest related states while accessible constructors or writable members permit other combinations. Observed paths are evidence, not a complete domain specification.");
+        description: "Constructor or factory paths suggest related states while accessible constructors or writable members permit other combinations. Protect the relationships with union cases or controlled construction. Use [TransportModel] only for a data carrier that intentionally permits these combinations and does not own domain state invariants. Observed paths are evidence, not a complete domain specification.");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [ImplicitStates, UnprotectedStates];
 
