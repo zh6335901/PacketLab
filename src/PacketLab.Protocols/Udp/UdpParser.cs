@@ -8,7 +8,7 @@ public enum UdpChecksumStatus { NotPresent, Match, Mismatch, Unavailable, ZeroNo
 public enum UdpUnavailableReason
 {
     IpLengthTooShort, HeaderTruncated, InvalidLength, LengthExceedsIpPayload,
-    PayloadTruncated, PseudoHeaderUnavailable, ReassemblyRequired
+    PayloadTruncated, PseudoHeaderUnavailable
 }
 
 public sealed record UdpChecksum(UdpChecksumStatus Status, UdpUnavailableReason? Reason = null);

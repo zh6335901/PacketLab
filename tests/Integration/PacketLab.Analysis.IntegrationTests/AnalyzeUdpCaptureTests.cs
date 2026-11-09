@@ -1,6 +1,9 @@
 using PacketLab.Pcap;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Udp;
+using PacketLab.Protocols.Ethernet;
+using PacketLab.Protocols.IPv4;
+using PacketLab.Protocols.IPv6;
 
 namespace PacketLab.Analysis.IntegrationTests;
 
@@ -17,10 +20,20 @@ public class AnalyzeUdpCaptureTests
         foreach (var expected in Expected)
         {
             var packet = reader.ReadNext() is AnalyzedPacket analyzed ? analyzed : throw new InvalidOperationException();
-            var (version, udp) = packet.Decoding switch
+            var frame = packet.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet decoded
+                ? decoded : throw new InvalidOperationException("Expected Ethernet frame.");
+            if (frame.Payload is IPv6DecodeResult ipv6 && ipv6 is DecodedIPv6 ip6 && ip6.Payload is IPv6FragmentPayload fragment)
             {
-                ProtocolDecodeResult.EthernetIPv4 { Udp: { } value } => (4, value),
-                ProtocolDecodeResult.EthernetIPv6 { Udp: { } value } => (6, value),
+                await Assert.That(expected.Kind).IsEqualTo("Fragment");
+                await Assert.That(fragment.Fragment).IsEqualTo(new IPv6Fragment(0, true, 0x01234567, 17));
+                await Assert.That(fragment.DeclaredLength).IsEqualTo(10u);
+                await Assert.That(Convert.ToHexString(fragment.Bytes.Span)).IsEqualTo(expected.Remaining);
+                continue;
+            }
+            var (version, udp) = frame.Payload switch
+            {
+                IPv4DecodeResult ip when ip is DecodedIPv4 decodedIp && decodedIp.Payload is UdpParseResult value => (4, value),
+                IPv6DecodeResult ip when ip is DecodedIPv6 decodedIp && decodedIp.Payload is UdpParseResult value => (6, value),
                 _ => throw new InvalidOperationException("Expected UDP through the Analysis entry point.")
             };
             var actual = udp switch
@@ -39,7 +52,7 @@ public class AnalyzeUdpCaptureTests
 
     private sealed record Snapshot(int Version, UdpHeader? Header, uint? EffectiveLength, int? PayloadLength,
         string? Payload, uint? SurplusLength, string? Surplus, bool? Complete, bool? SurplusComplete,
-        UdpChecksum Checksum, string? Remaining = null);
+        UdpChecksum? Checksum, string? Remaining = null, string Kind = "Udp");
 
     private static readonly Snapshot[] Expected =
     [
@@ -50,7 +63,7 @@ public class AnalyzeUdpCaptureTests
         new(6, new(0, 4660, 8, 0x9235), 8, 0, "", 4, "", true, false, new(UdpChecksumStatus.Match)),
         new(4, new(0, 4660, 11, 0x356e), 11, 2, "CAFE", 0, "", false, true, new(UdpChecksumStatus.Unavailable, UdpUnavailableReason.PayloadTruncated)),
         new(6, null, null, null, null, null, null, null, null,
-            new(UdpChecksumStatus.Unavailable, UdpUnavailableReason.ReassemblyRequired), "FFFF800000010000CAFE"),
+            null, "FFFF800000010000CAFE", "Fragment"),
         new(6, new(0, 4660, 8, 0x9235), 8, 0, "", 0, "", true, true, new(UdpChecksumStatus.Match)),
         new(4, new(0, 4660, 8, 0), 8, 0, "", 0, "", true, true, new(UdpChecksumStatus.NotPresent)),
         new(6, new(0, 4660, 8, 0), 8, 0, "", 0, "", true, true, new(UdpChecksumStatus.ZeroNotAllowed)),

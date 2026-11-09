@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using PacketLab.Protocols.IPv4;
+using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.IPv6;
 using PacketLab.Protocols.Udp;
 
@@ -56,12 +57,8 @@ public class DecodeUdpTests
         await Assert.That(udp.DeclaredSurplusLength).IsEqualTo(3u);
         await Assert.That(udp.IsSurplusComplete).IsTrue();
         await Assert.That(udp.Checksum.Status).IsEqualTo(UdpChecksumStatus.Match);
-        var trailing = result switch
-        {
-            ProtocolDecodeResult.EthernetIPv4 ip when ip.IPv4 is IPv4Packet p => p.TrailingBytes,
-            ProtocolDecodeResult.EthernetIPv6 ip when ip.IPv6 is IPv6Packet p && p.Payload is IPv6Payload.KnownLength k => k.TrailingBytes,
-            _ => throw new InvalidOperationException()
-        };
+        var trailing = ipv6 && IPv6(result).Capture is IPv6Payload.KnownLength known
+            ? known.TrailingBytes : IPv4(result).Packet.TrailingBytes;
         await Assert.That(Hex(trailing)).IsEqualTo("DEADBEEF");
     }
 
@@ -77,11 +74,10 @@ public class DecodeUdpTests
         await Assert.That(udp.DeclaredSurplusLength).IsEqualTo(4u);
         await Assert.That(Hex(udp.SurplusArea)).IsEqualTo("AA");
         await Assert.That(udp.Checksum.Status).IsEqualTo(UdpChecksumStatus.Match);
-        if (result is ProtocolDecodeResult.EthernetIPv4 ip4 && ip4.IPv4 is IPv4Packet p4)
-            await Assert.That(p4.IsDatagramComplete).IsFalse();
-        else if (result is ProtocolDecodeResult.EthernetIPv6 ip6 && ip6.IPv6 is IPv6Packet p6)
-            await Assert.That(p6.Extensions.Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.PayloadTruncated);
-        else throw new InvalidOperationException();
+        if (ipv6)
+            await Assert.That(IPv6(result).Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.PayloadTruncated);
+        else
+            await Assert.That(IPv4(result).Packet.IsDatagramComplete).IsFalse();
     }
 
     [Test]
@@ -194,12 +190,13 @@ public class DecodeUdpTests
     [Arguments(0x1FFF)]
     public async Task Ipv4_fragments_preserve_bytes_without_interpreting_udp_length(ushort fragment)
     {
-        var result = Udp(Frame(false, "0000123400010000CAFE", fragment: fragment));
-        var unavailable = result is UdpParseResult.Unavailable u ? u : throw new InvalidOperationException();
-        await Assert.That(unavailable.Reason).IsEqualTo(UdpUnavailableReason.ReassemblyRequired);
-        await Assert.That(unavailable.Header is null).IsTrue();
-        await Assert.That(unavailable.DeclaredUpperLayerLength).IsEqualTo(10u);
-        await Assert.That(Hex(unavailable.RemainingBytes)).IsEqualTo("0000123400010000CAFE");
+        var ip = IPv4(Frame(false, "0000123400010000CAFE", fragment: fragment));
+        var payload = ip.Payload is IPv4FragmentPayload value ? value : throw new InvalidOperationException();
+        await Assert.That(payload.Offset).IsEqualTo((ushort)(fragment & 0x1fff));
+        await Assert.That(payload.MoreFragments).IsEqualTo((fragment & 0x2000) != 0);
+        await Assert.That(payload.Protocol).IsEqualTo((byte)17);
+        await Assert.That(payload.DeclaredLength).IsEqualTo(10u);
+        await Assert.That(Hex(payload.Bytes)).IsEqualTo("0000123400010000CAFE");
     }
 
     [Test]
@@ -208,12 +205,12 @@ public class DecodeUdpTests
     [Arguments("0008")]
     public async Task Ipv6_fragments_require_reassembly_before_udp_parsing(string bits)
     {
-        var result = Udp(Frame(true, "1100" + bits + "012345670000123400010000CAFE", next: 44));
-        var unavailable = result is UdpParseResult.Unavailable u ? u : throw new InvalidOperationException();
-        await Assert.That(unavailable.Reason).IsEqualTo(UdpUnavailableReason.ReassemblyRequired);
-        await Assert.That(unavailable.Header is null).IsTrue();
-        await Assert.That(unavailable.DeclaredUpperLayerLength).IsEqualTo(10u);
-        await Assert.That(Hex(unavailable.RemainingBytes)).IsEqualTo("0000123400010000CAFE");
+        var ip = IPv6(Frame(true, "1100" + bits + "012345670000123400010000CAFE", next: 44));
+        var payload = ip.Payload is IPv6FragmentPayload value ? value : throw new InvalidOperationException();
+        await Assert.That(payload.Fragment.NextHeader).IsEqualTo((byte)17);
+        await Assert.That(payload.Fragment.IsAtomic).IsFalse();
+        await Assert.That(payload.DeclaredLength).IsEqualTo(10u);
+        await Assert.That(Hex(payload.Bytes)).IsEqualTo("0000123400010000CAFE");
     }
 
     [Test]
@@ -274,9 +271,15 @@ public class DecodeUdpTests
     public async Task Non_udp_and_unlocatable_ipv6_chains_do_not_dispatch(byte next)
     {
         var decoded = Frame(true, "0000123400089235", next: next);
-        await Assert.That(decoded is ProtocolDecodeResult.EthernetIPv6 ip && ip.Udp is null).IsTrue();
+        await Assert.That(IPv6(decoded).Payload.Value switch
+        {
+            UnsupportedIpProtocol other => next == 6 && other.Protocol == next,
+            IPv6NoNextHeader => next == 59,
+            IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Unsupported } => next is 50 or 253,
+            _ => false
+        }).IsTrue();
         decoded = Frame(false, "0000123400080173", next: next);
-        await Assert.That(decoded is ProtocolDecodeResult.EthernetIPv4 ip4 && ip4.Udp is null).IsTrue();
+        await Assert.That(IPv4(decoded).Payload is UnsupportedIpProtocol ip4Other && ip4Other.Protocol == next).IsTrue();
     }
 
     [Test]
@@ -286,7 +289,7 @@ public class DecodeUdpTests
     public async Task Invalid_jumbo_combinations_do_not_guess_udp_position(string bytes)
     {
         var decoded = Frame(true, bytes + "000012340000923D", 0, 0);
-        await Assert.That(decoded is ProtocolDecodeResult.EthernetIPv6 ip && ip.Udp is null).IsTrue();
+        await Assert.That(IPv6(decoded).Payload is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Invalid }).IsTrue();
     }
 
     [Test]
@@ -317,7 +320,12 @@ public class DecodeUdpTests
     {
         var result = ProtocolDecoder.Decode(Convert.FromHexString("FFFFFFFFFFFF020000000001" + etherType
             + "4500001C0000000040110000C0000201C63364020000123400080173"), LinkLayerProtocol.Ethernet);
-        await Assert.That(result is PacketLab.Protocols.Ethernet.EthernetParseResult).IsTrue();
+        await Assert.That(result is EthernetDecodeResult ethernet && ethernet.Value switch
+        {
+            DecodedEthernet frame => frame.Payload is UnsupportedEtherType,
+            EthernetParseResult.Ieee8023Length => true,
+            _ => false
+        }).IsTrue();
     }
 
     [Test]
@@ -334,10 +342,16 @@ public class DecodeUdpTests
     private static UdpParseResult Decode(bool ipv6, string bytes, ushort? declared = null) => Udp(Frame(ipv6, bytes, declared));
     private static UdpDatagram Datagram(UdpParseResult result) => result is UdpDatagram udp ? udp : throw new InvalidOperationException($"Expected UDP datagram, got {result.Value}.");
     private static string Hex(ReadOnlyMemory<byte> bytes) => Convert.ToHexString(bytes.Span);
-    private static UdpParseResult Udp(ProtocolDecodeResult result) => result switch
+    private static DecodedEthernet Ethernet(ProtocolDecodeResult result) =>
+        result is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame ? frame : throw new InvalidOperationException();
+    private static DecodedIPv4 IPv4(ProtocolDecodeResult result) =>
+        Ethernet(result).Payload is IPv4DecodeResult ip && ip is DecodedIPv4 decoded ? decoded : throw new InvalidOperationException();
+    private static DecodedIPv6 IPv6(ProtocolDecodeResult result) =>
+        Ethernet(result).Payload is IPv6DecodeResult ip && ip is DecodedIPv6 decoded ? decoded : throw new InvalidOperationException();
+    private static UdpParseResult Udp(ProtocolDecodeResult result) => Ethernet(result).Payload switch
     {
-        ProtocolDecodeResult.EthernetIPv4 { Udp: { } udp } => udp,
-        ProtocolDecodeResult.EthernetIPv6 { Udp: { } udp } => udp,
+        IPv4DecodeResult ip when ip is DecodedIPv4 decoded && decoded.Payload is UdpParseResult udp => udp,
+        IPv6DecodeResult ip when ip is DecodedIPv6 decoded && decoded.Payload is UdpParseResult udp => udp,
         _ => throw new InvalidOperationException("Expected UDP dispatch.")
     };
 

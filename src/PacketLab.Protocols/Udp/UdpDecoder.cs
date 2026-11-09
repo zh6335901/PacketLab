@@ -3,30 +3,20 @@ using PacketLab.Protocols.IPv6;
 
 namespace PacketLab.Protocols.Udp;
 
-public static class UdpDecoder
+internal static class UdpDecoder
 {
-    public static UdpParseResult? Decode(IPv4Packet packet)
+    internal static UdpParseResult Decode(IPv4Packet packet)
     {
         var header = packet.Header;
-        if (header.Protocol != 17) return null;
         var length = (uint)(header.TotalLength - header.HeaderLength);
-        if (header.MoreFragments || header.FragmentOffset != 0)
-            return new UdpParseResult.Unavailable(UdpUnavailableReason.ReassemblyRequired, length, packet.Payload);
         var destination = FinalDestination(header);
         ulong? addresses = destination is { } final ? Sum(header.Source) + Sum(final) : null;
         return UdpParser.Parse(packet.Payload, length, false, addresses);
     }
 
-    public static UdpParseResult? Decode(IPv6Packet packet)
+    internal static UdpParseResult Decode(IPv6UpperLayer upper, IPv6ChecksumContext? context)
     {
-        var chain = packet.Extensions;
-        if (chain.Status == IPv6ChainStatus.ReassemblyRequired && chain.Headers[^1].NextHeader == 17)
-            return new UdpParseResult.Unavailable(UdpUnavailableReason.ReassemblyRequired,
-                packet.Payload is IPv6Payload.KnownLength known ? known.DeclaredLength - (uint)(chain.RemainingOffset - 40) : 0,
-                chain.RemainingBytes);
-        if (chain.UpperLayer is not { Protocol: 17 } upper) return null;
-        ulong? addresses = chain.ChecksumContext is { } context
-            ? Sum(context.Source) + Sum(context.FinalDestination) : null;
+        ulong? addresses = context is { } known ? Sum(known.Source) + Sum(known.FinalDestination) : null;
         return UdpParser.Parse(upper.Bytes, upper.DeclaredLength, true, addresses);
     }
 

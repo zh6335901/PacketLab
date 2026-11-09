@@ -1,5 +1,6 @@
 using PacketLab.Pcap;
 using PacketLab.Protocols;
+using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.IPv4;
 
 namespace PacketLab.Analysis.IntegrationTests;
@@ -19,11 +20,11 @@ public class AnalyzeIPv4CaptureTests
             var context = $"{sample}, record {expected.RecordNumber}";
             var packet = reader.ReadNext() is AnalyzedPacket read ? read
                 : throw new InvalidOperationException($"Expected {context}.");
-            var decoding = packet.Decoding is ProtocolDecodeResult.EthernetIPv4 ip ? ip
+            var decoding = packet.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame ? frame
                 : throw new InvalidOperationException($"Expected IPv4 dispatch for {context}.");
             var actual = new RecordSnapshot(packet.RecordNumber, packet.Packet.CapturedLength, packet.Packet.OriginalLength,
-                decoding.Ethernet.Source.ToString(), decoding.Ethernet.Destination.ToString(), decoding.Ethernet.EtherType,
-                Snapshot(decoding.IPv4));
+                decoding.Frame.Source.ToString(), decoding.Frame.Destination.ToString(), decoding.Frame.EtherType,
+                Snapshot(decoding.Payload is IPv4DecodeResult ip ? ip : throw new InvalidOperationException()));
             await Assert.That(actual).IsEqualTo(expected).Because($"the output must match {context}");
         }
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
@@ -39,13 +40,13 @@ public class AnalyzeIPv4CaptureTests
         int? RequiredLength = null, int? CapturedLength = null, ushort? InvalidTotalLength = null,
         int? HeaderLength = null, string? RemainingBytes = null);
 
-    private static IPv4Snapshot Snapshot(IPv4ParseResult result) => result switch
+    private static IPv4Snapshot Snapshot(IPv4DecodeResult result) => result switch
     {
-        IPv4Packet packet => new("Packet", packet.ChecksumStatus, SnapshotHeader(packet.Header),
+        DecodedIPv4 { Packet: var packet } => new("Packet", packet.ChecksumStatus, SnapshotHeader(packet.Header),
             Hex(packet.Payload), Hex(packet.TrailingBytes), packet.IsDatagramComplete, CapturedLength: packet.CapturedLength),
-        IPv4ParseResult.IncompleteHeader incomplete => new("IncompleteHeader", result.ChecksumStatus,
+        IPv4ParseResult.IncompleteHeader incomplete => new("IncompleteHeader", IPv4ChecksumStatus.Unavailable,
             RequiredLength: incomplete.RequiredLength, CapturedLength: incomplete.CapturedLength, RemainingBytes: Hex(incomplete.RemainingBytes)),
-        IPv4ParseResult.InvalidTotalLength invalid => new("InvalidTotalLength", result.ChecksumStatus,
+        IPv4ParseResult.InvalidTotalLength invalid => new("InvalidTotalLength", IPv4ChecksumStatus.Unavailable,
             InvalidTotalLength: invalid.TotalLength, HeaderLength: invalid.HeaderLength, RemainingBytes: Hex(invalid.RemainingBytes)),
         _ => throw new InvalidOperationException("Unexpected IPv4 result in the mixed capture.")
     };
