@@ -4,11 +4,61 @@ using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.IPv4;
 using PacketLab.Protocols.IPv6;
 using PacketLab.Protocols.Udp;
+using PacketLab.Protocols.Tcp;
 
 namespace PacketLab.Cli;
 
 internal static class ProtocolFormatter
 {
+    private static string DescribeTcp(TcpParseResult result) => result switch
+    {
+        TcpSegment tcp => DescribeTcpHeader(tcp.Header)
+            + $"; segment declared {tcp.DeclaredLength} bytes; payload declared {tcp.DeclaredPayloadLength} bytes, available {tcp.Payload.Length} bytes ({(tcp.IsComplete ? "complete" : "incomplete")})"
+            + DescribeTcpOptions(tcp.Options) + $"; Checksum 0x{tcp.Header.Checksum:X4}: {DescribeTcpChecksum(tcp.Checksum)}.",
+        TcpParseResult.IpLengthTooShort error => "; TCP " + DescribeTcpFailure("IpLengthTooShort", 20, error.DeclaredLength, error.RemainingBytes.Length),
+        TcpParseResult.HeaderTruncated error => "; TCP " + DescribeTcpFailure("HeaderTruncated", 20, error.DeclaredLength, error.RemainingBytes.Length),
+        TcpParseResult.InvalidDataOffset error => DescribeTcpHeader(error.Header) + "; "
+            + DescribeTcpFailure("InvalidDataOffset (minimum 5)", 20, error.DeclaredLength, error.RemainingBytes.Length),
+        TcpParseResult.HeaderExceedsSegment error => DescribeTcpHeader(error.Header) + "; "
+            + DescribeTcpFailure("HeaderExceedsSegment", error.Header.HeaderLength, error.DeclaredLength, error.RemainingBytes.Length),
+        TcpParseResult.OptionsTruncated error => DescribeTcpHeader(error.Header) + DescribeTcpOptions(error.Options) + "; "
+            + DescribeTcpFailure("HeaderTruncated (options)", error.Header.HeaderLength, error.DeclaredLength, error.RemainingBytes.Length),
+        null => throw new InvalidOperationException("Uninitialized TCP parse result.")
+    };
+
+    private static string DescribeTcpHeader(TcpHeader header) =>
+        $"; TCP src port {header.SourcePort} dst port {header.DestinationPort} Seq {header.SequenceNumber} Ack {header.AcknowledgmentNumber}"
+        + $" Flags [{header.Flags}] Reserved {header.Reserved} Window {header.Window} Urgent Pointer {header.UrgentPointer}"
+        + $"; Data Offset {header.DataOffset}, header {header.HeaderLength} bytes";
+
+    private static string DescribeTcpFailure(string reason, int required, uint declared, int captured) =>
+        $"{reason}: header requires {required} bytes, IP upper layer declared {declared} bytes, available {captured} bytes; checksum unavailable.";
+
+    private static string DescribeTcpChecksum(TcpChecksum checksum) => checksum.Value switch
+    {
+        TcpChecksumStatus.Match => "match",
+        TcpChecksumStatus.Mismatch => "mismatch (captured bytes fail checksum; neither offload nor on-wire corruption is established)",
+        TcpChecksumUnavailable unavailable => $"unavailable ({unavailable.Reason})",
+        _ => throw new InvalidOperationException("Uninitialized TCP checksum result.")
+    };
+
+    private static string DescribeTcpOptions(TcpOptions options) =>
+        "; Options " + (options.Items.IsEmpty ? "none" : string.Join(", ", options.Items.Select(option =>
+            $"offset {option.Offset} " + (option.Value switch
+            {
+                TcpOptionValue.End => "EOL",
+                TcpOptionValue.NoOperation => "NOP",
+                TcpOptionValue.MaximumSegmentSize mss => $"MSS {mss.Value}",
+                TcpOptionValue.WindowScale scale => $"Window Scale {scale.ShiftCount}" + (scale.IsInRange ? "" : " (out of range; maximum 14)"),
+                TcpOptionValue.SackPermitted => "SACK Permitted",
+                TcpOptionValue.Sack sack => "SACK [" + string.Join(", ", sack.Blocks.Select(b => $"{b.LeftEdge}-{b.RightEdge}")) + "]",
+                TcpOptionValue.Timestamp ts => $"Timestamp {ts.Value} echo {ts.EchoReply}",
+                TcpOptionValue.Unknown => $"unknown kind {option.Kind} raw {Convert.ToHexString(option.Bytes.Span)}",
+                TcpOptionValue.Invalid invalid => $"kind {option.Kind} {invalid.Reason} (required {invalid.RequiredLength}, available {invalid.AvailableLength})",
+                null => throw new InvalidOperationException("Uninitialized TCP option.")
+            })))) + $"; option bytes {Convert.ToHexString(options.RawBytes.Span)}; padding {options.Padding.Length} bytes"
+        + (options.HasNonZeroPadding ? " (nonzero)" : "");
+
     internal static string Describe(ProtocolDecodeResult result) => result switch
     {
         EthernetDecodeResult ethernet => DescribeEthernet(ethernet),
@@ -89,6 +139,7 @@ internal static class ProtocolFormatter
 
     private static string DescribeIPv4Payload(IPv4PayloadResult result) => result switch
     {
+        TcpParseResult tcp => DescribeTcp(tcp),
         UdpParseResult udp => DescribeUdp(udp),
         IPv4FragmentPayload => "; IP reassembly required; complete upper layer unavailable.",
         UnsupportedIpProtocol => "",
@@ -139,6 +190,7 @@ internal static class ProtocolFormatter
 
     private static string DescribeIPv6Payload(IPv6PayloadResult result) => result switch
     {
+        TcpParseResult tcp => DescribeTcp(tcp),
         UdpParseResult udp => DescribeUdp(udp),
         IPv6FragmentPayload => "",
         IPv6NoNextHeader => "",
@@ -155,6 +207,8 @@ internal static class ProtocolFormatter
                 ? $" [offset {fragment.Offset} (8-byte units, {fragment.OffsetBytes} bytes) M {Bit(fragment.MoreFragments)} ID 0x{fragment.Identification:X8} {(fragment.IsAtomic ? "atomic" : "reassembly required")}]" : "")));
         var upper = packet.Payload switch
         {
+            TcpParseResult when packet.Capture is IPv6Payload.KnownLength known =>
+                DescribeLocatedProtocol(6, known.DeclaredLength - (uint)(packet.RemainingOffset - 40)),
             UdpParseResult when packet.Capture is IPv6Payload.KnownLength known =>
                 DescribeLocatedProtocol(17, known.DeclaredLength - (uint)(packet.RemainingOffset - 40)),
             UnsupportedIpProtocol other => DescribeLocatedProtocol(other.Protocol, other.DeclaredLength),

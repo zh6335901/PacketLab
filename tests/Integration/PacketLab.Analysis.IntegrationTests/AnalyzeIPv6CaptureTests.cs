@@ -4,6 +4,7 @@ using PacketLab.Protocols;
 using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.IPv6;
 using PacketLab.Protocols.Udp;
+using PacketLab.Protocols.Tcp;
 
 namespace PacketLab.Analysis.IntegrationTests;
 
@@ -55,6 +56,7 @@ public class AnalyzeIPv6CaptureTests
             var kind = ip.Payload switch
             {
                 UdpParseResult => "Udp",
+                TcpParseResult => "Tcp",
                 UnsupportedIpProtocol => "UnsupportedProtocol",
                 IPv6FragmentPayload => "Fragment",
                 IPv6NoNextHeader => "NoNextHeader",

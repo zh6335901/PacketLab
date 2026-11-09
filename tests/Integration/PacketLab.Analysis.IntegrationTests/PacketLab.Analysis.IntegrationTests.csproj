@@ -2,6 +2,6 @@
   <ItemGroup>
     <ProjectReference Include="../../../analyzers/PacketLab.Analyzers.Annotations/PacketLab.Analyzers.Annotations.csproj" />
     <ProjectReference Include="../../../src/PacketLab.Analysis/PacketLab.Analysis.csproj" />
-    <None Include="../../TestData/Pcap/ethernet-*.pcap;../../TestData/Pcap/arp-*.pcap;../../TestData/Pcap/ipv4-mixed.pcap;../../TestData/Pcap/udp-*.pcap;../../TestData/Pcap/ipv6-*.pcap;../../TestData/Pcap/record-truncated.pcap" Link="TestData/Pcap/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../TestData/Pcap/ethernet-*.pcap;../../TestData/Pcap/arp-*.pcap;../../TestData/Pcap/ipv4-mixed.pcap;../../TestData/Pcap/udp-*.pcap;../../TestData/Pcap/tcp-*.pcap;../../TestData/Pcap/ipv6-*.pcap;../../TestData/Pcap/record-truncated.pcap" Link="TestData/Pcap/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

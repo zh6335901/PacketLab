@@ -109,9 +109,9 @@ public class DecodeProtocolsTests
     }
 
     [Test]
-    [Arguments("450000141234400040063C79C0000201C6336402", 6)]
+    [Arguments("450000141234400040013C7EC0000201C6336402", 1)]
     [Arguments("450000141234400040FD3B82C0000201C6336402", 253)]
-    public async Task Non_udp_ipv4_has_an_explicit_unsupported_protocol_branch(string bytes, byte protocol)
+    public async Task Unsupported_ipv4_has_an_explicit_protocol_branch(string bytes, byte protocol)
     {
         var ip = DecodedIPv4.Decode(Convert.FromHexString(bytes)) is DecodedIPv4 decoded ? decoded : throw new InvalidOperationException();
         await Assert.That(ip.Payload is UnsupportedIpProtocol { DeclaredLength: 0 } other && other.Protocol == protocol).IsTrue();

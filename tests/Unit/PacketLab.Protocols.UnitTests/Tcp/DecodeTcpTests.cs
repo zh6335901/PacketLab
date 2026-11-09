@@ -1,0 +1,365 @@
+using System.Buffers.Binary;
+using PacketLab.Protocols.Ethernet;
+using PacketLab.Protocols.IPv4;
+using PacketLab.Protocols.IPv6;
+using PacketLab.Protocols.Tcp;
+
+namespace PacketLab.Protocols.UnitTests.Tcp;
+
+public class DecodeTcpTests
+{
+    private const string V4 = "ABCDFEDC81234567FEDCBA985BDB89AB698ACDEFCAFE01";
+    private const string V6 = "ABCDFEDC81234567FEDCBA985BDB89ABFA4CCDEFCAFE01";
+
+    [Test]
+    [Arguments(false, V4, "CAFE01")]
+    [Arguments(true, V6, "CAFE01")]
+    [Arguments(false, "ABCDFEDC81234567FEDCBA985BDB89AB358CCDEF", "")]
+    [Arguments(true, "ABCDFEDC81234567FEDCBA985BDB89ABC64ECDEF", "")]
+    [Arguments(false, "ABCDFEDC81234567FEDCBA985BDB89AB6987CDEFCAFE0102", "CAFE0102")]
+    [Arguments(true, "ABCDFEDC81234567FEDCBA985BDB89ABFA49CDEFCAFE0102", "CAFE0102")]
+    [Arguments(false, "ABCDFEDC81234567FEDCBA985BDB89AB0000CDEF358A", "358A")]
+    [Arguments(true, "ABCDFEDC81234567FEDCBA985BDB89AB0000CDEFC64C", "C64C")]
+    public async Task Independent_vectors_cover_fields_odd_lengths_and_valid_zero_checksum(bool ipv6, string wire, string payload)
+    {
+        var segment = Segment(Decode(ipv6, wire));
+        await Assert.That(segment.Header).IsEqualTo(new TcpHeader(0xabcd, 0xfedc, 0x81234567, 0xfedcba98,
+            5, 5, TcpFlags.AE | TcpFlags.CWR | TcpFlags.ECE | TcpFlags.ACK | TcpFlags.PSH | TcpFlags.SYN | TcpFlags.FIN,
+            0x89ab, Convert.ToUInt16(wire.Substring(32, 4), 16), 0xcdef));
+        await Assert.That(Hex(segment.Payload)).IsEqualTo(payload);
+        await Assert.That(segment.DeclaredLength).IsEqualTo((uint)(wire.Length / 2));
+        await Assert.That(segment.IsComplete).IsTrue();
+        await Assert.That(segment.Options.RawBytes.IsEmpty).IsTrue();
+        await Assert.That(segment.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Changed_fields_and_payload_fail_checksum_while_trailing_bytes_are_excluded(bool ipv6)
+    {
+        var wire = Convert.FromHexString(ipv6 ? V6 : V4);
+        for (var offset = 0; offset < wire.Length; offset++)
+        {
+            if (offset == 12) continue; // Changing Data Offset has its own structural diagnostics.
+            var changed = (byte[])wire.Clone();
+            changed[offset] ^= 1;
+            await Assert.That(Segment(Decode(ipv6, Hex(changed))).Checksum.Value).IsEqualTo(TcpChecksumStatus.Mismatch);
+        }
+        var valid = Segment(Decode(ipv6, Hex(wire) + "DEADBEEF", 23));
+        await Assert.That(Hex(valid.Payload)).IsEqualTo("CAFE01");
+        await Assert.That(valid.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
+        wire[16] = wire[17] = 0;
+        await Assert.That(Segment(Decode(ipv6, Hex(wire))).Checksum.Value).IsEqualTo(TcpChecksumStatus.Mismatch);
+    }
+
+    [Test]
+    [Arguments(0x100, TcpFlags.AE)]
+    [Arguments(0x80, TcpFlags.CWR)]
+    [Arguments(0x40, TcpFlags.ECE)]
+    [Arguments(0x20, TcpFlags.URG)]
+    [Arguments(0x10, TcpFlags.ACK)]
+    [Arguments(0x08, TcpFlags.PSH)]
+    [Arguments(0x04, TcpFlags.RST)]
+    [Arguments(0x02, TcpFlags.SYN)]
+    [Arguments(0x01, TcpFlags.FIN)]
+    public async Task Flag_bits_are_independent_of_reserved_and_offset(ushort bits, TcpFlags expected)
+    {
+        var wire = Convert.FromHexString(V4);
+        BinaryPrimitives.WriteUInt16BigEndian(wire.AsSpan(12), (ushort)(0x5e00 | bits));
+        var header = Segment(Decode(false, Hex(wire))).Header;
+        await Assert.That(header.Flags).IsEqualTo(expected);
+        await Assert.That(header.Reserved).IsEqualTo((byte)7);
+        await Assert.That(header.DataOffset).IsEqualTo((byte)5);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Every_capture_prefix_distinguishes_fixed_header_options_and_payload(bool ipv6)
+    {
+        var wire = WithOptions("020405B401030307080A123456789ABCDEF00000") + "CAFE01";
+        for (var n = 0; n < wire.Length / 2; n++)
+        {
+            var result = Decode(ipv6, wire[..(n * 2)], 43);
+            if (n < 20)
+                await Assert.That(result is TcpParseResult.HeaderTruncated error && error.RemainingBytes.Length == n).IsTrue();
+            else if (n < 40)
+                await Assert.That(result is TcpParseResult.OptionsTruncated error && error.Header.HeaderLength == 40
+                    && error.Options.RawBytes.Length == n - 20 && error.RemainingBytes.Length == n).IsTrue();
+            else
+            {
+                var segment = Segment(result);
+                await Assert.That(segment.Payload.Length).IsEqualTo(n - 40);
+                await Assert.That(segment.IsComplete).IsFalse();
+                await Assert.That(segment.DeclaredPayloadLength).IsEqualTo(3u);
+            }
+            await Assert.That(result.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(n < 40
+                ? TcpUnavailableReason.HeaderTruncated : TcpUnavailableReason.PayloadTruncated));
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Invalid_declarations_do_not_borrow_capture_or_guess_a_payload(bool ipv6)
+    {
+        for (ushort n = 0; n < 20; n++)
+            await Assert.That(Decode(ipv6, V4, n) is TcpParseResult.IpLengthTooShort error
+                && error.RemainingBytes.Length == n).IsTrue();
+        for (byte offset = 0; offset < 5; offset++)
+        {
+            var wire = Convert.FromHexString(V4); wire[12] = (byte)(offset << 4);
+            var result = Decode(ipv6, Hex(wire));
+            await Assert.That(result is TcpParseResult.InvalidDataOffset error && error.Header.DataOffset == offset).IsTrue();
+            await Assert.That(result.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.InvalidDataOffset));
+        }
+        var exceeds = Decode(ipv6, WithOptions("01010101"), 23);
+        await Assert.That(exceeds is TcpParseResult.HeaderExceedsSegment exceedsError && exceedsError.Header.HeaderLength == 24).IsTrue();
+        await Assert.That(exceeds.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.HeaderExceedsSegment));
+    }
+
+    [Test]
+    public async Task Maximum_header_preserves_common_options_unknown_values_and_eol_padding()
+    {
+        const string options = "020405B403030E0402080A81234567FEDCBA98050A1234567887654321FE04CAFE01000000000000";
+        var segment = Segment(Decode(false, WithOptions(options) + "AB"));
+        await Assert.That(segment.Header.HeaderLength).IsEqualTo(60);
+        await Assert.That(Hex(segment.Options.RawBytes)).IsEqualTo(options);
+        await Assert.That(Hex(segment.Payload)).IsEqualTo("AB");
+        var items = segment.Options.Items;
+        await Assert.That(items.Length).IsEqualTo(8);
+        await Assert.That(items[0].Value.Value).IsEqualTo(new TcpOptionValue.MaximumSegmentSize(1460));
+        await Assert.That(items[1].Value.Value).IsEqualTo(new TcpOptionValue.WindowScale(14));
+        await Assert.That(items[2].Value is TcpOptionValue.SackPermitted).IsTrue();
+        await Assert.That(items[3].Value.Value).IsEqualTo(new TcpOptionValue.Timestamp(0x81234567, 0xfedcba98));
+        var sack = items[4].Value is TcpOptionValue.Sack s ? s : throw new InvalidOperationException();
+        await Assert.That(sack.Blocks.Single()).IsEqualTo(new TcpSackBlock(0x12345678, 0x87654321));
+        await Assert.That(items[5].Value is TcpOptionValue.Unknown).IsTrue();
+        await Assert.That(Hex(items[5].Bytes)).IsEqualTo("FE04CAFE");
+        await Assert.That(items[5].Offset).IsEqualTo(49);
+        await Assert.That(items[6].Value is TcpOptionValue.NoOperation).IsTrue();
+        await Assert.That(items[7].Value is TcpOptionValue.End).IsTrue();
+        await Assert.That(segment.Options.Padding.Length).IsEqualTo(5);
+        await Assert.That(segment.Options.HasNonZeroPadding).IsFalse();
+    }
+
+    [Test]
+    [Arguments("010101FE", TcpOptionFailure.ExceedsHeader)]
+    [Arguments("FE05AABB", TcpOptionFailure.ExceedsHeader)]
+    [Arguments("FE000000", TcpOptionFailure.InvalidLength)]
+    [Arguments("FE010000", TcpOptionFailure.InvalidLength)]
+    [Arguments("02030000", TcpOptionFailure.InvalidLength)]
+    [Arguments("03040000", TcpOptionFailure.InvalidLength)]
+    [Arguments("04040000", TcpOptionFailure.InvalidLength)]
+    [Arguments("05020000", TcpOptionFailure.InvalidLength)]
+    [Arguments("050B00000000000000000000", TcpOptionFailure.InvalidLength)]
+    [Arguments("08040000", TcpOptionFailure.InvalidLength)]
+    public async Task Invalid_option_lengths_preserve_raw_bytes_and_payload(string options, TcpOptionFailure reason)
+    {
+        var segment = Segment(Decode(false, WithOptions(options) + "CAFE"));
+        await Assert.That(segment.Options.Items.Any(o => o.Value is TcpOptionValue.Invalid invalid && invalid.Reason == reason)).IsTrue();
+        await Assert.That(Hex(segment.Options.RawBytes)).IsEqualTo(options);
+        await Assert.That(Hex(segment.Payload)).IsEqualTo("CAFE");
+    }
+
+    [Test]
+    public async Task Options_capture_failure_is_distinct_from_declared_header_overrun()
+    {
+        var result = Decode(false, WithOptions("FE040102")[..44], 24);
+        var shortOptions = result is TcpParseResult.OptionsTruncated o ? o : throw new InvalidOperationException();
+        await Assert.That(shortOptions.Options.Items.Single().Value.Value)
+            .IsEqualTo(new TcpOptionValue.Invalid(TcpOptionFailure.CaptureTruncated, 4, 2));
+        var segment = Segment(Decode(false, WithOptions("0303FF00DEADBEEF")));
+        await Assert.That(segment.Options.Items[0].Value is TcpOptionValue.WindowScale { ShiftCount: 255, IsInRange: false }).IsTrue();
+        await Assert.That(Hex(segment.Options.Padding)).IsEqualTo("DEADBEEF");
+        await Assert.That(segment.Options.HasNonZeroPadding).IsTrue();
+    }
+
+    [Test]
+    public async Task Sack_can_contain_multiple_blocks_and_fill_the_option_area_without_eol()
+    {
+        var segment = Segment(Decode(false, WithOptions("01010522123456788765432100000000FFFFFFFF8000000090000000000000010000000201010101")));
+        var sack = segment.Options.Items[2].Value is TcpOptionValue.Sack s ? s : throw new InvalidOperationException();
+        await Assert.That(sack.Blocks.Length).IsEqualTo(4);
+        await Assert.That(sack.Blocks[1]).IsEqualTo(new TcpSackBlock(0, uint.MaxValue));
+        await Assert.That(sack.Blocks[2]).IsEqualTo(new TcpSackBlock(0x80000000, 0x90000000));
+        await Assert.That(sack.Blocks[3]).IsEqualTo(new TcpSackBlock(1, 2));
+        await Assert.That(segment.Options.Padding.IsEmpty).IsTrue();
+    }
+
+    [Test]
+    [Arguments("0600000000000000", 0)]
+    [Arguments("0600000000000000", 60)]
+    [Arguments("0600FE0000000000", 43)]
+    [Arguments("06020000010203040506070800000000", 51)]
+    [Arguments("0600000001234567", 44)]
+    [Arguments("3C000000000000002B000000000000003300FE00000000002C0200000102030405060708000000000600000001234567", 0)]
+    public async Task Ipv6_checksum_excludes_extensions_and_uses_final_protocol_and_length(string extensions, byte next)
+    {
+        var segment = Segment(Tcp(Frame(true, extensions + V6, next: next)));
+        await Assert.That(Hex(segment.Payload)).IsEqualTo("CAFE01");
+        await Assert.That(segment.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
+    }
+
+    [Test]
+    [Arguments("01010000", V4)]
+    [Arguments("9E040000", V4)]
+    [Arguments("83030400", V4)]
+    [Arguments("8307080102030400", V4)]
+    [Arguments("830B04C0000209C633640300", "ABCDFEDC81234567FEDCBA985BDB89AB6989CDEFCAFE01")]
+    [Arguments("890B04C0000209C633640300", "ABCDFEDC81234567FEDCBA985BDB89AB6989CDEFCAFE01")]
+    public async Task Ipv4_options_use_reliable_final_destination(string options, string wire)
+    {
+        await Assert.That(Segment(Tcp(Frame(false, wire, options: options))).Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
+    }
+
+    [Test]
+    [Arguments("830705C633640200")]
+    [Arguments("83070CC633640200")]
+    [Arguments("830604C633640200")]
+    [Arguments("830704C6336402890704C63364020000")]
+    [Arguments("9E080000")]
+    public async Task Uncertain_ipv4_route_disables_checksum_but_keeps_tcp(string options)
+    {
+        await Assert.That(Segment(Tcp(Frame(false, V4, options: options))).Checksum.Value)
+            .IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.PseudoHeaderUnavailable));
+    }
+
+    [Test]
+    [Arguments("0600FE0100000000", 43)]
+    [Arguments("0602C91020010DB800000000000000000000000900000000", 60)]
+    public async Task Uncertain_ipv6_addresses_disable_checksum_but_keep_tcp(string extensions, byte next)
+    {
+        var tcp = Segment(Tcp(Frame(true, extensions + V6, next: next)));
+        await Assert.That(tcp.IsComplete).IsTrue();
+        await Assert.That(tcp.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.PseudoHeaderUnavailable));
+    }
+
+    [Test]
+    [Arguments(0x2000)]
+    [Arguments(0x2001)]
+    [Arguments(0x0001)]
+    [Arguments(0x1fff)]
+    public async Task Ipv4_fragments_never_dispatch_tcp(ushort bits)
+    {
+        var frame = Ethernet(Frame(false, V4, fragment: bits));
+        await Assert.That(frame.Payload is IPv4DecodeResult ip && ip is DecodedIPv4 decoded
+            && decoded.Payload is IPv4FragmentPayload fragment && fragment.Protocol == 6
+            && Hex(fragment.Bytes) == V4).IsTrue();
+    }
+
+    [Test]
+    [Arguments("0001")]
+    [Arguments("0008")]
+    [Arguments("0009")]
+    public async Task Ipv6_non_atomic_fragments_never_dispatch_tcp(string bits)
+    {
+        var frame = Ethernet(Frame(true, "0600" + bits + "01234567" + V6, next: 44));
+        await Assert.That(frame.Payload is IPv6DecodeResult ip && ip is DecodedIPv6 decoded
+            && decoded.Payload is IPv6FragmentPayload fragment && fragment.Fragment.NextHeader == 6
+            && Hex(fragment.Bytes) == V6).IsTrue();
+    }
+
+    [Test]
+    [Arguments(17)]
+    [Arguments(58)]
+    [Arguments(50)]
+    [Arguments(59)]
+    [Arguments(253)]
+    public async Task Other_protocols_never_dispatch_tcp(byte next)
+    {
+        foreach (var ipv6 in new[] { false, true })
+        {
+            var frame = Ethernet(Frame(ipv6, V4, next: next));
+            await Assert.That(frame.Payload switch
+            {
+                IPv4DecodeResult ip when ip is DecodedIPv4 decoded => decoded.Payload is not TcpParseResult,
+                IPv6DecodeResult ip when ip is DecodedIPv6 decoded => decoded.Payload is not TcpParseResult,
+                _ => false
+            }).IsTrue();
+        }
+    }
+
+    [Test]
+    [Arguments(65536, 0xc661)]
+    [Arguments(131073, 0xc75e)]
+    [Arguments(200008, 0xb917)]
+    public async Task Jumbo_checksum_uses_full_32_bit_segment_length(int length, ushort checksum)
+    {
+        var wire = new byte[length + 8];
+        Convert.FromHexString("0600C204").CopyTo(wire, 0);
+        BinaryPrimitives.WriteUInt32BigEndian(wire.AsSpan(4), (uint)wire.Length);
+        Convert.FromHexString(V6[..40]).CopyTo(wire, 8);
+        BinaryPrimitives.WriteUInt16BigEndian(wire.AsSpan(24), checksum);
+        wire.AsSpan(28).Fill(0xff);
+        var segment = Segment(Tcp(Frame(true, Hex(wire) + "DEAD", 0, 0)));
+        await Assert.That(segment.DeclaredLength).IsEqualTo((uint)length);
+        await Assert.That(segment.Payload.Length).IsEqualTo(length - 20);
+        await Assert.That(segment.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
+    }
+
+    [Test]
+    public async Task Maximum_jumbo_declaration_is_not_replaced_by_captured_length()
+    {
+        var segment = Segment(Tcp(Frame(true, "0600C204FFFFFFFF" + V6, 0, 0)));
+        await Assert.That(segment.DeclaredLength).IsEqualTo(uint.MaxValue - 8);
+        await Assert.That(segment.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.PayloadTruncated));
+    }
+
+    [Test]
+    public async Task Every_ipv6_address_word_contributes_to_checksum()
+    {
+        var frame = Convert.FromHexString("FFFFFFFFFFFF02000000000186DD6000000000170640"
+            + "20010DB8123456789ABCDEF01111222220010DB887654321FEDCBA9833334444"
+            + "ABCDFEDC81234567FEDCBA985BDB89ABE94ECDEFCAFE01");
+        await Assert.That(Segment(Tcp(ProtocolDecoder.Decode(frame, LinkLayerProtocol.Ethernet))).Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
+        for (var i = 22; i < 54; i++)
+        {
+            frame[i] ^= 1;
+            await Assert.That(Segment(Tcp(ProtocolDecoder.Decode(frame, LinkLayerProtocol.Ethernet))).Checksum.Value).IsEqualTo(TcpChecksumStatus.Mismatch);
+            frame[i] ^= 1;
+        }
+    }
+
+    private static string WithOptions(string options)
+    {
+        var bytes = Convert.FromHexString(V4[..40] + options);
+        bytes[12] = (byte)(bytes.Length / 4 << 4);
+        return Hex(bytes);
+    }
+    private static TcpParseResult Decode(bool ipv6, string bytes, ushort? declared = null) => Tcp(Frame(ipv6, bytes, declared));
+    private static TcpSegment Segment(TcpParseResult result) => result is TcpSegment tcp ? tcp : throw new InvalidOperationException($"Expected TCP segment, got {result.Value}.");
+    private static string Hex(ReadOnlyMemory<byte> bytes) => Convert.ToHexString(bytes.Span);
+    private static DecodedEthernet Ethernet(ProtocolDecodeResult result) =>
+        result is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame ? frame : throw new InvalidOperationException();
+    private static TcpParseResult Tcp(ProtocolDecodeResult result) => Ethernet(result).Payload switch
+    {
+        IPv4DecodeResult ip when ip is DecodedIPv4 decoded && decoded.Payload is TcpParseResult tcp => tcp,
+        IPv6DecodeResult ip when ip is DecodedIPv6 decoded && decoded.Payload is TcpParseResult tcp => tcp,
+        _ => throw new InvalidOperationException("Expected TCP dispatch.")
+    };
+
+    private static ProtocolDecodeResult Frame(bool ipv6, string payload, ushort? declared = null, byte next = 6,
+        ushort fragment = 0, string options = "")
+    {
+        var bytes = Convert.FromHexString(payload);
+        var header = ipv6
+            ? Convert.FromHexString("600000000000064020010DB800000000000000000000000120010DB8000000000000000000000002")
+            : Convert.FromHexString("450000000000000040060000C0000201C6336402" + options);
+        if (ipv6)
+        {
+            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(4), declared ?? checked((ushort)bytes.Length));
+            header[6] = next;
+        }
+        else
+        {
+            header[0] = (byte)(0x40 | header.Length / 4);
+            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(2), (ushort)(header.Length + (declared ?? bytes.Length)));
+            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(6), fragment);
+            header[9] = next;
+        }
+        var ethernet = Convert.FromHexString("FFFFFFFFFFFF020000000001" + (ipv6 ? "86DD" : "0800"));
+        return ProtocolDecoder.Decode((byte[])[.. ethernet, .. header, .. bytes], LinkLayerProtocol.Ethernet);
+    }
+}

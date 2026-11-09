@@ -268,7 +268,7 @@ public class DecodeUdpTests
     }
 
     [Test]
-    [Arguments(6)]
+    [Arguments(58)]
     [Arguments(50)]
     [Arguments(59)]
     [Arguments(253)]
@@ -277,7 +277,7 @@ public class DecodeUdpTests
         var decoded = Frame(true, "0000123400089235", next: next);
         await Assert.That(IPv6(decoded).Payload.Value switch
         {
-            UnsupportedIpProtocol other => next == 6 && other.Protocol == next,
+            UnsupportedIpProtocol other => next == 58 && other.Protocol == next,
             IPv6NoNextHeader => next == 59,
             IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Unsupported } => next is 50 or 253,
             _ => false
