@@ -1,5 +1,7 @@
+using PacketLab.Analyzers.Annotations;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
+using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.Arp;
 
 namespace PacketLab.Analysis.IntegrationTests;
@@ -27,11 +29,11 @@ public class AnalyzeArpCaptureTests
             var context = $"{sample}, record {expected.RecordNumber}";
             var packet = reader.ReadNext() is AnalyzedPacket read ? read
                 : throw new InvalidOperationException($"Expected {context}.");
-            var decoding = packet.Decoding is ProtocolDecodeResult.EthernetArp arp ? arp
+            var decoding = packet.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame ? frame
                 : throw new InvalidOperationException($"Expected ARP dispatch for {context}.");
             var actual = new RecordSnapshot(packet.RecordNumber, packet.Packet.Timestamp, packet.Packet.CapturedLength,
-                packet.Packet.OriginalLength, Hex(packet.Packet.Data), decoding.Ethernet.Source.ToString(),
-                decoding.Ethernet.Destination.ToString(), decoding.Ethernet.EtherType, Hex(decoding.Ethernet.RemainingBytes), Snapshot(decoding.Arp));
+                packet.Packet.OriginalLength, Hex(packet.Packet.Data), decoding.Frame.Source.ToString(),
+                decoding.Frame.Destination.ToString(), decoding.Frame.EtherType, Hex(decoding.Frame.RemainingBytes), Snapshot(decoding.Payload is ArpParseResult arp ? arp : throw new InvalidOperationException()));
             await Assert.That(actual).IsEqualTo(expected).Because($"the output must match {context}");
         }
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
@@ -39,6 +41,7 @@ public class AnalyzeArpCaptureTests
 
     private sealed record RecordSnapshot(long RecordNumber, PcapTimestamp Timestamp, uint CapturedLength, uint OriginalLength,
         string Bytes, string Source, string Destination, ushort EtherType, string EthernetPayload, ArpSnapshot Arp);
+    [TransportModel]
     private sealed record ArpSnapshot(string Kind, ushort? HardwareType = null, ushort? ProtocolType = null,
         byte? HardwareLength = null, byte? ProtocolLength = null, ushort? Operation = null,
         string? SenderHardware = null, string? SenderProtocol = null, string? TargetHardware = null, string? TargetProtocol = null,

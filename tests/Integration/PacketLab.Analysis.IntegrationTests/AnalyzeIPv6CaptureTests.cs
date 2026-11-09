@@ -1,6 +1,9 @@
+using PacketLab.Analyzers.Annotations;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
+using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.IPv6;
+using PacketLab.Protocols.Udp;
 
 namespace PacketLab.Analysis.IntegrationTests;
 
@@ -20,11 +23,11 @@ public class AnalyzeIPv6CaptureTests
             var context = $"{sample}, record {expected.RecordNumber}";
             var analyzed = reader.ReadNext() is AnalyzedPacket read ? read
                 : throw new InvalidOperationException($"Expected {context}.");
-            var decoding = analyzed.Decoding is ProtocolDecodeResult.EthernetIPv6 ip ? ip
+            var decoding = analyzed.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame ? frame
                 : throw new InvalidOperationException($"Expected IPv6 dispatch for {context}.");
             var actual = new RecordSnapshot(analyzed.RecordNumber, analyzed.Packet.CapturedLength, analyzed.Packet.OriginalLength,
-                decoding.Ethernet.Source.ToString(), decoding.Ethernet.Destination.ToString(), decoding.Ethernet.EtherType,
-                Snapshot(decoding.IPv6));
+                decoding.Frame.Source.ToString(), decoding.Frame.Destination.ToString(), decoding.Frame.EtherType,
+                Snapshot(decoding.Payload is IPv6DecodeResult ip ? ip : throw new InvalidOperationException()));
             await Assert.That(actual).IsEqualTo(expected).Because($"the output must match {context}");
         }
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
@@ -45,14 +48,23 @@ public class AnalyzeIPv6CaptureTests
                 : throw new InvalidOperationException($"Expected record {i + 1}.");
             await Assert.That(record.RecordNumber).IsEqualTo(i + 1L);
             await Assert.That(record.Packet.OriginalLength).IsEqualTo(70000u);
-            var ip = record.Decoding is ProtocolDecodeResult.EthernetIPv6 decoded && decoded.IPv6 is IPv6Packet parsed
+            var frame = record.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet decoded
+                ? decoded : throw new InvalidOperationException("Expected Ethernet frame.");
+            var ip = frame.Payload is IPv6DecodeResult result && result is DecodedIPv6 parsed
                 ? parsed : throw new InvalidOperationException("Expected IPv6 packet.");
-            var chain = ip.Extensions;
-            var actual = new ExtensionSnapshot(chain.Status,
-                string.Join(",", chain.Headers.Select(h => $"{h.Type}@{h.Offset}+{h.Length}>{h.NextHeader}:{Convert.ToHexString(h.Bytes.Span)}")),
-                chain.RemainingOffset, Convert.ToHexString(chain.RemainingBytes.Span), chain.UpperLayer?.Protocol,
-                chain.UpperLayer?.DeclaredLength, chain.ChecksumContext is not null,
-                string.Join(",", chain.Diagnostics.Select(d => $"{d.Code}@{d.Offset}")));
+            var kind = ip.Payload switch
+            {
+                UdpParseResult => "Udp",
+                UnsupportedIpProtocol => "UnsupportedProtocol",
+                IPv6FragmentPayload => "Fragment",
+                IPv6NoNextHeader => "NoNextHeader",
+                IPv6PayloadUnavailable unavailable => unavailable.Reason.ToString(),
+                null => throw new InvalidOperationException()
+            };
+            var actual = new ExtensionSnapshot(kind,
+                string.Join(",", ip.Extensions.Select(h => $"{h.Type}@{h.Offset}+{h.Length}>{h.NextHeader}:{Convert.ToHexString(h.Bytes.Span)}")),
+                ip.RemainingOffset, Convert.ToHexString(ip.RemainingBytes.Span), ip.CanBuildChecksumContext,
+                string.Join(",", ip.Diagnostics.Select(d => $"{d.Code}@{d.Offset}")));
             await Assert.That(actual).IsEqualTo(ExpectedExtensionRecords[i]).Because($"record {i + 1} must match independently specified wire fields");
         }
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
@@ -60,14 +72,16 @@ public class AnalyzeIPv6CaptureTests
 
     private sealed record RecordSnapshot(long RecordNumber, uint CapturedLength, uint OriginalLength,
         string Source, string Destination, ushort EtherType, IPv6Snapshot IPv6);
+    [TransportModel]
     private sealed record IPv6Snapshot(string Kind, IPv6Header? Header = null, PayloadSnapshot? Payload = null,
         int? RequiredLength = null, int? CapturedLength = null, byte? InvalidVersion = null, string? RemainingBytes = null);
+    [TransportModel]
     private sealed record PayloadSnapshot(string Kind, string Bytes, string? TrailingBytes = null,
         uint? DeclaredLength = null, ulong? DeclaredDatagramLength = null, bool? IsDatagramComplete = null);
 
-    private static IPv6Snapshot Snapshot(IPv6ParseResult result) => result switch
+    private static IPv6Snapshot Snapshot(IPv6DecodeResult result) => result switch
     {
-        IPv6Packet packet => new("Packet", packet.Header, Snapshot(packet.Payload)),
+        DecodedIPv6 packet => new("Packet", packet.Header, Snapshot(packet.Capture)),
         IPv6ParseResult.IncompleteHeader incomplete => new("IncompleteHeader", RequiredLength: incomplete.RequiredLength,
             CapturedLength: incomplete.CapturedLength, RemainingBytes: Convert.ToHexString(incomplete.RemainingBytes.Span)),
         IPv6ParseResult.InvalidVersion invalid => new("InvalidVersion", InvalidVersion: invalid.Version,
@@ -113,21 +127,20 @@ public class AnalyzeIPv6CaptureTests
                 new("KnownLength", "FFFFFFFF", "", DeclaredLength: 4, DeclaredDatagramLength: 44, IsDatagramComplete: true)))
     ];
 
-    private sealed record ExtensionSnapshot(IPv6ChainStatus Status, string Headers, int RemainingOffset, string Remaining,
-        byte? Protocol, uint? UpperLength, bool HasChecksumContext, string Diagnostics);
+    private sealed record ExtensionSnapshot(string Kind, string Headers, int RemainingOffset, string Remaining, bool CanBuildChecksumContext, string Diagnostics);
 
     private static readonly ExtensionSnapshot[] ExpectedExtensionRecords =
     [
-        new(IPv6ChainStatus.UpperLayer,
+        new("Udp",
             "0@40+8>60:3C00000000000000,60@48+8>43:2B00000000000000,43@56+8>51:3300FE0100000000,51@64+24>44:2C0400000102030405060708000000000000000000000000,44@88+8>17:1100000001234567",
-            96, "CAFE", 17, 10, false, "FinalDestinationUnavailable@56,PayloadTruncated@98"),
-        new(IPv6ChainStatus.ReassemblyRequired, "44@40+8>60:3C00000989ABCDEF", 48, "DEAD", null, null, false, "ReassemblyRequired@40"),
-        new(IPv6ChainStatus.Truncated, "", 40, "1101", null, null, false, "HeaderTruncated@40,PayloadTruncated@42"),
-        new(IPv6ChainStatus.Unsupported, "", 40, "DEAD", null, null, false, "EncryptedEsp@40"),
-        new(IPv6ChainStatus.Unsupported, "", 40, "DEAD", null, null, false, "UnsupportedNextHeader@40"),
-        new(IPv6ChainStatus.NoNextHeader, "", 40, "DEAD", null, null, false, ""),
-        new(IPv6ChainStatus.UpperLayer, "0@40+8>17:1100C20400010000", 48, "", 17, 65528, false, "PayloadTruncated@48"),
-        new(IPv6ChainStatus.Invalid, "0@40+8>17:1100000000000000", 48, "", null, null, false, "MissingJumboPayload@40"),
-        new(IPv6ChainStatus.UpperLayer, "", 40, "CAFE0102", 17, 4, true, "")
+            96, "CAFE", false, "FinalDestinationUnavailable@56,PayloadTruncated@98"),
+        new("Fragment", "44@40+8>60:3C00000989ABCDEF", 48, "DEAD", false, "ReassemblyRequired@40"),
+        new("Truncated", "", 40, "1101", false, "HeaderTruncated@40,PayloadTruncated@42"),
+        new("Unsupported", "", 40, "DEAD", false, "EncryptedEsp@40"),
+        new("Unsupported", "", 40, "DEAD", false, "UnsupportedNextHeader@40"),
+        new("NoNextHeader", "", 40, "DEAD", false, ""),
+        new("Udp", "0@40+8>17:1100C20400010000", 48, "", true, "PayloadTruncated@48"),
+        new("Invalid", "0@40+8>17:1100000000000000", 48, "", false, "MissingJumboPayload@40"),
+        new("Udp", "", 40, "CAFE0102", true, "")
     ];
 }

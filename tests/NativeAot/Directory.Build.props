@@ -1,3 +1,6 @@
 <Project>
   <Import Project="../../Directory.Build.props" />
+  <PropertyGroup>
+    <EnablePacketLabAnalyzers>false</EnablePacketLabAnalyzers>
+  </PropertyGroup>
 </Project>

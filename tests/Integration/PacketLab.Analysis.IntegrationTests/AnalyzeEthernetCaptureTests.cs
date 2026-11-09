@@ -1,3 +1,4 @@
+using PacketLab.Analyzers.Annotations;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Arp;
@@ -30,6 +31,7 @@ public class AnalyzeEthernetCaptureTests
 
     private sealed record RecordSnapshot(long RecordNumber, PcapTimestamp Timestamp, uint CapturedLength, uint OriginalLength,
         string Bytes, EthernetSnapshot Ethernet);
+    [TransportModel]
     private sealed record EthernetSnapshot(string Kind, string? Source = null, string? Destination = null,
         ushort? EtherType = null, ushort? Length = null, ushort? InvalidLengthOrType = null,
         int? CapturedHeaderLength = null, string RemainingBytes = "", int? RequiredArpHeaderLength = null,
@@ -37,28 +39,38 @@ public class AnalyzeEthernetCaptureTests
 
     private static EthernetSnapshot Snapshot(ProtocolDecodeResult result) => result switch
     {
-        EthernetParseResult ethernet => SnapshotEthernet(ethernet),
-        ProtocolDecodeResult.EthernetArp arp when arp.Arp is ArpParseResult.IncompleteHeader incomplete =>
-            SnapshotEthernet(arp.Ethernet) with
-            {
-                RequiredArpHeaderLength = incomplete.RequiredLength,
-                ArpRemainingBytes = Hex(incomplete.RemainingBytes)
-            },
+        EthernetDecodeResult ethernet => SnapshotEthernet(ethernet),
         _ => throw new InvalidOperationException("Unexpected decoding in an Ethernet fixture.")
     };
 
-    private static EthernetSnapshot SnapshotEthernet(EthernetParseResult result) => result switch
+    private static EthernetSnapshot SnapshotEthernet(EthernetDecodeResult result) => result switch
     {
-        EthernetFrame frame => new("Frame", frame.Source.ToString(), frame.Destination.ToString(),
-            EtherType: frame.EtherType, RemainingBytes: Hex(frame.RemainingBytes)),
+        DecodedEthernet frame => SnapshotFrame(frame),
         EthernetParseResult.IncompleteHeader incomplete => new("IncompleteHeader",
             CapturedHeaderLength: incomplete.CapturedLength, RemainingBytes: Hex(incomplete.RemainingBytes)),
         EthernetParseResult.Ieee8023Length length => new("Ieee8023Length", length.Source.ToString(), length.Destination.ToString(),
             Length: length.Length, RemainingBytes: Hex(length.RemainingBytes)),
         EthernetParseResult.InvalidLengthOrType invalid => new("InvalidLengthOrType", invalid.Source.ToString(), invalid.Destination.ToString(),
             InvalidLengthOrType: invalid.Value, RemainingBytes: Hex(invalid.RemainingBytes)),
-        null => throw new InvalidOperationException("Uninitialized Ethernet parse result.")
+        null => throw new InvalidOperationException("Uninitialized Ethernet decode result.")
     };
+
+    private static EthernetSnapshot SnapshotFrame(DecodedEthernet decoded)
+    {
+        var frame = decoded.Frame;
+        var snapshot = new EthernetSnapshot("Frame", frame.Source.ToString(), frame.Destination.ToString(),
+            EtherType: frame.EtherType, RemainingBytes: Hex(frame.RemainingBytes));
+        return decoded.Payload switch
+        {
+            ArpParseResult arp when arp is ArpParseResult.IncompleteHeader incomplete => snapshot with
+            {
+                RequiredArpHeaderLength = incomplete.RequiredLength,
+                ArpRemainingBytes = Hex(incomplete.RemainingBytes)
+            },
+            UnsupportedEtherType => snapshot,
+            _ => throw new InvalidOperationException("Unexpected Ethernet payload in fixture.")
+        };
+    }
 
     private static string Hex(ReadOnlyMemory<byte> bytes) => Convert.ToHexString(bytes.Span);
 

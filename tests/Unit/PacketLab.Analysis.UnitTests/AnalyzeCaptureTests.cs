@@ -20,8 +20,8 @@ public class AnalyzeCaptureTests
         {
             var reader = Open(stream);
             first = Read(reader);
-            decodedBytes = first.Decoding is ProtocolDecodeResult.EthernetArp parsed
-                ? parsed.Ethernet.RemainingBytes : throw new AssertionException("Expected decoded bytes.");
+            decodedBytes = first.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet parsed
+                ? parsed.Frame.RemainingBytes : throw new AssertionException("Expected decoded bytes.");
             await Assert.That(first.RecordNumber).IsEqualTo(1L);
             await Assert.That(first.Packet.Timestamp).IsEqualTo(PcapTimestamp.FromMicroseconds(1, 123456));
             await Assert.That(first.Packet.CapturedLength).IsEqualTo(16u);

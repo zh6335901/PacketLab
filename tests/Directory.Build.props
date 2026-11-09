@@ -1,6 +1,7 @@
 <Project>
   <Import Project="../Directory.Build.props" />
   <PropertyGroup>
+    <EnablePacketLabAnalyzers>false</EnablePacketLabAnalyzers>
     <OutputType>Exe</OutputType>
     <TargetFramework>net11.0</TargetFramework>
   </PropertyGroup>
