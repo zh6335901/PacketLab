@@ -1,11 +1,13 @@
 <Solution>
+  <Folder Name="/analyzers/">
+    <Project Path="analyzers/PacketLab.Analyzers/PacketLab.Analyzers.csproj" />
+    <Project Path="analyzers/PacketLab.Analyzers.Annotations/PacketLab.Analyzers.Annotations.csproj" />
+  </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/PacketLab.Analysis.Benchmarks/PacketLab.Analysis.Benchmarks.csproj" />
     <Project Path="benchmarks/PacketLab.Pcap.Benchmarks/PacketLab.Pcap.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/PacketLab.Analyzers/PacketLab.Analyzers.csproj" />
-    <Project Path="src/PacketLab.Analyzers.Annotations/PacketLab.Analyzers.Annotations.csproj" />
     <Project Path="src/PacketLab.Analysis/PacketLab.Analysis.csproj" />
     <Project Path="src/PacketLab.Cli/PacketLab.Cli.csproj" />
     <Project Path="src/PacketLab.Protocols/PacketLab.Protocols.csproj" />
