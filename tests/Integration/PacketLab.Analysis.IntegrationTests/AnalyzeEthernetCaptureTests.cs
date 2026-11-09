@@ -30,10 +30,12 @@ public class AnalyzeEthernetCaptureTests
 
     private sealed record RecordSnapshot(long RecordNumber, PcapTimestamp Timestamp, uint CapturedLength, uint OriginalLength,
         string Bytes, EthernetSnapshot Ethernet);
+    #pragma warning disable PL0001 // Test snapshots intentionally flatten different result cases for comparison.
     private sealed record EthernetSnapshot(string Kind, string? Source = null, string? Destination = null,
         ushort? EtherType = null, ushort? Length = null, ushort? InvalidLengthOrType = null,
         int? CapturedHeaderLength = null, string RemainingBytes = "", int? RequiredArpHeaderLength = null,
         string? ArpRemainingBytes = null);
+    #pragma warning restore PL0001
 
     private static EthernetSnapshot Snapshot(ProtocolDecodeResult result) => result switch
     {

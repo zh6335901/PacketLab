@@ -1,6 +1,8 @@
 namespace PacketLab.Pcap.UnitTests;
 
+#pragma warning disable PL0001 // Failure injection is independently optional and unrelated to the disposal flag.
 internal sealed class ProbeStream(byte[] bytes) : Stream
+#pragma warning restore PL0001
 {
     internal int ChunkSize { get; init; } = int.MaxValue;
     internal int? FailAt { get; set; }

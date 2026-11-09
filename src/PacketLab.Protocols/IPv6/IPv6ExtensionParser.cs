@@ -143,8 +143,10 @@ internal static class IPv6ExtensionParser
         }
     }
 
+    #pragma warning disable PL0001 // Existing private option scanner accumulates metadata and partial error details; retain its representation in this analyzer change.
     private sealed record Options(uint? JumboLength = null, bool HasHomeAddress = false,
         IPv6DiagnosticCode? Error = null, int ErrorOffset = 0, string? Message = null);
+    #pragma warning restore PL0001
 
     private static Options ReadOptions(ReadOnlySpan<byte> header, bool firstHopByHop, ushort fixedLength)
     {

@@ -50,9 +50,11 @@ public class AnalyzeUdpCaptureTests
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
     }
 
+    #pragma warning disable PL0001 // Test snapshots intentionally flatten different result cases for comparison.
     private sealed record Snapshot(int Version, UdpHeader? Header, uint? EffectiveLength, int? PayloadLength,
         string? Payload, uint? SurplusLength, string? Surplus, bool? Complete, bool? SurplusComplete,
         UdpChecksum? Checksum, string? Remaining = null, string Kind = "Udp");
+    #pragma warning restore PL0001
 
     private static readonly Snapshot[] Expected =
     [

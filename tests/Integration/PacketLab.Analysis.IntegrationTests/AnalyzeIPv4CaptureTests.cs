@@ -35,10 +35,12 @@ public class AnalyzeIPv4CaptureTests
     private sealed record HeaderSnapshot(byte Version, byte Ihl, byte Dscp, byte Ecn, ushort TotalLength,
         ushort Identification, byte Flags, ushort FragmentOffset, byte Ttl, byte Protocol, ushort HeaderChecksum,
         IPv4Address Source, IPv4Address Destination, string Options);
+    #pragma warning disable PL0001 // Test snapshots intentionally flatten different result cases for comparison.
     private sealed record IPv4Snapshot(string Kind, IPv4ChecksumStatus ChecksumStatus, HeaderSnapshot? Header = null,
         string? Payload = null, string? TrailingBytes = null, bool? IsDatagramComplete = null,
         int? RequiredLength = null, int? CapturedLength = null, ushort? InvalidTotalLength = null,
         int? HeaderLength = null, string? RemainingBytes = null);
+    #pragma warning restore PL0001
 
     private static IPv4Snapshot Snapshot(IPv4DecodeResult result) => result switch
     {

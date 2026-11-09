@@ -35,6 +35,8 @@ public sealed record IPv6UpperLayer(byte Protocol, int Offset, uint DeclaredLeng
 public sealed record IPv6ChecksumContext(IPv6Address Source, IPv6Address FinalDestination,
     byte Protocol, uint UpperLayerLength);
 
+#pragma warning disable PL0001 // Preserve the existing low-level parser API; DecodedIPv6 exposes terminal states as a union.
 public sealed record IPv6ExtensionChain(ImmutableArray<IPv6ExtensionHeader> Headers, IPv6ChainStatus Status,
     int RemainingOffset, ReadOnlyMemory<byte> RemainingBytes, IPv6UpperLayer? UpperLayer,
     IPv6ChecksumContext? ChecksumContext, ImmutableArray<IPv6Diagnostic> Diagnostics);
+#pragma warning restore PL0001

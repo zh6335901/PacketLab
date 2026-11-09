@@ -11,7 +11,9 @@ public enum UdpUnavailableReason
     PayloadTruncated, PseudoHeaderUnavailable
 }
 
+#pragma warning disable PL0001 // Preserve the existing checksum API; replacing status/reason with union cases is a separate API change.
 public sealed record UdpChecksum(UdpChecksumStatus Status, UdpUnavailableReason? Reason = null);
+#pragma warning restore PL0001
 
 public sealed record UdpDatagram(UdpHeader Header, uint EffectiveLength, ReadOnlyMemory<byte> Payload,
     uint DeclaredSurplusLength, ReadOnlyMemory<byte> SurplusArea, UdpChecksum Checksum)
@@ -29,8 +31,10 @@ public union UdpParseResult(UdpDatagram, UdpParseResult.Unavailable)
         _ => throw new InvalidOperationException("Uninitialized UDP result.")
     };
 
+    #pragma warning disable PL0001 // This is already a failure case; Header retains any header parsed before the failure.
     public sealed record Unavailable(UdpUnavailableReason Reason, uint DeclaredUpperLayerLength,
         ReadOnlyMemory<byte> RemainingBytes, UdpHeader? Header = null);
+    #pragma warning restore PL0001
 }
 
 internal static class UdpParser
