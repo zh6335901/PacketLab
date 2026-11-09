@@ -8,11 +8,6 @@ public union IPv6DecodeResult(DecodedIPv6, IPv6ParseResult.IncompleteHeader, IPv
 public union IPv6PayloadResult(UdpParseResult, IPv6FragmentPayload, IPv6NoNextHeader,
     IPv6PayloadUnavailable, UnsupportedIpProtocol);
 
-public sealed record IPv6FragmentPayload(IPv6Fragment Fragment, uint DeclaredLength, ReadOnlyMemory<byte> Bytes);
-public sealed record IPv6NoNextHeader;
-public enum IPv6PayloadFailure { Unsupported, Invalid, Truncated }
-public sealed record IPv6PayloadUnavailable(IPv6PayloadFailure Reason);
-
 public sealed record DecodedIPv6
 {
     public IPv6Header Header { get; }
@@ -33,22 +28,18 @@ public sealed record DecodedIPv6
         Diagnostics = chain.Diagnostics;
         RemainingOffset = chain.RemainingOffset;
         RemainingBytes = chain.RemainingBytes;
-        CanBuildChecksumContext = chain.ChecksumContext is not null;
+        CanBuildChecksumContext = chain.Result is IPv6UpperLayer located &&
+            located.ChecksumContext is IPv6ChecksumContext.KnownAddresses;
         // Consume the location result; retain one terminal payload state in the decoded tree.
-        Payload = chain.Status switch
+        Payload = chain.Result switch
         {
-            IPv6ChainStatus.UpperLayer when chain.UpperLayer is { Protocol: 17 } upper =>
-                UdpDecoder.Decode(upper, chain.ChecksumContext),
-            IPv6ChainStatus.UpperLayer when chain.UpperLayer is { } upper =>
+            IPv6UpperLayer { Protocol: 17 } upper => UdpDecoder.Decode(upper),
+            IPv6UpperLayer upper =>
                 new UnsupportedIpProtocol(upper.Protocol, upper.DeclaredLength, upper.Bytes),
-            IPv6ChainStatus.ReassemblyRequired when chain.Headers[^1].Fragment is { } fragment
-                && packet.Payload is IPv6Payload.KnownLength known =>
-                new IPv6FragmentPayload(fragment, known.DeclaredLength - (uint)(chain.RemainingOffset - 40), chain.RemainingBytes),
-            IPv6ChainStatus.NoNextHeader => new IPv6NoNextHeader(),
-            IPv6ChainStatus.Unsupported => new IPv6PayloadUnavailable(IPv6PayloadFailure.Unsupported),
-            IPv6ChainStatus.Invalid => new IPv6PayloadUnavailable(IPv6PayloadFailure.Invalid),
-            IPv6ChainStatus.Truncated => new IPv6PayloadUnavailable(IPv6PayloadFailure.Truncated),
-            _ => throw new InvalidOperationException("Inconsistent IPv6 extension parse result.")
+            IPv6FragmentPayload fragment => fragment,
+            IPv6NoNextHeader end => end,
+            IPv6PayloadUnavailable unavailable => unavailable,
+            null => throw new InvalidOperationException("Uninitialized IPv6 extension parse result.")
         };
     }
 

@@ -1,3 +1,4 @@
+using PacketLab.Analyzers.Annotations;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Ethernet;
@@ -40,12 +41,11 @@ public class AnalyzeArpCaptureTests
 
     private sealed record RecordSnapshot(long RecordNumber, PcapTimestamp Timestamp, uint CapturedLength, uint OriginalLength,
         string Bytes, string Source, string Destination, ushort EtherType, string EthernetPayload, ArpSnapshot Arp);
-    #pragma warning disable PL0001 // Test snapshots intentionally flatten different result cases for comparison.
+    [TransportModel]
     private sealed record ArpSnapshot(string Kind, ushort? HardwareType = null, ushort? ProtocolType = null,
         byte? HardwareLength = null, byte? ProtocolLength = null, ushort? Operation = null,
         string? SenderHardware = null, string? SenderProtocol = null, string? TargetHardware = null, string? TargetProtocol = null,
         string RemainingBytes = "", int? RequiredLength = null, int? CapturedLength = null);
-    #pragma warning restore PL0001
 
     private static ArpSnapshot Snapshot(ArpParseResult result) => result switch
     {

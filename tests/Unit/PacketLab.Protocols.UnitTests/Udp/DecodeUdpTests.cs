@@ -23,7 +23,7 @@ public class DecodeUdpTests
         await Assert.That(udp.EffectiveLength).IsEqualTo((uint)(bytes.Length / 2));
         await Assert.That(Hex(udp.Payload)).IsEqualTo(payload);
         await Assert.That(udp.IsComplete).IsTrue();
-        await Assert.That(udp.Checksum).IsEqualTo(new UdpChecksum(UdpChecksumStatus.Match));
+        await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
     }
 
     [Test]
@@ -33,7 +33,7 @@ public class DecodeUdpTests
     [Arguments(true, "0000123400089234")]
     public async Task Changed_payload_or_checksum_does_not_match(bool ipv6, string bytes)
     {
-        await Assert.That(Datagram(Decode(ipv6, bytes)).Checksum.Status).IsEqualTo(UdpChecksumStatus.Mismatch);
+        await Assert.That(Datagram(Decode(ipv6, bytes)).Checksum.Value).IsEqualTo(UdpChecksumStatus.Mismatch);
     }
 
     [Test]
@@ -41,7 +41,7 @@ public class DecodeUdpTests
     [Arguments(true, UdpChecksumStatus.ZeroNotAllowed)]
     public async Task Zero_checksum_has_network_specific_semantics(bool ipv6, UdpChecksumStatus expected)
     {
-        await Assert.That(Datagram(Decode(ipv6, "FFFF800000080000")).Checksum.Status).IsEqualTo(expected);
+        await Assert.That(Datagram(Decode(ipv6, "FFFF800000080000")).Checksum.Value).IsEqualTo(expected);
     }
 
     [Test]
@@ -56,7 +56,7 @@ public class DecodeUdpTests
         await Assert.That(Hex(udp.SurplusArea)).IsEqualTo("AABBCC");
         await Assert.That(udp.DeclaredSurplusLength).IsEqualTo(3u);
         await Assert.That(udp.IsSurplusComplete).IsTrue();
-        await Assert.That(udp.Checksum.Status).IsEqualTo(UdpChecksumStatus.Match);
+        await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
         var trailing = ipv6 && IPv6(result).Capture is IPv6Payload.KnownLength known
             ? known.TrailingBytes : IPv4(result).Packet.TrailingBytes;
         await Assert.That(Hex(trailing)).IsEqualTo("DEADBEEF");
@@ -73,7 +73,7 @@ public class DecodeUdpTests
         await Assert.That(udp.IsSurplusComplete).IsFalse();
         await Assert.That(udp.DeclaredSurplusLength).IsEqualTo(4u);
         await Assert.That(Hex(udp.SurplusArea)).IsEqualTo("AA");
-        await Assert.That(udp.Checksum.Status).IsEqualTo(UdpChecksumStatus.Match);
+        await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
         if (ipv6)
             await Assert.That(IPv6(result).Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.PayloadTruncated);
         else
@@ -92,11 +92,16 @@ public class DecodeUdpTests
     public async Task Invalid_lengths_do_not_borrow_trailing_capture(bool ipv6, string bytes, ushort declared, UdpUnavailableReason reason)
     {
         var result = Decode(ipv6, bytes, declared);
-        var invalid = result is UdpParseResult.Unavailable value ? value : throw new InvalidOperationException();
-        await Assert.That(invalid.Reason).IsEqualTo(reason);
-        await Assert.That(invalid.RemainingBytes.Length).IsEqualTo(Math.Min(bytes.Length / 2, declared));
-        await Assert.That(invalid.Header is not null).IsEqualTo(declared >= 8);
-        await Assert.That(result.Checksum).IsEqualTo(new UdpChecksum(UdpChecksumStatus.Unavailable, reason));
+        var remaining = result switch
+        {
+            UdpParseResult.IpLengthTooShort error when reason == UdpUnavailableReason.IpLengthTooShort => error.RemainingBytes,
+            UdpParseResult.InvalidLength error when reason == UdpUnavailableReason.InvalidLength => error.RemainingBytes,
+            UdpParseResult.LengthExceedsIpPayload error when reason == UdpUnavailableReason.LengthExceedsIpPayload => error.RemainingBytes,
+            _ => throw new InvalidOperationException("Unexpected UDP failure case.")
+        };
+        await Assert.That(remaining.Length).IsEqualTo(Math.Min(bytes.Length / 2, declared));
+        await Assert.That(result is UdpParseResult.InvalidLength or UdpParseResult.LengthExceedsIpPayload).IsEqualTo(declared >= 8);
+        await Assert.That(result.Checksum.Value).IsEqualTo(new UdpChecksumUnavailable(reason));
     }
 
     [Test]
@@ -110,9 +115,8 @@ public class DecodeUdpTests
             var result = Decode(ipv6, bytes[..(n * 2)], 11);
             if (n < 8)
             {
-                var shortHeader = result is UdpParseResult.Unavailable u ? u : throw new InvalidOperationException();
-                await Assert.That(shortHeader.Reason).IsEqualTo(UdpUnavailableReason.HeaderTruncated);
-                await Assert.That(shortHeader.Header is null).IsTrue();
+                var shortHeader = result is UdpParseResult.HeaderTruncated u ? u : throw new InvalidOperationException();
+                await Assert.That(result.Checksum.Value).IsEqualTo(new UdpChecksumUnavailable(UdpUnavailableReason.HeaderTruncated));
                 await Assert.That(shortHeader.RemainingBytes.Length).IsEqualTo(n);
             }
             else
@@ -121,7 +125,7 @@ public class DecodeUdpTests
                 await Assert.That(udp.Header.Length).IsEqualTo((ushort)11);
                 await Assert.That(udp.Payload.Length).IsEqualTo(n - 8);
                 await Assert.That(udp.IsComplete).IsFalse();
-                await Assert.That(udp.Checksum).IsEqualTo(new UdpChecksum(UdpChecksumStatus.Unavailable, UdpUnavailableReason.PayloadTruncated));
+                await Assert.That(udp.Checksum.Value).IsEqualTo(new UdpChecksumUnavailable(UdpUnavailableReason.PayloadTruncated));
             }
         }
     }
@@ -137,7 +141,7 @@ public class DecodeUdpTests
     {
         var result = Frame(true, extensions + "00001234000BC630CAFE01", next: next);
         var udp = Datagram(Udp(result));
-        await Assert.That(udp.Checksum.Status).IsEqualTo(UdpChecksumStatus.Match);
+        await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
         await Assert.That(Hex(udp.Payload)).IsEqualTo("CAFE01");
     }
 
@@ -149,7 +153,7 @@ public class DecodeUdpTests
         var udp = Datagram(Udp(Frame(true, extensions + udpBytes, next: next)));
         await Assert.That(udp.Header.Length).IsEqualTo((ushort)0);
         await Assert.That(udp.EffectiveLength).IsEqualTo(effective);
-        await Assert.That(udp.Checksum.Status).IsEqualTo(UdpChecksumStatus.Match);
+        await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
     }
 
     [Test]
@@ -170,7 +174,7 @@ public class DecodeUdpTests
         await Assert.That(udp.IsComplete).IsTrue();
         await Assert.That(udp.DeclaredSurplusLength).IsEqualTo(0u);
         await Assert.That(udp.SurplusArea.IsEmpty).IsTrue();
-        await Assert.That(udp.Checksum.Status).IsEqualTo(UdpChecksumStatus.Match);
+        await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
     }
 
     [Test]
@@ -179,7 +183,7 @@ public class DecodeUdpTests
         var udp = Datagram(Udp(Frame(true, "1100C204FFFFFFFF0000123400000001CAFE", 0, 0)));
         await Assert.That(udp.EffectiveLength).IsEqualTo(uint.MaxValue - 8);
         await Assert.That(udp.IsComplete).IsFalse();
-        await Assert.That(udp.Checksum.Reason).IsEqualTo(UdpUnavailableReason.PayloadTruncated);
+        await Assert.That(udp.Checksum.Value).IsEqualTo(new UdpChecksumUnavailable(UdpUnavailableReason.PayloadTruncated));
         await Assert.That(Hex(udp.Payload)).IsEqualTo("CAFE");
     }
 
@@ -224,7 +228,7 @@ public class DecodeUdpTests
     public async Task Ipv4_options_use_known_final_destination_and_ignore_unrelated_options(string options)
     {
         var udp = Datagram(Udp(Frame(false, "0000123400080173", options: options)));
-        await Assert.That(udp.Checksum.Status).IsEqualTo(UdpChecksumStatus.Match);
+        await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
     }
 
     [Test]
@@ -232,7 +236,7 @@ public class DecodeUdpTests
     {
         // Current destination remains 198.51.100.2; final route destination is 198.51.100.3.
         var udp = Datagram(Udp(Frame(false, "0000123400080172", options: "830B04C0000209C633640300")));
-        await Assert.That(udp.Checksum.Status).IsEqualTo(UdpChecksumStatus.Match);
+        await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
     }
 
     [Test]
@@ -250,7 +254,7 @@ public class DecodeUdpTests
     public async Task Ambiguous_or_malformed_source_routes_disable_checksum(string options)
     {
         var udp = Datagram(Udp(Frame(false, "0000123400080173", options: options)));
-        await Assert.That(udp.Checksum).IsEqualTo(new UdpChecksum(UdpChecksumStatus.Unavailable, UdpUnavailableReason.PseudoHeaderUnavailable));
+        await Assert.That(udp.Checksum.Value).IsEqualTo(new UdpChecksumUnavailable(UdpUnavailableReason.PseudoHeaderUnavailable));
     }
 
     [Test]
@@ -260,7 +264,7 @@ public class DecodeUdpTests
     {
         var udp = Datagram(Udp(Frame(true, extensions + "0000123400089235", next: next)));
         await Assert.That(udp.IsComplete).IsTrue();
-        await Assert.That(udp.Checksum).IsEqualTo(new UdpChecksum(UdpChecksumStatus.Unavailable, UdpUnavailableReason.PseudoHeaderUnavailable));
+        await Assert.That(udp.Checksum.Value).IsEqualTo(new UdpChecksumUnavailable(UdpUnavailableReason.PseudoHeaderUnavailable));
     }
 
     [Test]
@@ -309,7 +313,7 @@ public class DecodeUdpTests
         await Assert.That(udp.DeclaredSurplusLength).IsEqualTo(65520u);
         await Assert.That(udp.IsComplete).IsTrue();
         await Assert.That(udp.IsSurplusComplete).IsFalse();
-        await Assert.That(udp.Checksum.Status).IsEqualTo(UdpChecksumStatus.Match);
+        await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
     }
 
     [Test]
@@ -336,7 +340,7 @@ public class DecodeUdpTests
             + "20010DB8123456789ABCDEF011112222"
             + "20010DB887654321FEDCBA9833334444"
             + "00001234000BB532CAFE01"), LinkLayerProtocol.Ethernet);
-        await Assert.That(Datagram(Udp(result)).Checksum.Status).IsEqualTo(UdpChecksumStatus.Match);
+        await Assert.That(Datagram(Udp(result)).Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
     }
 
     private static UdpParseResult Decode(bool ipv6, string bytes, ushort? declared = null) => Udp(Frame(ipv6, bytes, declared));

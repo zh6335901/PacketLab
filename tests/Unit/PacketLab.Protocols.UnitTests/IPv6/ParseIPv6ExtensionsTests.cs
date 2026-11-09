@@ -12,14 +12,14 @@ public class ParseIPv6ExtensionsTests
     public async Task Direct_upper_layer_has_exact_range_and_pseudo_header(byte protocol)
     {
         var packet = Parse(protocol, "CAFE0102DEAD", 4);
-        var upper = packet.Extensions.UpperLayer!;
+        var upper = Upper(packet.Extensions);
         await Assert.That(upper.Protocol).IsEqualTo(protocol);
         await Assert.That(upper.Offset).IsEqualTo(40);
         await Assert.That(upper.DeclaredLength).IsEqualTo(4u);
         await Assert.That(Hex(upper.Bytes)).IsEqualTo("CAFE0102");
         await Assert.That(packet.Extensions.Headers.IsEmpty).IsTrue();
-        await Assert.That(packet.Extensions.ChecksumContext).IsEqualTo(new IPv6ChecksumContext(
-            new(0x20010db800000000, 1), new(0xff02000000000000, 2), protocol, 4));
+        await Assert.That(upper.ChecksumContext.Value).IsEqualTo(new IPv6ChecksumContext.KnownAddresses(
+            new(0x20010db800000000, 1), new(0xff02000000000000, 2)));
         await Assert.That(Hex(Known(packet).TrailingBytes)).IsEqualTo("DEAD");
     }
 
@@ -38,10 +38,10 @@ public class ParseIPv6ExtensionsTests
         await Assert.That(item.Offset).IsEqualTo(40);
         await Assert.That(item.Length).IsEqualTo(length);
         await Assert.That(Hex(item.Bytes)).IsEqualTo(extension);
-        await Assert.That(packet.Extensions.UpperLayer!.Offset).IsEqualTo(40 + length);
-        await Assert.That(Hex(packet.Extensions.UpperLayer.Bytes)).IsEqualTo("CAFE");
-        await Assert.That(packet.Extensions.UpperLayer.DeclaredLength).IsEqualTo(2u);
-        await Assert.That(packet.Extensions.ChecksumContext is not null).IsTrue();
+        await Assert.That(Upper(packet.Extensions).Offset).IsEqualTo(40 + length);
+        await Assert.That(Hex(Upper(packet.Extensions).Bytes)).IsEqualTo("CAFE");
+        await Assert.That(Upper(packet.Extensions).DeclaredLength).IsEqualTo(2u);
+        await Assert.That(HasKnownContext(packet.Extensions)).IsTrue();
     }
 
     [Test]
@@ -53,11 +53,11 @@ public class ParseIPv6ExtensionsTests
         var chain = packet.Extensions;
         await Assert.That(string.Join(",", chain.Headers.Select(h => h.Type))).IsEqualTo("0,60,43,51,44");
         await Assert.That(string.Join(",", chain.Headers.Select(h => h.Offset))).IsEqualTo("40,48,64,72,96");
-        await Assert.That(chain.UpperLayer!.Offset).IsEqualTo(104);
-        await Assert.That(chain.UpperLayer.Protocol).IsEqualTo((byte)6);
-        await Assert.That(chain.UpperLayer.DeclaredLength).IsEqualTo(4u);
-        await Assert.That(Hex(chain.UpperLayer.Bytes)).IsEqualTo("CAFE0102");
-        await Assert.That(chain.ChecksumContext!.UpperLayerLength).IsEqualTo(4u);
+        await Assert.That(Upper(chain).Offset).IsEqualTo(104);
+        await Assert.That(Upper(chain).Protocol).IsEqualTo((byte)6);
+        await Assert.That(Upper(chain).DeclaredLength).IsEqualTo(4u);
+        await Assert.That(Hex(Upper(chain).Bytes)).IsEqualTo("CAFE0102");
+        await Assert.That(HasKnownContext(chain)).IsTrue();
         await Assert.That(chain.Diagnostics.IsEmpty).IsTrue();
     }
 
@@ -78,9 +78,9 @@ public class ParseIPv6ExtensionsTests
         await Assert.That(actual).IsEqualTo(new IPv6Fragment(offset, more, 0x89abcdef, 60));
         await Assert.That(actual.OffsetBytes).IsEqualTo(offset * 8);
         await Assert.That(actual.IsAtomic).IsEqualTo(offset == 0 && !more);
-        await Assert.That(packet.Extensions.UpperLayer is null).IsTrue();
-        await Assert.That(packet.Extensions.ChecksumContext is null).IsTrue();
-        await Assert.That(packet.Extensions.Status).IsEqualTo(actual.IsAtomic ? IPv6ChainStatus.Invalid : IPv6ChainStatus.ReassemblyRequired);
+        await Assert.That(actual.IsAtomic
+            ? packet.Extensions.Result is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Invalid }
+            : packet.Extensions.Result is IPv6FragmentPayload { DeclaredLength: 2 } result && result.Fragment == actual).IsTrue();
         await Assert.That(packet.Extensions.RemainingOffset).IsEqualTo(48);
         await Assert.That(Hex(packet.Extensions.RemainingBytes)).IsEqualTo("DEAD");
     }
@@ -91,8 +91,10 @@ public class ParseIPv6ExtensionsTests
     public async Task Routing_segments_control_final_destination_reliability(byte segments, bool available)
     {
         var chain = Parse(43, "1100FE" + segments.ToString("X2") + "00000000CAFE").Extensions;
-        await Assert.That(chain.UpperLayer!.Protocol).IsEqualTo((byte)17);
-        await Assert.That(chain.ChecksumContext is not null).IsEqualTo(available);
+        await Assert.That(Upper(chain).Protocol).IsEqualTo((byte)17);
+        await Assert.That(available
+            ? Upper(chain).ChecksumContext is IPv6ChecksumContext.KnownAddresses
+            : Upper(chain).ChecksumContext is IPv6ChecksumContext.Unavailable).IsTrue();
         await Assert.That(chain.Diagnostics.Any(d => d.Code == IPv6DiagnosticCode.FinalDestinationUnavailable)).IsEqualTo(!available);
     }
 
@@ -103,10 +105,8 @@ public class ParseIPv6ExtensionsTests
     public async Task Unsupported_chain_preserves_prefix_and_remainder(byte type, IPv6DiagnosticCode code)
     {
         var chain = Parse(60, type.ToString("X2") + "00000000000000CAFE").Extensions;
-        await Assert.That(chain.Status).IsEqualTo(IPv6ChainStatus.Unsupported);
+        await Assert.That(chain.Result is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Unsupported }).IsTrue();
         await Assert.That(chain.Headers.Length).IsEqualTo(1);
-        await Assert.That(chain.UpperLayer is null).IsTrue();
-        await Assert.That(chain.ChecksumContext is null).IsTrue();
         await Assert.That(chain.Diagnostics.Single().Code).IsEqualTo(code);
         await Assert.That(chain.Diagnostics.Single().Offset).IsEqualTo(48);
         await Assert.That(chain.RemainingOffset).IsEqualTo(48);
@@ -117,9 +117,7 @@ public class ParseIPv6ExtensionsTests
     public async Task No_next_header_ignores_but_preserves_remaining_payload()
     {
         var chain = Parse(60, "3B00000000000000CAFE").Extensions;
-        await Assert.That(chain.Status).IsEqualTo(IPv6ChainStatus.NoNextHeader);
-        await Assert.That(chain.UpperLayer is null).IsTrue();
-        await Assert.That(chain.ChecksumContext is null).IsTrue();
+        await Assert.That(chain.Result is IPv6NoNextHeader).IsTrue();
         await Assert.That(Hex(chain.RemainingBytes)).IsEqualTo("CAFE");
     }
 
@@ -137,8 +135,8 @@ public class ParseIPv6ExtensionsTests
         var packet = Parse(type, bytes, declared);
         await Assert.That(packet.Extensions.Diagnostics[0].Code).IsEqualTo(code);
         await Assert.That(packet.Extensions.Diagnostics[0].Offset).IsEqualTo(code == IPv6DiagnosticCode.InvalidOptions ? 42 : 40);
-        await Assert.That(packet.Extensions.UpperLayer is null).IsTrue();
-        await Assert.That(packet.Extensions.ChecksumContext is null).IsTrue();
+        await Assert.That(packet.Extensions.Result is IPv6PayloadUnavailable failure && failure.Reason ==
+            (code == IPv6DiagnosticCode.HeaderTruncated ? IPv6PayloadFailure.Truncated : IPv6PayloadFailure.Invalid)).IsTrue();
         await Assert.That(Known(packet).Bytes.Length).IsEqualTo(Math.Min(declared, bytes.Length / 2));
     }
 
@@ -146,10 +144,10 @@ public class ParseIPv6ExtensionsTests
     public async Task Incomplete_upper_payload_retains_pseudo_header_context_and_capture_diagnostic()
     {
         var packet = Parse(60, "1100000000000000CAFE", 12);
-        await Assert.That(packet.Extensions.UpperLayer!.DeclaredLength).IsEqualTo(4u);
-        await Assert.That(packet.Extensions.UpperLayer.IsComplete).IsFalse();
-        await Assert.That(Hex(packet.Extensions.UpperLayer.Bytes)).IsEqualTo("CAFE");
-        await Assert.That(packet.Extensions.ChecksumContext is not null).IsTrue();
+        await Assert.That(Upper(packet.Extensions).DeclaredLength).IsEqualTo(4u);
+        await Assert.That(Upper(packet.Extensions).IsComplete).IsFalse();
+        await Assert.That(Hex(Upper(packet.Extensions).Bytes)).IsEqualTo("CAFE");
+        await Assert.That(HasKnownContext(packet.Extensions)).IsTrue();
         await Assert.That(packet.Extensions.Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.PayloadTruncated);
     }
 
@@ -162,9 +160,9 @@ public class ParseIPv6ExtensionsTests
         await Assert.That(Known(packet).DeclaredLength).IsEqualTo(expected);
         await Assert.That(Known(packet).DeclaredDatagramLength).IsEqualTo(40UL + expected);
         await Assert.That(Known(packet).IsDatagramComplete).IsFalse();
-        await Assert.That(packet.Extensions.UpperLayer!.DeclaredLength).IsEqualTo(expected - 8);
-        await Assert.That(packet.Extensions.UpperLayer.Offset).IsEqualTo(48);
-        await Assert.That(packet.Extensions.ChecksumContext is not null).IsTrue();
+        await Assert.That(Upper(packet.Extensions).DeclaredLength).IsEqualTo(expected - 8);
+        await Assert.That(Upper(packet.Extensions).Offset).IsEqualTo(48);
+        await Assert.That(HasKnownContext(packet.Extensions)).IsTrue();
         await Assert.That(packet.Extensions.Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.PayloadTruncated);
     }
 
@@ -178,9 +176,9 @@ public class ParseIPv6ExtensionsTests
         await Assert.That(Known(packet).IsDatagramComplete).IsTrue();
         await Assert.That(Known(packet).TrailingBytes.Length).IsEqualTo(3);
         await Assert.That(Known(packet).TrailingBytes.Span[0]).IsEqualTo((byte)0xcd);
-        await Assert.That(packet.Extensions.UpperLayer!.Bytes.Length).IsEqualTo(65528);
-        await Assert.That(packet.Extensions.UpperLayer.Bytes.Span[^1]).IsEqualTo((byte)0xab);
-        await Assert.That(packet.Extensions.ChecksumContext!.UpperLayerLength).IsEqualTo(65528u);
+        await Assert.That(Upper(packet.Extensions).Bytes.Length).IsEqualTo(65528);
+        await Assert.That(Upper(packet.Extensions).Bytes.Span[^1]).IsEqualTo((byte)0xab);
+        await Assert.That(Upper(packet.Extensions).DeclaredLength).IsEqualTo(65528u);
         await Assert.That(packet.Extensions.Diagnostics.IsEmpty).IsTrue();
     }
 
@@ -200,8 +198,8 @@ public class ParseIPv6ExtensionsTests
             : throw new InvalidOperationException("Expected unknown length.");
         await Assert.That(Hex(payload.CapturedBytes)).IsEqualTo(bytes);
         await Assert.That(packet.Extensions.Diagnostics[0].Code).IsEqualTo(code);
-        await Assert.That(packet.Extensions.UpperLayer is null).IsTrue();
-        await Assert.That(packet.Extensions.ChecksumContext is null).IsTrue();
+        await Assert.That(packet.Extensions.Result is IPv6PayloadUnavailable failure && failure.Reason ==
+            (code == IPv6DiagnosticCode.HeaderTruncated ? IPv6PayloadFailure.Truncated : IPv6PayloadFailure.Invalid)).IsTrue();
     }
 
     [Test]
@@ -212,7 +210,7 @@ public class ParseIPv6ExtensionsTests
         var packet = Parse(type, "1100C20400010000");
         await Assert.That(Known(packet).DeclaredLength).IsEqualTo(8u);
         await Assert.That(packet.Extensions.Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.InvalidJumboPayload);
-        await Assert.That(packet.Extensions.UpperLayer is null).IsTrue();
+        await Assert.That(packet.Extensions.Result is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Invalid }).IsTrue();
     }
 
     [Test]
@@ -224,17 +222,15 @@ public class ParseIPv6ExtensionsTests
         var chain = Parse(type, bytes, length).Extensions;
         await Assert.That(chain.Headers.Length).IsEqualTo(2);
         await Assert.That(chain.Diagnostics[0].Code).IsEqualTo(code);
-        await Assert.That(chain.Status).IsEqualTo(IPv6ChainStatus.Invalid);
-        await Assert.That(chain.UpperLayer is null).IsTrue();
-        await Assert.That(chain.ChecksumContext is null).IsTrue();
+        await Assert.That(chain.Result is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Invalid }).IsTrue();
     }
 
     [Test]
     public async Task Home_address_option_does_not_supply_potentially_wrong_source_to_checksum()
     {
         var chain = Parse(60, "1102C91020010DB800000000000000000000000900000000CAFE").Extensions;
-        await Assert.That(chain.UpperLayer!.Offset).IsEqualTo(64);
-        await Assert.That(chain.ChecksumContext is null).IsTrue();
+        await Assert.That(Upper(chain).Offset).IsEqualTo(64);
+        await Assert.That(Upper(chain).ChecksumContext is IPv6ChecksumContext.Unavailable).IsTrue();
         await Assert.That(chain.Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.SourceAddressUnavailable);
     }
 
@@ -256,6 +252,11 @@ public class ParseIPv6ExtensionsTests
             + next.ToString("X2") + "40" + "20010DB8000000000000000000000001FF020000000000000000000000000002" + payload);
         return IPv6Parser.Parse(bytes) is IPv6Packet packet ? packet : throw new InvalidOperationException("Expected IPv6.");
     }
+
+    private static IPv6UpperLayer Upper(IPv6ExtensionChain chain) => chain.Result is IPv6UpperLayer upper
+        ? upper : throw new InvalidOperationException("Expected a located upper layer.");
+    private static bool HasKnownContext(IPv6ExtensionChain chain) => chain.Result is IPv6UpperLayer upper &&
+        upper.ChecksumContext is IPv6ChecksumContext.KnownAddresses;
 
     private static string Hex(ReadOnlyMemory<byte> bytes) => Convert.ToHexString(bytes.Span);
     private static IPv6Payload.KnownLength Known(IPv6Packet packet) => packet.Payload is IPv6Payload.KnownLength known

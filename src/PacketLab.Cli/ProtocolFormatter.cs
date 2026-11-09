@@ -22,19 +22,27 @@ internal static class ProtocolFormatter
             + $"; payload {udp.Payload.Length} bytes ({(udp.IsComplete ? "complete" : "incomplete")})"
             + $"; surplus declared {udp.DeclaredSurplusLength} bytes, available {udp.SurplusArea.Length} bytes"
             + $"; Checksum 0x{udp.Header.Checksum:X4}: {DescribeUdpChecksum(udp.Checksum)}.",
-        UdpParseResult.Unavailable unavailable => "; UDP "
-            + (unavailable.Header is { } header ? $"src port {header.SourcePort} dst port {header.DestinationPort} Length {header.Length} Checksum 0x{header.Checksum:X4}; " : "")
-            + $"{unavailable.Reason}: IP upper layer declared {unavailable.DeclaredUpperLayerLength} bytes, available {unavailable.RemainingBytes.Length} bytes; checksum unavailable.",
+        UdpParseResult.IpLengthTooShort error => "; UDP " + DescribeUdpFailure(nameof(UdpParseResult.IpLengthTooShort), error.DeclaredUpperLayerLength, error.RemainingBytes.Length),
+        UdpParseResult.HeaderTruncated error => "; UDP " + DescribeUdpFailure(nameof(UdpParseResult.HeaderTruncated), error.DeclaredUpperLayerLength, error.RemainingBytes.Length),
+        UdpParseResult.InvalidLength error => DescribeUdpHeader(error.Header) + DescribeUdpFailure(nameof(UdpParseResult.InvalidLength), error.DeclaredUpperLayerLength, error.RemainingBytes.Length),
+        UdpParseResult.LengthExceedsIpPayload error => DescribeUdpHeader(error.Header) + DescribeUdpFailure(nameof(UdpParseResult.LengthExceedsIpPayload), error.DeclaredUpperLayerLength, error.RemainingBytes.Length),
         null => throw new InvalidOperationException("Uninitialized UDP parse result.")
     };
 
-    private static string DescribeUdpChecksum(UdpChecksum checksum) => checksum.Status switch
+    private static string DescribeUdpFailure(string reason, uint declared, int captured) =>
+        $"{reason}: IP upper layer declared {declared} bytes, available {captured} bytes; checksum unavailable.";
+
+    private static string DescribeUdpHeader(UdpHeader header) =>
+        $"; UDP src port {header.SourcePort} dst port {header.DestinationPort} Length {header.Length} Checksum 0x{header.Checksum:X4}; ";
+
+    private static string DescribeUdpChecksum(UdpChecksum checksum) => checksum.Value switch
     {
         UdpChecksumStatus.NotPresent => "not present (IPv4)",
         UdpChecksumStatus.Match => "match",
         UdpChecksumStatus.Mismatch => "mismatch (captured bytes fail checksum; capture may precede checksum offload, but neither offload nor on-wire corruption is established)",
         UdpChecksumStatus.ZeroNotAllowed => "zero not allowed for ordinary IPv6 UDP; RFC 6935/6936 tunnel exception not established",
-        _ => $"unavailable ({checksum.Reason})"
+        UdpChecksumUnavailable unavailable => $"unavailable ({unavailable.Reason})",
+        _ => throw new InvalidOperationException("Uninitialized UDP checksum result.")
     };
 
     private static string DescribeEthernet(EthernetDecodeResult result) => result switch

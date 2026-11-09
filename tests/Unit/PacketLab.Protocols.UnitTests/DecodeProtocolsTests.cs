@@ -64,8 +64,7 @@ public class DecodeProtocolsTests
         await Assert.That(Convert.ToHexString(frame.Frame.RemainingBytes.Span)).IsEqualTo(bytes);
         var ip = frame.Payload is IPv4DecodeResult result && result is DecodedIPv4 decoded ? decoded : throw new InvalidOperationException();
         await Assert.That(ip.Packet.Header.Source.ToString()).IsEqualTo("192.0.2.1");
-        await Assert.That(ip.Payload is UdpParseResult udp && udp is UdpParseResult.Unavailable
-            { Reason: UdpUnavailableReason.IpLengthTooShort }).IsTrue();
+        await Assert.That(ip.Payload is UdpParseResult udp && udp is UdpParseResult.IpLengthTooShort).IsTrue();
     }
 
     [Test]

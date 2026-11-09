@@ -1,3 +1,4 @@
+using PacketLab.Analyzers.Annotations;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Ethernet;
@@ -71,14 +72,12 @@ public class AnalyzeIPv6CaptureTests
 
     private sealed record RecordSnapshot(long RecordNumber, uint CapturedLength, uint OriginalLength,
         string Source, string Destination, ushort EtherType, IPv6Snapshot IPv6);
-    #pragma warning disable PL0001 // Test snapshots intentionally flatten different result cases for comparison.
+    [TransportModel]
     private sealed record IPv6Snapshot(string Kind, IPv6Header? Header = null, PayloadSnapshot? Payload = null,
         int? RequiredLength = null, int? CapturedLength = null, byte? InvalidVersion = null, string? RemainingBytes = null);
-    #pragma warning restore PL0001
-    #pragma warning disable PL0001 // Test snapshots intentionally flatten different result cases for comparison.
+    [TransportModel]
     private sealed record PayloadSnapshot(string Kind, string Bytes, string? TrailingBytes = null,
         uint? DeclaredLength = null, ulong? DeclaredDatagramLength = null, bool? IsDatagramComplete = null);
-    #pragma warning restore PL0001
 
     private static IPv6Snapshot Snapshot(IPv6DecodeResult result) => result switch
     {

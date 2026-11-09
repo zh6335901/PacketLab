@@ -14,9 +14,10 @@ internal static class UdpDecoder
         return UdpParser.Parse(packet.Payload, length, false, addresses);
     }
 
-    internal static UdpParseResult Decode(IPv6UpperLayer upper, IPv6ChecksumContext? context)
+    internal static UdpParseResult Decode(IPv6UpperLayer upper)
     {
-        ulong? addresses = context is { } known ? Sum(known.Source) + Sum(known.FinalDestination) : null;
+        ulong? addresses = upper.ChecksumContext is IPv6ChecksumContext.KnownAddresses known
+            ? Sum(known.Source) + Sum(known.FinalDestination) : null;
         return UdpParser.Parse(upper.Bytes, upper.DeclaredLength, true, addresses);
     }
 

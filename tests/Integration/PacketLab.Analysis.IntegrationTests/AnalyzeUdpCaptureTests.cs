@@ -1,3 +1,4 @@
+using PacketLab.Analyzers.Annotations;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Udp;
@@ -40,9 +41,11 @@ public class AnalyzeUdpCaptureTests
             {
                 UdpDatagram d => new Snapshot(version, d.Header, d.EffectiveLength, d.Payload.Length,
                     d.Payload.Length > 32 ? $"{d.Payload.Span[0]:X2}..{d.Payload.Span[^1]:X2}" : Convert.ToHexString(d.Payload.Span),
-                    d.DeclaredSurplusLength, Convert.ToHexString(d.SurplusArea.Span), d.IsComplete, d.IsSurplusComplete, d.Checksum),
-                UdpParseResult.Unavailable u => new Snapshot(version, u.Header, null, null, null, null, null, null, null,
-                    udp.Checksum, Convert.ToHexString(u.RemainingBytes.Span)),
+                    d.DeclaredSurplusLength, Convert.ToHexString(d.SurplusArea.Span), d.IsComplete, d.IsSurplusComplete, d.Checksum.Value),
+                UdpParseResult.IpLengthTooShort u => Failure(version, null, udp.Checksum, u.RemainingBytes),
+                UdpParseResult.HeaderTruncated u => Failure(version, null, udp.Checksum, u.RemainingBytes),
+                UdpParseResult.InvalidLength u => Failure(version, u.Header, udp.Checksum, u.RemainingBytes),
+                UdpParseResult.LengthExceedsIpPayload u => Failure(version, u.Header, udp.Checksum, u.RemainingBytes),
                 null => throw new InvalidOperationException()
             };
             await Assert.That(actual).IsEqualTo(expected);
@@ -50,29 +53,31 @@ public class AnalyzeUdpCaptureTests
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
     }
 
-    #pragma warning disable PL0001 // Test snapshots intentionally flatten different result cases for comparison.
+    private static Snapshot Failure(int version, UdpHeader? header, UdpChecksum checksum, ReadOnlyMemory<byte> remaining) =>
+        new(version, header, null, null, null, null, null, null, null, checksum.Value, Convert.ToHexString(remaining.Span));
+
+    [TransportModel]
     private sealed record Snapshot(int Version, UdpHeader? Header, uint? EffectiveLength, int? PayloadLength,
         string? Payload, uint? SurplusLength, string? Surplus, bool? Complete, bool? SurplusComplete,
-        UdpChecksum? Checksum, string? Remaining = null, string Kind = "Udp");
-    #pragma warning restore PL0001
+        object? Checksum, string? Remaining = null, string Kind = "Udp");
 
     private static readonly Snapshot[] Expected =
     [
-        new(4, new(0, 4660, 11, 0x356e), 11, 3, "CAFE01", 2, "AABB", true, true, new(UdpChecksumStatus.Match)),
-        new(6, new(0, 4660, 11, 0xc630), 11, 3, "CAFE01", 0, "", true, true, new(UdpChecksumStatus.Match)),
+        new(4, new(0, 4660, 11, 0x356e), 11, 3, "CAFE01", 2, "AABB", true, true, UdpChecksumStatus.Match),
+        new(6, new(0, 4660, 11, 0xc630), 11, 3, "CAFE01", 0, "", true, true, UdpChecksumStatus.Match),
         new(4, new(0, 4660, 7, 1), null, null, null, null, null, null, null,
-            new(UdpChecksumStatus.Unavailable, UdpUnavailableReason.InvalidLength), "0000123400070001"),
-        new(6, new(0, 4660, 8, 0x9235), 8, 0, "", 4, "", true, false, new(UdpChecksumStatus.Match)),
-        new(4, new(0, 4660, 11, 0x356e), 11, 2, "CAFE", 0, "", false, true, new(UdpChecksumStatus.Unavailable, UdpUnavailableReason.PayloadTruncated)),
+            new UdpChecksumUnavailable(UdpUnavailableReason.InvalidLength), "0000123400070001"),
+        new(6, new(0, 4660, 8, 0x9235), 8, 0, "", 4, "", true, false, UdpChecksumStatus.Match),
+        new(4, new(0, 4660, 11, 0x356e), 11, 2, "CAFE", 0, "", false, true, new UdpChecksumUnavailable(UdpUnavailableReason.PayloadTruncated)),
         new(6, null, null, null, null, null, null, null, null,
             null, "FFFF800000010000CAFE", "Fragment"),
-        new(6, new(0, 4660, 8, 0x9235), 8, 0, "", 0, "", true, true, new(UdpChecksumStatus.Match)),
-        new(4, new(0, 4660, 8, 0), 8, 0, "", 0, "", true, true, new(UdpChecksumStatus.NotPresent)),
-        new(6, new(0, 4660, 8, 0), 8, 0, "", 0, "", true, true, new(UdpChecksumStatus.ZeroNotAllowed)),
-        new(6, new(0, 4660, 0, 0x923d), 8, 0, "", 0, "", true, true, new(UdpChecksumStatus.Match)),
-        new(6, new(0, 4660, 8, 0x9235), 8, 0, "", 0, "", true, true, new(UdpChecksumStatus.Unavailable, UdpUnavailableReason.PseudoHeaderUnavailable)),
-        new(4, new(0, 4660, 11, 0x356e), 11, 3, "CAFE00", 0, "", true, true, new(UdpChecksumStatus.Mismatch)),
-        new(6, new(0, 4660, 0, 0x9244), 65536, 65528, "FF..FF", 0, "", true, true, new(UdpChecksumStatus.Match)),
-        new(6, new(0, 4660, 8, 0x9235), 8, 0, "", 0, "", true, true, new(UdpChecksumStatus.Match))
+        new(6, new(0, 4660, 8, 0x9235), 8, 0, "", 0, "", true, true, UdpChecksumStatus.Match),
+        new(4, new(0, 4660, 8, 0), 8, 0, "", 0, "", true, true, UdpChecksumStatus.NotPresent),
+        new(6, new(0, 4660, 8, 0), 8, 0, "", 0, "", true, true, UdpChecksumStatus.ZeroNotAllowed),
+        new(6, new(0, 4660, 0, 0x923d), 8, 0, "", 0, "", true, true, UdpChecksumStatus.Match),
+        new(6, new(0, 4660, 8, 0x9235), 8, 0, "", 0, "", true, true, new UdpChecksumUnavailable(UdpUnavailableReason.PseudoHeaderUnavailable)),
+        new(4, new(0, 4660, 11, 0x356e), 11, 3, "CAFE00", 0, "", true, true, UdpChecksumStatus.Mismatch),
+        new(6, new(0, 4660, 0, 0x9244), 65536, 65528, "FF..FF", 0, "", true, true, UdpChecksumStatus.Match),
+        new(6, new(0, 4660, 8, 0x9235), 8, 0, "", 0, "", true, true, UdpChecksumStatus.Match)
     ];
 }

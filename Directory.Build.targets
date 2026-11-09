@@ -1,5 +1,5 @@
 <Project>
-  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.csproj' and '$(MSBuildProjectName)' != 'PacketLab.Analyzers' and '$(MSBuildProjectName)' != 'PacketLab.Analyzers.UnitTests'">
+  <ItemGroup Condition="'$(EnablePacketLabAnalyzers)' != 'false' and '$(MSBuildProjectExtension)' == '.csproj' and '$(MSBuildProjectName)' != 'PacketLab.Analyzers' and '$(MSBuildProjectName)' != 'PacketLab.Analyzers.Annotations'">
     <ProjectReference Include="$(MSBuildThisFileDirectory)src/PacketLab.Analyzers/PacketLab.Analyzers.csproj"
                       OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>

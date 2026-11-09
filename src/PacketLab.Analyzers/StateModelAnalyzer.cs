@@ -39,6 +39,12 @@ public sealed class StateModelAnalyzer : DiagnosticAnalyzer
         if (type.TypeKind is not (TypeKind.Class or TypeKind.Struct) || type.IsImplicitlyDeclared)
             return;
 
+        var transportModel = context.Compilation.GetTypeByMetadataName(
+            "PacketLab.Analyzers.Annotations.TransportModelAttribute");
+        if (transportModel is not null && type.GetAttributes().Any(attribute =>
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, transportModel)))
+            return;
+
         var members = type.GetMembers().Where(IsStoredMember).ToImmutableArray();
         var optional = members.Where(IsOptional).ToImmutableArray();
         var discriminators = members.Where(IsDiscriminator).ToImmutableArray();

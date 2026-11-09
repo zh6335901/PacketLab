@@ -4,16 +4,15 @@ namespace PacketLab.Protocols.Udp;
 
 public sealed record UdpHeader(ushort SourcePort, ushort DestinationPort, ushort Length, ushort Checksum);
 
-public enum UdpChecksumStatus { NotPresent, Match, Mismatch, Unavailable, ZeroNotAllowed }
+public enum UdpChecksumStatus { NotPresent, Match, Mismatch, ZeroNotAllowed }
 public enum UdpUnavailableReason
 {
     IpLengthTooShort, HeaderTruncated, InvalidLength, LengthExceedsIpPayload,
     PayloadTruncated, PseudoHeaderUnavailable
 }
 
-#pragma warning disable PL0001 // Preserve the existing checksum API; replacing status/reason with union cases is a separate API change.
-public sealed record UdpChecksum(UdpChecksumStatus Status, UdpUnavailableReason? Reason = null);
-#pragma warning restore PL0001
+public union UdpChecksum(UdpChecksumStatus, UdpChecksumUnavailable);
+public sealed record UdpChecksumUnavailable(UdpUnavailableReason Reason);
 
 public sealed record UdpDatagram(UdpHeader Header, uint EffectiveLength, ReadOnlyMemory<byte> Payload,
     uint DeclaredSurplusLength, ReadOnlyMemory<byte> SurplusArea, UdpChecksum Checksum)
@@ -22,19 +21,23 @@ public sealed record UdpDatagram(UdpHeader Header, uint EffectiveLength, ReadOnl
     public bool IsSurplusComplete => SurplusArea.Length == DeclaredSurplusLength;
 }
 
-public union UdpParseResult(UdpDatagram, UdpParseResult.Unavailable)
+public union UdpParseResult(UdpDatagram, UdpParseResult.IpLengthTooShort, UdpParseResult.HeaderTruncated,
+    UdpParseResult.InvalidLength, UdpParseResult.LengthExceedsIpPayload)
 {
     public UdpChecksum Checksum => Value switch
     {
         UdpDatagram datagram => datagram.Checksum,
-        Unavailable unavailable => new(UdpChecksumStatus.Unavailable, unavailable.Reason),
+        IpLengthTooShort => new UdpChecksumUnavailable(UdpUnavailableReason.IpLengthTooShort),
+        HeaderTruncated => new UdpChecksumUnavailable(UdpUnavailableReason.HeaderTruncated),
+        InvalidLength => new UdpChecksumUnavailable(UdpUnavailableReason.InvalidLength),
+        LengthExceedsIpPayload => new UdpChecksumUnavailable(UdpUnavailableReason.LengthExceedsIpPayload),
         _ => throw new InvalidOperationException("Uninitialized UDP result.")
     };
 
-    #pragma warning disable PL0001 // This is already a failure case; Header retains any header parsed before the failure.
-    public sealed record Unavailable(UdpUnavailableReason Reason, uint DeclaredUpperLayerLength,
-        ReadOnlyMemory<byte> RemainingBytes, UdpHeader? Header = null);
-    #pragma warning restore PL0001
+    public sealed record IpLengthTooShort(uint DeclaredUpperLayerLength, ReadOnlyMemory<byte> RemainingBytes);
+    public sealed record HeaderTruncated(uint DeclaredUpperLayerLength, ReadOnlyMemory<byte> RemainingBytes);
+    public sealed record InvalidLength(UdpHeader Header, uint DeclaredUpperLayerLength, ReadOnlyMemory<byte> RemainingBytes);
+    public sealed record LengthExceedsIpPayload(UdpHeader Header, uint DeclaredUpperLayerLength, ReadOnlyMemory<byte> RemainingBytes);
 }
 
 internal static class UdpParser
@@ -44,9 +47,9 @@ internal static class UdpParser
         // The network layer owns the declaration; captured padding cannot extend it.
         data = data[..(int)Math.Min((ulong)data.Length, declaredLength)];
         if (declaredLength < 8)
-            return new UdpParseResult.Unavailable(UdpUnavailableReason.IpLengthTooShort, declaredLength, data);
+            return new UdpParseResult.IpLengthTooShort(declaredLength, data);
         if (data.Length < 8)
-            return new UdpParseResult.Unavailable(UdpUnavailableReason.HeaderTruncated, declaredLength, data);
+            return new UdpParseResult.HeaderTruncated(declaredLength, data);
         var bytes = data.Span;
         var header = new UdpHeader(BinaryPrimitives.ReadUInt16BigEndian(bytes),
             BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]), BinaryPrimitives.ReadUInt16BigEndian(bytes[4..]),
@@ -54,15 +57,15 @@ internal static class UdpParser
         // RFC 2675 receiver rule also covers zero Length without a Jumbo option.
         uint length = ipv6 && header.Length == 0 ? declaredLength : header.Length;
         if (length < 8)
-            return new UdpParseResult.Unavailable(UdpUnavailableReason.InvalidLength, declaredLength, data, header);
+            return new UdpParseResult.InvalidLength(header, declaredLength, data);
         if (length > declaredLength)
-            return new UdpParseResult.Unavailable(UdpUnavailableReason.LengthExceedsIpPayload, declaredLength, data, header);
+            return new UdpParseResult.LengthExceedsIpPayload(header, declaredLength, data);
         var end = (int)Math.Min((ulong)data.Length, length);
-        var checksum = header.Checksum == 0
-            ? new UdpChecksum(ipv6 ? UdpChecksumStatus.ZeroNotAllowed : UdpChecksumStatus.NotPresent)
-            : data.Length < length ? new(UdpChecksumStatus.Unavailable, UdpUnavailableReason.PayloadTruncated)
-            : addressSum is null ? new(UdpChecksumStatus.Unavailable, UdpUnavailableReason.PseudoHeaderUnavailable)
-            : new(Validate(bytes[..end], addressSum.Value + 17 + (length >> 16) + (length & 0xffff)));
+        UdpChecksum checksum = header.Checksum == 0
+            ? ipv6 ? UdpChecksumStatus.ZeroNotAllowed : UdpChecksumStatus.NotPresent
+            : data.Length < length ? new UdpChecksumUnavailable(UdpUnavailableReason.PayloadTruncated)
+            : addressSum is null ? new UdpChecksumUnavailable(UdpUnavailableReason.PseudoHeaderUnavailable)
+            : Validate(bytes[..end], addressSum.Value + 17 + (length >> 16) + (length & 0xffff));
         return new UdpDatagram(header, length, data[8..end], declaredLength - length, data[end..], checksum);
     }
 

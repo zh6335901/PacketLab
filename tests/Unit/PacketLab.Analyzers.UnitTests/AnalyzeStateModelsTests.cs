@@ -9,8 +9,55 @@ public class AnalyzeStateModelsTests
 {
     private static readonly ImmutableArray<MetadataReference> References =
         ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
-        .Where(p => Path.GetFileName(p) is "System.Private.CoreLib.dll" or "System.Runtime.dll" or "System.Collections.dll")
+        .Where(p => Path.GetFileName(p) is "System.Private.CoreLib.dll" or "System.Runtime.dll" or "System.Collections.dll" or "netstandard.dll")
+        .Append(typeof(Annotations.TransportModelAttribute).Assembly.Location)
         .Select(p => MetadataReference.CreateFromFile(p)).ToImmutableArray<MetadataReference>();
+
+    [Test]
+    [Arguments("class")]
+    [Arguments("struct")]
+    [Arguments("record")]
+    public async Task Transport_models_are_exempt_from_both_rules(string kind)
+    {
+        var source = $$"""
+            [PacketLab.Analyzers.Annotations.TransportModel]
+            public {{kind}} Snapshot
+            {
+                public string? Value { get; init; }
+                public string? Error { get; init; }
+                public static Snapshot Success() => new() { Value = "ok" };
+                public static Snapshot Failure() => new() { Error = "error" };
+            }
+            """;
+        await Assert.That((await Analyze(source)).Length).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Transport_model_exemption_does_not_spread_to_nested_or_derived_types()
+    {
+        const string source = """
+            [PacketLab.Analyzers.Annotations.TransportModel]
+            public class Carrier
+            {
+                public class Nested { public string? Value; public string? Error; }
+            }
+            public class Derived : Carrier { public string? Value; public string? Error; }
+            """;
+        var diagnostics = await Analyze(source);
+        await Assert.That(diagnostics.Length).IsEqualTo(2);
+        await Assert.That(diagnostics.All(d => d.Id == "PL0001")).IsTrue();
+    }
+
+    [Test]
+    public async Task Unrelated_attribute_with_the_same_short_name_does_not_exempt_a_type()
+    {
+        const string source = """
+            public class TransportModelAttribute : System.Attribute { }
+            [TransportModel]
+            public record Result(string? Value, string? Error);
+            """;
+        await Assert.That((await Analyze(source)).Single().Id).IsEqualTo("PL0001");
+    }
 
     [Test]
     [Arguments("public record Result(string? Value, string? Error);")]
