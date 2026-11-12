@@ -36,19 +36,35 @@ public class DecodeTcpTests
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task Changed_fields_and_payload_fail_checksum_while_trailing_bytes_are_excluded(bool ipv6)
+    public async Task Changed_fields_and_payload_fail_checksum(bool ipv6)
     {
         var wire = Convert.FromHexString(ipv6 ? V6 : V4);
         for (var offset = 0; offset < wire.Length; offset++)
         {
-            if (offset == 12) continue; // Changing Data Offset has its own structural diagnostics.
             var changed = (byte[])wire.Clone();
             changed[offset] ^= 1;
-            await Assert.That(Segment(Decode(ipv6, Hex(changed))).Checksum.Value).IsEqualTo(TcpChecksumStatus.Mismatch);
+            await Assert.That(Segment(Decode(ipv6, Hex(changed))).Checksum.Value)
+                .IsEqualTo(TcpChecksumStatus.Mismatch).Because($"changing the low bit at byte {offset} must invalidate the checksum");
         }
-        var valid = Segment(Decode(ipv6, Hex(wire) + "DEADBEEF", 23));
-        await Assert.That(Hex(valid.Payload)).IsEqualTo("CAFE01");
-        await Assert.That(valid.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Ip_trailing_bytes_are_excluded_from_tcp_payload_and_checksum(bool ipv6)
+    {
+        var wire = ipv6 ? V6 : V4;
+        var segment = Segment(Decode(ipv6, wire + "DEADBEEF", 23));
+        await Assert.That(Hex(segment.Payload)).IsEqualTo("CAFE01");
+        await Assert.That(segment.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Clearing_a_required_nonzero_checksum_does_not_mean_checksum_absent(bool ipv6)
+    {
+        var wire = Convert.FromHexString(ipv6 ? V6 : V4);
         wire[16] = wire[17] = 0;
         await Assert.That(Segment(Decode(ipv6, Hex(wire))).Checksum.Value).IsEqualTo(TcpChecksumStatus.Mismatch);
     }
@@ -76,47 +92,83 @@ public class DecodeTcpTests
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task Every_capture_prefix_distinguishes_fixed_header_options_and_payload(bool ipv6)
+    public async Task Every_incomplete_fixed_header_prefix_reports_header_truncation(bool ipv6)
     {
         var wire = WithOptions("020405B401030307080A123456789ABCDEF00000") + "CAFE01";
-        for (var n = 0; n < wire.Length / 2; n++)
+        for (var captured = 0; captured < 20; captured++)
         {
-            var result = Decode(ipv6, wire[..(n * 2)], 43);
-            if (n < 20)
-                await Assert.That(result is TcpParseResult.HeaderTruncated error && error.RemainingBytes.Length == n).IsTrue();
-            else if (n < 40)
-                await Assert.That(result is TcpParseResult.OptionsTruncated error && error.Header.HeaderLength == 40
-                    && error.Options.RawBytes.Length == n - 20 && error.RemainingBytes.Length == n).IsTrue();
-            else
-            {
-                var segment = Segment(result);
-                await Assert.That(segment.Payload.Length).IsEqualTo(n - 40);
-                await Assert.That(segment.IsComplete).IsFalse();
-                await Assert.That(segment.DeclaredPayloadLength).IsEqualTo(3u);
-            }
-            await Assert.That(result.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(n < 40
-                ? TcpUnavailableReason.HeaderTruncated : TcpUnavailableReason.PayloadTruncated));
+            var result = Decode(ipv6, wire[..(captured * 2)], 43);
+            await Assert.That(result is TcpParseResult.HeaderTruncated error && error.RemainingBytes.Length == captured)
+                .IsTrue().Because($"only {captured} fixed header bytes were captured");
+            await Assert.That(result.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.HeaderTruncated));
         }
     }
 
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task Invalid_declarations_do_not_borrow_capture_or_guess_a_payload(bool ipv6)
+    public async Task Every_incomplete_options_prefix_preserves_the_fixed_header(bool ipv6)
     {
-        for (ushort n = 0; n < 20; n++)
-            await Assert.That(Decode(ipv6, V4, n) is TcpParseResult.IpLengthTooShort error
-                && error.RemainingBytes.Length == n).IsTrue();
+        var wire = WithOptions("020405B401030307080A123456789ABCDEF00000") + "CAFE01";
+        for (var captured = 20; captured < 40; captured++)
+        {
+            var result = Decode(ipv6, wire[..(captured * 2)], 43);
+            await Assert.That(result is TcpParseResult.OptionsTruncated error && error.Header.HeaderLength == 40
+                && error.Options.RawBytes.Length == captured - 20 && error.RemainingBytes.Length == captured)
+                .IsTrue().Because($"only {captured - 20} option bytes were captured");
+            await Assert.That(result.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.HeaderTruncated));
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Every_incomplete_payload_prefix_preserves_the_declared_payload_length(bool ipv6)
+    {
+        var wire = WithOptions("020405B401030307080A123456789ABCDEF00000") + "CAFE01";
+        for (var captured = 40; captured < 43; captured++)
+        {
+            var segment = Segment(Decode(ipv6, wire[..(captured * 2)], 43));
+            await Assert.That(segment.Payload.Length).IsEqualTo(captured - 40);
+            await Assert.That(segment.IsComplete).IsFalse();
+            await Assert.That(segment.DeclaredPayloadLength).IsEqualTo(3u);
+            await Assert.That(segment.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.PayloadTruncated));
+        }
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Short_ip_declarations_do_not_borrow_trailing_capture(bool ipv6)
+    {
+        for (ushort declared = 0; declared < 20; declared++)
+            await Assert.That(Decode(ipv6, V4, declared) is TcpParseResult.IpLengthTooShort error
+                && error.RemainingBytes.Length == declared).IsTrue().Because($"IP declares only {declared} bytes");
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Data_offsets_below_five_do_not_guess_a_payload(bool ipv6)
+    {
         for (byte offset = 0; offset < 5; offset++)
         {
-            var wire = Convert.FromHexString(V4); wire[12] = (byte)(offset << 4);
+            var wire = Convert.FromHexString(V4);
+            wire[12] = (byte)(offset << 4);
             var result = Decode(ipv6, Hex(wire));
             await Assert.That(result is TcpParseResult.InvalidDataOffset error && error.Header.DataOffset == offset).IsTrue();
             await Assert.That(result.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.InvalidDataOffset));
         }
-        var exceeds = Decode(ipv6, WithOptions("01010101"), 23);
-        await Assert.That(exceeds is TcpParseResult.HeaderExceedsSegment exceedsError && exceedsError.Header.HeaderLength == 24).IsTrue();
-        await Assert.That(exceeds.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.HeaderExceedsSegment));
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Header_exceeding_ip_declaration_does_not_borrow_trailing_capture(bool ipv6)
+    {
+        var result = Decode(ipv6, WithOptions("01010101"), 23);
+        await Assert.That(result is TcpParseResult.HeaderExceedsSegment { Header.HeaderLength: 24 }).IsTrue();
+        await Assert.That(result.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.HeaderExceedsSegment));
     }
 
     [Test]
@@ -170,8 +222,19 @@ public class DecodeTcpTests
         var shortOptions = result is TcpParseResult.OptionsTruncated o ? o : throw new InvalidOperationException();
         await Assert.That(shortOptions.Options.Items.Single().Value.Value)
             .IsEqualTo(new TcpOptionValue.Invalid(TcpOptionFailure.CaptureTruncated, 4, 2));
-        var segment = Segment(Decode(false, WithOptions("0303FF00DEADBEEF")));
+    }
+
+    [Test]
+    public async Task Out_of_range_window_scale_preserves_the_wire_value()
+    {
+        var segment = Segment(Decode(false, WithOptions("0303FF00")));
         await Assert.That(segment.Options.Items[0].Value is TcpOptionValue.WindowScale { ShiftCount: 255, IsInRange: false }).IsTrue();
+    }
+
+    [Test]
+    public async Task Nonzero_bytes_after_eol_are_retained_as_padding()
+    {
+        var segment = Segment(Decode(false, WithOptions("0303FF00DEADBEEF")));
         await Assert.That(Hex(segment.Options.Padding)).IsEqualTo("DEADBEEF");
         await Assert.That(segment.Options.HasNonZeroPadding).IsTrue();
     }
@@ -267,18 +330,26 @@ public class DecodeTcpTests
     [Arguments(50)]
     [Arguments(59)]
     [Arguments(253)]
-    public async Task Other_protocols_never_dispatch_tcp(byte next)
+    public async Task Other_ipv4_protocols_never_dispatch_tcp(byte next)
     {
-        foreach (var ipv6 in new[] { false, true })
-        {
-            var frame = Ethernet(Frame(ipv6, V4, next: next));
-            await Assert.That(frame.Payload switch
-            {
-                IPv4DecodeResult ip when ip is DecodedIPv4 decoded => decoded.Payload is not TcpParseResult,
-                IPv6DecodeResult ip when ip is DecodedIPv6 decoded => decoded.Payload is not TcpParseResult,
-                _ => false
-            }).IsTrue();
-        }
+        var frame = Ethernet(Frame(false, V4, next: next));
+        var ip = frame.Payload is IPv4DecodeResult result && result is DecodedIPv4 decoded
+            ? decoded : throw new InvalidOperationException("Expected IPv4.");
+        await Assert.That(ip.Payload is TcpParseResult).IsFalse();
+    }
+
+    [Test]
+    [Arguments(17)]
+    [Arguments(58)]
+    [Arguments(50)]
+    [Arguments(59)]
+    [Arguments(253)]
+    public async Task Other_ipv6_protocols_never_dispatch_tcp(byte next)
+    {
+        var frame = Ethernet(Frame(true, V6, next: next));
+        var ip = frame.Payload is IPv6DecodeResult result && result is DecodedIPv6 decoded
+            ? decoded : throw new InvalidOperationException("Expected IPv6.");
+        await Assert.That(ip.Payload is TcpParseResult).IsFalse();
     }
 
     [Test]
