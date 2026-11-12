@@ -10,6 +10,7 @@ namespace PacketLab.Analysis.IntegrationTests;
 
 public class AnalyzeIPv6CaptureTests
 {
+#pragma warning disable PL0003 // Verify the ordered results of one complete reference capture.
     [Test]
     [Arguments("ipv6-little", PcapByteOrder.LittleEndian)]
     [Arguments("ipv6-big", PcapByteOrder.BigEndian)]
@@ -33,7 +34,9 @@ public class AnalyzeIPv6CaptureTests
         }
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
     }
+#pragma warning restore PL0003
 
+#pragma warning disable PL0003 // Verify extension-chain results and continued reading within one capture.
     [Test]
     [Arguments("little", PcapByteOrder.LittleEndian)]
     [Arguments("big", PcapByteOrder.BigEndian)]
@@ -71,6 +74,7 @@ public class AnalyzeIPv6CaptureTests
         }
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
     }
+#pragma warning restore PL0003
 
     private sealed record RecordSnapshot(long RecordNumber, uint CapturedLength, uint OriginalLength,
         string Source, string Destination, ushort EtherType, IPv6Snapshot IPv6);

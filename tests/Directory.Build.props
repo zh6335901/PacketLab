@@ -2,10 +2,15 @@
   <Import Project="../Directory.Build.props" />
   <PropertyGroup>
     <EnablePacketLabAnalyzers>false</EnablePacketLabAnalyzers>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);PL0003</WarningsNotAsErrors>
     <OutputType>Exe</OutputType>
     <TargetFramework>net11.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="TUnit" Version="1.76.45" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'PacketLab.Testing.Analyzers.UnitTests'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../analyzers/PacketLab.Testing.Analyzers/PacketLab.Testing.Analyzers.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

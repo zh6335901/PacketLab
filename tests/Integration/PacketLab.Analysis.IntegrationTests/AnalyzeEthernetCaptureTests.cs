@@ -8,6 +8,7 @@ namespace PacketLab.Analysis.IntegrationTests;
 
 public class AnalyzeEthernetCaptureTests
 {
+#pragma warning disable PL0003 // Verify the ordered results of one complete reference capture.
     [Test]
     [Arguments("ethernet-little", PcapByteOrder.LittleEndian)]
     [Arguments("ethernet-big", PcapByteOrder.BigEndian)]
@@ -28,6 +29,7 @@ public class AnalyzeEthernetCaptureTests
         }
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
     }
+#pragma warning restore PL0003
 
     private sealed record RecordSnapshot(long RecordNumber, PcapTimestamp Timestamp, uint CapturedLength, uint OriginalLength,
         string Bytes, EthernetSnapshot Ethernet);

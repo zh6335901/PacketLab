@@ -38,6 +38,7 @@ public class AnalyzeCaptureTests
         await Assert.That(Convert.ToHexString(decodedBytes.Span)).IsEqualTo("AABB");
     }
 
+#pragma warning disable PL0003 // Every record must remain readable with the same unsupported link type.
     [Test]
     public async Task Unknown_link_type_allows_raw_reading_deferred_decoding_and_analysis_of_every_record()
     {
@@ -66,6 +67,7 @@ public class AnalyzeCaptureTests
         }
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
     }
+#pragma warning restore PL0003
 
     [Test]
     [Arguments(1, LinkLayerProtocol.Ethernet)]

@@ -4,6 +4,7 @@ namespace PacketLab.Pcap.IntegrationTests;
 
 public class ReadPcapFileTests
 {
+#pragma warning disable PL0003 // Consume the file to verify stream ownership after all records are read.
     [Test]
     public async Task Reading_a_file_preserves_caller_ownership_and_allows_exclusive_reopening()
     {
@@ -28,4 +29,5 @@ public class ReadPcapFileTests
         using var reopened = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
         await Assert.That(reopened.Length).IsEqualTo(77L);
     }
+#pragma warning restore PL0003
 }

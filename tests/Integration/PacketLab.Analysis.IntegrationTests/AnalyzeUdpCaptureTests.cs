@@ -8,6 +8,7 @@ namespace PacketLab.Analysis.IntegrationTests;
 
 public class AnalyzeUdpCaptureTests
 {
+#pragma warning disable PL0003 // One reader must continue through all diagnostics to the final valid record.
     [Test]
     [Arguments("udp-little", PcapByteOrder.LittleEndian)]
     [Arguments("udp-big", PcapByteOrder.BigEndian)]
@@ -24,6 +25,7 @@ public class AnalyzeUdpCaptureTests
         await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
     }
+#pragma warning restore PL0003
 
     [Test]
     [Arguments("udp-little", SampleRecord.PayloadWithSurplus, 11, 0x356e, 11u, "CAFE01", 2u, "AABB", UdpChecksumStatus.Match)]

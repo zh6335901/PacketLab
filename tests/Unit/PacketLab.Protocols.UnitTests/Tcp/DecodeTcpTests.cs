@@ -33,6 +33,7 @@ public class DecodeTcpTests
         await Assert.That(segment.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
     }
 
+#pragma warning disable PL0003 // Every byte mutation checks the same checksum sensitivity contract.
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -47,6 +48,7 @@ public class DecodeTcpTests
                 .IsEqualTo(TcpChecksumStatus.Mismatch).Because($"changing the low bit at byte {offset} must invalidate the checksum");
         }
     }
+#pragma warning restore PL0003
 
     [Test]
     [Arguments(false)]
@@ -89,6 +91,7 @@ public class DecodeTcpTests
         await Assert.That(header.DataOffset).IsEqualTo((byte)5);
     }
 
+#pragma warning disable PL0003 // Every fixed-header prefix checks the same truncation contract.
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -103,7 +106,9 @@ public class DecodeTcpTests
             await Assert.That(result.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.HeaderTruncated));
         }
     }
+#pragma warning restore PL0003
 
+#pragma warning disable PL0003 // Every options prefix checks the same fixed-header preservation contract.
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -119,7 +124,9 @@ public class DecodeTcpTests
             await Assert.That(result.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.HeaderTruncated));
         }
     }
+#pragma warning restore PL0003
 
+#pragma warning disable PL0003 // Every payload prefix checks the same declared-length contract.
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -135,7 +142,9 @@ public class DecodeTcpTests
             await Assert.That(segment.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.PayloadTruncated));
         }
     }
+#pragma warning restore PL0003
 
+#pragma warning disable PL0003 // Every short IP length checks the same capture boundary contract.
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -145,7 +154,9 @@ public class DecodeTcpTests
             await Assert.That(Decode(ipv6, V4, declared) is TcpParseResult.IpLengthTooShort error
                 && error.RemainingBytes.Length == declared).IsTrue().Because($"IP declares only {declared} bytes");
     }
+#pragma warning restore PL0003
 
+#pragma warning disable PL0003 // Every invalid data offset checks the same rejection contract.
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -160,6 +171,7 @@ public class DecodeTcpTests
             await Assert.That(result.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.InvalidDataOffset));
         }
     }
+#pragma warning restore PL0003
 
     [Test]
     [Arguments(false)]
@@ -378,6 +390,7 @@ public class DecodeTcpTests
         await Assert.That(segment.Checksum.Value).IsEqualTo(new TcpChecksumUnavailable(TcpUnavailableReason.PayloadTruncated));
     }
 
+#pragma warning disable PL0003 // Every address byte mutation checks the same pseudo-header checksum contract.
     [Test]
     public async Task Every_ipv6_address_word_contributes_to_checksum()
     {
@@ -392,6 +405,7 @@ public class DecodeTcpTests
             frame[i] ^= 1;
         }
     }
+#pragma warning restore PL0003
 
     private static string WithOptions(string options)
     {

@@ -8,6 +8,7 @@ namespace PacketLab.Analysis.IntegrationTests;
 
 public class AnalyzeTcpCaptureTests
 {
+#pragma warning disable PL0003 // One reader must continue through all diagnostics to the final valid record.
     [Test]
     [Arguments("tcp-little", PcapByteOrder.LittleEndian)]
     [Arguments("tcp-big", PcapByteOrder.BigEndian)]
@@ -31,6 +32,7 @@ public class AnalyzeTcpCaptureTests
         await Assert.That(last.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
         await Assert.That(Hex(last.Payload)).IsEqualTo("CAFE01");
     }
+#pragma warning restore PL0003
 
     [Test]
     [Arguments("tcp-little", SampleRecord.MaximumHeader, 60, 63u, "CAFE01", TcpChecksumStatus.Match)]

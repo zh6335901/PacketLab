@@ -136,6 +136,7 @@ public class DecodeUdpTests
         await Assert.That(result.Checksum.Value).IsEqualTo(new UdpChecksumUnavailable(UdpUnavailableReason.IpLengthTooShort));
     }
 
+#pragma warning disable PL0003 // Every header prefix checks the same truncation contract.
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -151,7 +152,9 @@ public class DecodeUdpTests
             await Assert.That(result.Checksum.Value).IsEqualTo(new UdpChecksumUnavailable(UdpUnavailableReason.HeaderTruncated));
         }
     }
+#pragma warning restore PL0003
 
+#pragma warning disable PL0003 // Every payload prefix checks the same header preservation contract.
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -167,6 +170,7 @@ public class DecodeUdpTests
             await Assert.That(udp.Checksum.Value).IsEqualTo(new UdpChecksumUnavailable(UdpUnavailableReason.PayloadTruncated));
         }
     }
+#pragma warning restore PL0003
 
     [Test]
     [Arguments("", 17)]
