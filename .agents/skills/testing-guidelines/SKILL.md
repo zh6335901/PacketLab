@@ -7,7 +7,8 @@ description: Use when writing, changing, organizing, or reviewing tests.
 
 ## Test Design
 
-- Keep each test focused on its purpose.
+- Name each test after one clear behavior and assert only what is needed to verify it.
+- Write separate tests for distinct behaviors; use parameterization or loops for input variations of the same behavior, without branching between unrelated expectations.
 - Add tests only when they provide additional verification value; avoid redundant or speculative coverage.
 - For correctness checks, assert observable behavior rather than implementation details.
 - Keep tests and fixtures simple, allowing small duplication rather than unnecessary abstractions. Prefer explicit expected data; do not duplicate production logic to compute expected results.

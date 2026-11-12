@@ -18,6 +18,8 @@ public class InspectPcapFileTests
     [Arguments("ipv6-extensions-big", "ipv6-extensions", 0)]
     [Arguments("udp-little", "udp", 0)]
     [Arguments("udp-big", "udp", 0)]
+    [Arguments("tcp-little", "tcp", 0)]
+    [Arguments("tcp-big", "tcp", 0)]
     [Arguments("record-truncated", "record-truncated", 1)]
     [Arguments("unsupported-link", "unsupported-link", 1)]
     public async Task Inspect_matches_expected_file_output(string sample, string expectation, int exitCode)

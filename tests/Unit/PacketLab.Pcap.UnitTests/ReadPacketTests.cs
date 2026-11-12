@@ -143,30 +143,28 @@ public class ReadPacketTests
     }
 
     [Test]
-    [Arguments("02000000", false)]
-    [Arguments("03000000", true)]
-    [Arguments("FFFFFFFF", true)]
-    public async Task Snaplen_limits_capture_size_without_limiting_original_length(string snaplen, bool valid)
+    [Arguments("03000000")]
+    [Arguments("FFFFFFFF")]
+    public async Task Capture_within_snaplen_preserves_large_original_length(string snaplen)
     {
-        // §4/5: captured length cannot exceed SnapLen; original length is retained independently.
         var bytes = PcapSamples.Replace(PcapSamples.Single("little-micro"), 16, snaplen);
         bytes = PcapSamples.Replace(bytes, 36, "FFFFFFFF");
         using var stream = new MemoryStream(bytes);
-        var openResult = PcapReader.Open(stream);
-        var reader = await openResult.ShouldSucceed();
-        if (valid)
-        {
-            var packetResult = reader.ReadNext();
-            var packet = await packetResult.ShouldSucceed();
-            await Assert.That(packet.OriginalLength).IsEqualTo(uint.MaxValue);
-            await Assert.That(packet.CapturedLength).IsEqualTo(3u);
-        }
-        else
-        {
-            var errorResult = reader.ReadNext();
-            var error = await errorResult.ShouldFail(new PcapError.CapturedLengthExceedsSnapLen(24, 1, 3, 2));
-            await Location(error, 32, 1);
-        }
+        var reader = await PcapReader.Open(stream).ShouldSucceed();
+        var packet = await reader.ReadNext().ShouldSucceed();
+        await Assert.That(packet.OriginalLength).IsEqualTo(uint.MaxValue);
+        await Assert.That(packet.CapturedLength).IsEqualTo(3u);
+    }
+
+    [Test]
+    public async Task Capture_exceeding_snaplen_is_rejected_even_with_large_original_length()
+    {
+        var bytes = PcapSamples.Replace(PcapSamples.Single("little-micro"), 16, "02000000");
+        bytes = PcapSamples.Replace(bytes, 36, "FFFFFFFF");
+        using var stream = new MemoryStream(bytes);
+        var reader = await PcapReader.Open(stream).ShouldSucceed();
+        var error = await reader.ReadNext().ShouldFail(new PcapError.CapturedLengthExceedsSnapLen(24, 1, 3, 2));
+        await Location(error, 32, 1);
     }
 
     [Test]

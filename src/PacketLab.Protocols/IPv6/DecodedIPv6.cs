@@ -1,11 +1,12 @@
 using System.Collections.Immutable;
 using PacketLab.Protocols.Udp;
+using PacketLab.Protocols.Tcp;
 
 namespace PacketLab.Protocols.IPv6;
 
 public union IPv6DecodeResult(DecodedIPv6, IPv6ParseResult.IncompleteHeader, IPv6ParseResult.InvalidVersion);
 
-public union IPv6PayloadResult(UdpParseResult, IPv6FragmentPayload, IPv6NoNextHeader,
+public union IPv6PayloadResult(TcpParseResult, UdpParseResult, IPv6FragmentPayload, IPv6NoNextHeader,
     IPv6PayloadUnavailable, UnsupportedIpProtocol);
 
 public sealed record DecodedIPv6
@@ -33,6 +34,7 @@ public sealed record DecodedIPv6
         // Consume the location result; retain one terminal payload state in the decoded tree.
         Payload = chain.Result switch
         {
+            IPv6UpperLayer { Protocol: 6 } upper => TcpDecoder.Decode(upper),
             IPv6UpperLayer { Protocol: 17 } upper => UdpDecoder.Decode(upper),
             IPv6UpperLayer upper =>
                 new UnsupportedIpProtocol(upper.Protocol, upper.DeclaredLength, upper.Bytes),

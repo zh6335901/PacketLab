@@ -234,6 +234,7 @@ public class ParseIPv6ExtensionsTests
         await Assert.That(chain.Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.SourceAddressUnavailable);
     }
 
+#pragma warning disable PL0003 // Every capture prefix checks the same extension-chain bounds contract.
     [Test]
     public async Task Every_capture_prefix_is_bounded_and_never_throws()
     {
@@ -245,6 +246,7 @@ public class ParseIPv6ExtensionsTests
             await Assert.That(packet.Extensions.Headers.All(h => h.Offset + h.Length <= 40 + captured)).IsTrue();
         }
     }
+#pragma warning restore PL0003
 
     private static IPv6Packet Parse(byte next, string payload, ushort? length = null)
     {

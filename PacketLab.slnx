@@ -2,6 +2,7 @@
   <Folder Name="/analyzers/">
     <Project Path="analyzers/PacketLab.Analyzers/PacketLab.Analyzers.csproj" />
     <Project Path="analyzers/PacketLab.Analyzers.Annotations/PacketLab.Analyzers.Annotations.csproj" />
+    <Project Path="analyzers/PacketLab.Testing.Analyzers/PacketLab.Testing.Analyzers.csproj" />
   </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/PacketLab.Analysis.Benchmarks/PacketLab.Analysis.Benchmarks.csproj" />
@@ -25,6 +26,7 @@
   </Folder>
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/PacketLab.Analyzers.UnitTests/PacketLab.Analyzers.UnitTests.csproj" />
+    <Project Path="tests/Unit/PacketLab.Testing.Analyzers.UnitTests/PacketLab.Testing.Analyzers.UnitTests.csproj" />
     <Project Path="tests/Unit/PacketLab.Analysis.UnitTests/PacketLab.Analysis.UnitTests.csproj" />
     <Project Path="tests/Unit/PacketLab.Protocols.UnitTests/PacketLab.Protocols.UnitTests.csproj" />
     <Project Path="tests/Unit/PacketLab.Pcap.UnitTests/PacketLab.Pcap.UnitTests.csproj" />

@@ -1,11 +1,12 @@
 using PacketLab.Protocols.Udp;
+using PacketLab.Protocols.Tcp;
 
 namespace PacketLab.Protocols.IPv4;
 
 public union IPv4DecodeResult(DecodedIPv4, IPv4ParseResult.IncompleteHeader, IPv4ParseResult.InvalidVersion,
     IPv4ParseResult.InvalidHeaderLength, IPv4ParseResult.InvalidTotalLength);
 
-public union IPv4PayloadResult(UdpParseResult, IPv4FragmentPayload, UnsupportedIpProtocol);
+public union IPv4PayloadResult(TcpParseResult, UdpParseResult, IPv4FragmentPayload, UnsupportedIpProtocol);
 
 public sealed record IPv4FragmentPayload(ushort Offset, bool MoreFragments, ushort Identification,
     byte Protocol, uint DeclaredLength, ReadOnlyMemory<byte> Bytes);
@@ -23,6 +24,7 @@ public sealed record DecodedIPv4
         Payload = header.MoreFragments || header.FragmentOffset != 0
             ? new IPv4FragmentPayload(header.FragmentOffset, header.MoreFragments, header.Identification,
                 header.Protocol, length, packet.Payload)
+            : header.Protocol == 6 ? TcpDecoder.Decode(packet)
             : header.Protocol == 17 ? UdpDecoder.Decode(packet)
             : new UnsupportedIpProtocol(header.Protocol, length, packet.Payload);
     }

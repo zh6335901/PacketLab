@@ -8,6 +8,7 @@ namespace PacketLab.Analysis.IntegrationTests;
 
 public class AnalyzeIPv4CaptureTests
 {
+#pragma warning disable PL0003 // Verify the ordered results of one complete reference capture.
     [Test]
     public async Task Analysis_matches_expected_ipv4_file_records()
     {
@@ -30,6 +31,7 @@ public class AnalyzeIPv4CaptureTests
         }
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
     }
+#pragma warning restore PL0003
 
     private sealed record RecordSnapshot(long RecordNumber, uint CapturedLength, uint OriginalLength,
         string Source, string Destination, ushort EtherType, IPv4Snapshot IPv4);
