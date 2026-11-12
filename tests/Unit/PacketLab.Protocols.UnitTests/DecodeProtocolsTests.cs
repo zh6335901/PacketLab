@@ -68,35 +68,41 @@ public class DecodeProtocolsTests
     }
 
     [Test]
-    [Arguments("0800")]
-    [Arguments("86DD")]
-    public async Task Ip_header_failure_keeps_ethernet_without_constructing_decoded_ip(string type)
+    public async Task Ipv4_header_failure_keeps_ethernet_without_constructing_decoded_ip()
     {
-        var frame = Decode(type, "AABB") is DecodedEthernet ethernet ? ethernet : throw new InvalidOperationException();
-        var isIncomplete = frame.Payload switch
-        {
-            IPv4DecodeResult ip => ip is IPv4ParseResult.IncompleteHeader { CapturedLength: 2 },
-            IPv6DecodeResult ip => ip is IPv6ParseResult.IncompleteHeader { CapturedLength: 2 },
-            _ => false
-        };
-        await Assert.That(isIncomplete).IsTrue();
-        await Assert.That(frame.Frame.EtherType).IsEqualTo(Convert.ToUInt16(type, 16));
+        var frame = Decode("0800", "AABB") is DecodedEthernet ethernet ? ethernet : throw new InvalidOperationException();
+        await Assert.That(frame.Payload is IPv4DecodeResult ip && ip is IPv4ParseResult.IncompleteHeader { CapturedLength: 2 }).IsTrue();
+        await Assert.That(frame.Frame.EtherType).IsEqualTo((ushort)0x0800);
     }
 
     [Test]
-    [Arguments(true)]
-    [Arguments(false)]
-    public async Task Arp_dispatch_preserves_outer_frame_and_inner_result(bool complete)
+    public async Task Ipv6_header_failure_keeps_ethernet_without_constructing_decoded_ip()
     {
-        var payload = complete ? "0001080006040001020000000001C0000201000000000000C0000202" : "AABB";
+        var frame = Decode("86DD", "AABB") is DecodedEthernet ethernet ? ethernet : throw new InvalidOperationException();
+        await Assert.That(frame.Payload is IPv6DecodeResult ip && ip is IPv6ParseResult.IncompleteHeader { CapturedLength: 2 }).IsTrue();
+        await Assert.That(frame.Frame.EtherType).IsEqualTo((ushort)0x86DD);
+    }
+
+    [Test]
+    public async Task Complete_arp_dispatch_preserves_outer_frame_and_packet()
+    {
+        const string payload = "0001080006040001020000000001C0000201000000000000C0000202";
         var frame = Decode("0806", payload) is DecodedEthernet ethernet ? ethernet : throw new InvalidOperationException();
         await Assert.That(frame.Frame.Source.ToString()).IsEqualTo("02:00:00:00:00:01");
         await Assert.That(Convert.ToHexString(frame.Frame.RemainingBytes.Span)).IsEqualTo(payload);
         var arp = frame.Payload is ArpParseResult result ? result : throw new InvalidOperationException();
-        if (complete)
-            await Assert.That(arp is ArpPacket).IsTrue();
-        else
-            await Assert.That(arp is ArpParseResult.IncompleteHeader { RequiredLength: 8, CapturedLength: 2 }).IsTrue();
+        await Assert.That(arp is ArpPacket).IsTrue();
+    }
+
+    [Test]
+    public async Task Truncated_arp_dispatch_preserves_outer_frame_and_diagnostic()
+    {
+        const string payload = "AABB";
+        var frame = Decode("0806", payload) is DecodedEthernet ethernet ? ethernet : throw new InvalidOperationException();
+        await Assert.That(frame.Frame.Source.ToString()).IsEqualTo("02:00:00:00:00:01");
+        await Assert.That(Convert.ToHexString(frame.Frame.RemainingBytes.Span)).IsEqualTo(payload);
+        var arp = frame.Payload is ArpParseResult result ? result : throw new InvalidOperationException();
+        await Assert.That(arp is ArpParseResult.IncompleteHeader { RequiredLength: 8, CapturedLength: 2 }).IsTrue();
     }
 
     [Test]
@@ -132,23 +138,35 @@ public class DecodeProtocolsTests
     }
 
     [Test]
-    [Arguments("350000140000000040110000C0000201C6336402", "InvalidVersion")]
-    [Arguments("440000140000000040110000C0000201C6336402", "InvalidHeaderLength")]
-    [Arguments("450000130000000040110000C0000201C6336402", "InvalidTotalLength")]
-    [Arguments("460000180000000040110000C0000201C6336402", "IncompleteHeader")]
-    public async Task Ipv4_header_errors_keep_their_specific_branch(string bytes, string expected)
+    public async Task Ipv4_invalid_version_stays_in_the_header_error_branch()
     {
-        var frame = Decode("0800", bytes) is DecodedEthernet ethernet ? ethernet : throw new InvalidOperationException();
+        var frame = Decode("0800", "350000140000000040110000C0000201C6336402") is DecodedEthernet ethernet ? ethernet : throw new InvalidOperationException();
         var ip = frame.Payload is IPv4DecodeResult result ? result : throw new InvalidOperationException();
-        var kind = ip switch
-        {
-            IPv4ParseResult.InvalidVersion { Version: 3 } => "InvalidVersion",
-            IPv4ParseResult.InvalidHeaderLength { Ihl: 4 } => "InvalidHeaderLength",
-            IPv4ParseResult.InvalidTotalLength { TotalLength: 19, HeaderLength: 20 } => "InvalidTotalLength",
-            IPv4ParseResult.IncompleteHeader { RequiredLength: 24, CapturedLength: 20 } => "IncompleteHeader",
-            _ => throw new InvalidOperationException("Wrong network failure branch.")
-        };
-        await Assert.That(kind).IsEqualTo(expected);
+        await Assert.That(ip is IPv4ParseResult.InvalidVersion { Version: 3 }).IsTrue();
+    }
+
+    [Test]
+    public async Task Ipv4_invalid_ihl_stays_in_the_header_error_branch()
+    {
+        var frame = Decode("0800", "440000140000000040110000C0000201C6336402") is DecodedEthernet ethernet ? ethernet : throw new InvalidOperationException();
+        var ip = frame.Payload is IPv4DecodeResult result ? result : throw new InvalidOperationException();
+        await Assert.That(ip is IPv4ParseResult.InvalidHeaderLength { Ihl: 4 }).IsTrue();
+    }
+
+    [Test]
+    public async Task Ipv4_invalid_total_length_stays_in_the_header_error_branch()
+    {
+        var frame = Decode("0800", "450000130000000040110000C0000201C6336402") is DecodedEthernet ethernet ? ethernet : throw new InvalidOperationException();
+        var ip = frame.Payload is IPv4DecodeResult result ? result : throw new InvalidOperationException();
+        await Assert.That(ip is IPv4ParseResult.InvalidTotalLength { TotalLength: 19, HeaderLength: 20 }).IsTrue();
+    }
+
+    [Test]
+    public async Task Ipv4_truncated_options_stay_in_the_header_error_branch()
+    {
+        var frame = Decode("0800", "460000180000000040110000C0000201C6336402") is DecodedEthernet ethernet ? ethernet : throw new InvalidOperationException();
+        var ip = frame.Payload is IPv4DecodeResult result ? result : throw new InvalidOperationException();
+        await Assert.That(ip is IPv4ParseResult.IncompleteHeader { RequiredLength: 24, CapturedLength: 20 }).IsTrue();
     }
 
     [Test]

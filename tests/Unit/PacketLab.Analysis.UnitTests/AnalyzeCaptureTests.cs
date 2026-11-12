@@ -98,22 +98,35 @@ public class AnalyzeCaptureTests
     }
 
     [Test]
-    [Arguments(8, true)]
-    [Arguments(18, false)]
-    public async Task Truncated_records_report_relative_location_and_stop_further_reading(int secondRecordBytes, bool headerTruncated)
+    public async Task Truncated_record_header_reports_relative_location_and_stops_reading()
     {
         var capture = Convert.FromHexString(Header + Records);
-        using var stream = new MemoryStream([0xaa, 0xbb, .. capture[..(56 + secondRecordBytes)]]);
+        using var stream = new MemoryStream([0xaa, 0xbb, .. capture[..64]]);
         stream.Position = 2;
         var reader = Open(stream);
         Read(reader);
         var error = reader.ReadNext() is PcapError failure ? failure : throw new AssertionException("Expected a file error.");
-        await Assert.That(error.Offset).IsEqualTo(56L + secondRecordBytes);
+        await Assert.That(error.Offset).IsEqualTo(64L);
         await Assert.That(error.RecordNumber).IsEqualTo((long?)2);
-        if (headerTruncated)
-            await Assert.That(error is PcapError.IncompleteRecordHeader { ReadBytes: 8 }).IsTrue();
-        else
-            await Assert.That(error is PcapError.IncompletePacketData { ExpectedBytes: 3, ReadBytes: 2 }).IsTrue();
+        await Assert.That(error is PcapError.IncompleteRecordHeader { ReadBytes: 8 }).IsTrue();
+        var stoppedAt = stream.Position;
+        await Assert.That(reader.ReadNext() is PcapError repeated && repeated.Value.Equals(error.Value)).IsTrue();
+        await Assert.That(stream.Position).IsEqualTo(stoppedAt);
+        await Assert.That(stream.CanRead).IsTrue();
+    }
+
+    [Test]
+    public async Task Truncated_packet_data_reports_relative_location_and_stops_reading()
+    {
+        var capture = Convert.FromHexString(Header + Records);
+        using var stream = new MemoryStream([0xaa, 0xbb, .. capture[..74]]);
+        stream.Position = 2;
+        var reader = Open(stream);
+        Read(reader);
+        var error = reader.ReadNext() is PcapError failure ? failure : throw new AssertionException("Expected a file error.");
+        await Assert.That(error.Offset).IsEqualTo(74L);
+        await Assert.That(error.RecordNumber).IsEqualTo((long?)2);
+        await Assert.That(error is PcapError.IncompletePacketData { ExpectedBytes: 3, ReadBytes: 2 }).IsTrue();
         var stoppedAt = stream.Position;
         await Assert.That(reader.ReadNext() is PcapError repeated && repeated.Value.Equals(error.Value)).IsTrue();
         await Assert.That(stream.Position).IsEqualTo(stoppedAt);
@@ -141,26 +154,25 @@ public class AnalyzeCaptureTests
     }
 
     [Test]
-    [Arguments(true)]
-    [Arguments(false)]
-    public async Task Environmental_exceptions_propagate_without_disposing_the_stream(bool failOnOpen)
+    public async Task Open_exceptions_propagate_without_disposing_the_stream()
     {
-        using var stream = new FailingStream(Convert.FromHexString(Header + Records)) { Fail = failOnOpen };
-        if (failOnOpen)
-        {
-            var error = await Assert.That(() => PcapAnalysisReader.Open(stream)).Throws<IOException>();
-            await Assert.That(error).IsSameReferenceAs(stream.Failure);
-        }
-        else
-        {
-            var reader = Open(stream);
-            stream.Fail = true;
-            var error = await Assert.That(() => reader.ReadNext()).Throws<IOException>();
-            await Assert.That(error).IsSameReferenceAs(stream.Failure);
-            stream.Fail = false;
-            var repeated = await Assert.That(() => reader.ReadNext()).Throws<IOException>();
-            await Assert.That(repeated).IsSameReferenceAs(error);
-        }
+        using var stream = new FailingStream(Convert.FromHexString(Header + Records)) { Fail = true };
+        var error = await Assert.That(() => PcapAnalysisReader.Open(stream)).Throws<IOException>();
+        await Assert.That(error).IsSameReferenceAs(stream.Failure);
+        await Assert.That(stream.CanRead).IsTrue();
+    }
+
+    [Test]
+    public async Task Read_exceptions_are_repeated_without_disposing_the_stream()
+    {
+        using var stream = new FailingStream(Convert.FromHexString(Header + Records));
+        var reader = Open(stream);
+        stream.Fail = true;
+        var error = await Assert.That(() => reader.ReadNext()).Throws<IOException>();
+        await Assert.That(error).IsSameReferenceAs(stream.Failure);
+        stream.Fail = false;
+        var repeated = await Assert.That(() => reader.ReadNext()).Throws<IOException>();
+        await Assert.That(repeated).IsSameReferenceAs(error);
         await Assert.That(stream.CanRead).IsTrue();
     }
 
