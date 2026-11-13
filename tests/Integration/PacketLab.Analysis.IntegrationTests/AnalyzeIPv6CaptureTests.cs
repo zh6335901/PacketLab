@@ -1,8 +1,10 @@
+using PacketLab.Analysis.Pcap;
+using PacketLab.Protocols.IP;
 using PacketLab.Analyzers.Annotations;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Ethernet;
-using PacketLab.Protocols.IPv6;
+using PacketLab.Protocols.IP.IPv6;
 using PacketLab.Protocols.Udp;
 using PacketLab.Protocols.Tcp;
 

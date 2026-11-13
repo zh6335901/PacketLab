@@ -1,8 +1,9 @@
+using PacketLab.Protocols.IP;
 using System.Collections.Immutable;
 using PacketLab.Protocols.Udp;
 using PacketLab.Protocols.Tcp;
 
-namespace PacketLab.Protocols.IPv6;
+namespace PacketLab.Protocols.IP.IPv6;
 
 public union IPv6DecodeResult(DecodedIPv6, IPv6ParseResult.IncompleteHeader, IPv6ParseResult.InvalidVersion);
 

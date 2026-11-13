@@ -1,8 +1,9 @@
+using PacketLab.Analysis.Pcap;
 using PacketLab.Pcap;
 using PacketLab.Protocols.Udp;
 using PacketLab.Protocols.Ethernet;
-using PacketLab.Protocols.IPv4;
-using PacketLab.Protocols.IPv6;
+using PacketLab.Protocols.IP.IPv4;
+using PacketLab.Protocols.IP.IPv6;
 
 namespace PacketLab.Analysis.IntegrationTests;
 

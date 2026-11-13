@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Net;
 
-namespace PacketLab.Protocols.IPv6;
+namespace PacketLab.Protocols.IP.IPv6;
 
 public readonly record struct IPv6Address(ulong High, ulong Low)
 {

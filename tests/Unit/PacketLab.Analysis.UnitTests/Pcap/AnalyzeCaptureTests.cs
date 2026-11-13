@@ -1,9 +1,10 @@
+using PacketLab.Analysis.Pcap;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Ethernet;
 using TUnit.Assertions.Exceptions;
 
-namespace PacketLab.Analysis.UnitTests;
+namespace PacketLab.Analysis.UnitTests.Pcap;
 
 public class AnalyzeCaptureTests
 {

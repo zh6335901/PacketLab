@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace PacketLab.Protocols.IPv6;
+namespace PacketLab.Protocols.IP.IPv6;
 
 public sealed record IPv6Fragment(ushort Offset, bool MoreFragments, uint Identification, byte NextHeader)
 {

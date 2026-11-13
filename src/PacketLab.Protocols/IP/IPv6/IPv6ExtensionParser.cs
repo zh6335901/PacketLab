@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Collections.Immutable;
 
-namespace PacketLab.Protocols.IPv6;
+namespace PacketLab.Protocols.IP.IPv6;
 
 internal static class IPv6ExtensionParser
 {
