@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using PacketLab.Analysis;
+using PacketLab.Analysis.Pcap;
 using PacketLab.Pcap;
 
 try

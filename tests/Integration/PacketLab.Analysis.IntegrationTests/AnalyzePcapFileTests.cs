@@ -1,3 +1,4 @@
+using PacketLab.Analysis.Pcap;
 using PacketLab.Pcap;
 
 namespace PacketLab.Analysis.IntegrationTests;

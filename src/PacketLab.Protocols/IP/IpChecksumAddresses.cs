@@ -1,7 +1,7 @@
-using PacketLab.Protocols.IPv4;
-using PacketLab.Protocols.IPv6;
+using PacketLab.Protocols.IP.IPv4;
+using PacketLab.Protocols.IP.IPv6;
 
-namespace PacketLab.Protocols;
+namespace PacketLab.Protocols.IP;
 
 internal static class IpChecksumAddresses
 {

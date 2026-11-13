@@ -1,7 +1,8 @@
+using PacketLab.Protocols.IP;
 using System.Buffers.Binary;
-using PacketLab.Protocols.IPv4;
+using PacketLab.Protocols.IP.IPv4;
 using PacketLab.Protocols.Ethernet;
-using PacketLab.Protocols.IPv6;
+using PacketLab.Protocols.IP.IPv6;
 using PacketLab.Protocols.Udp;
 
 namespace PacketLab.Protocols.UnitTests.Udp;

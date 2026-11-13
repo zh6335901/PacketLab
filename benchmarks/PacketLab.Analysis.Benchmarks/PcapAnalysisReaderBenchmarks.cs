@@ -1,5 +1,6 @@
 using BenchmarkDotNet.Attributes;
 using PacketLab.Pcap;
+using PacketLab.Analysis.Pcap;
 using PacketLab.Protocols.Ethernet;
 
 namespace PacketLab.Analysis.Benchmarks;
@@ -78,7 +79,7 @@ public class PcapAnalysisReaderBenchmarks
     public void AnalyzeToEnd()
     {
         capture.Position = 0;
-        var reader = PcapAnalysisReader.Open(capture) switch
+        using var reader = PcapAnalysisReader.Open(capture) switch
         {
             PcapAnalysisReader opened => opened,
             PcapError error => throw new InvalidDataException(error.Message),
@@ -90,9 +91,9 @@ public class PcapAnalysisReaderBenchmarks
         {
             switch (reader.ReadNext())
             {
-                case AnalyzedPacket packet when packet.Decoding is EthernetParseResult ethernet && ethernet is EthernetFrame frame:
+                case AnalyzedPacket packet when packet.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame:
                     packets++;
-                    bytes += EthernetHeaderLength + frame.RemainingBytes.Length;
+                    bytes += EthernetHeaderLength + frame.Frame.RemainingBytes.Length;
                     break;
                 case AnalyzedPacket:
                     throw new InvalidDataException("Expected a decoded Ethernet II frame.");

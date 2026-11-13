@@ -1,8 +1,10 @@
+using PacketLab.Protocols.IP.Reassembly;
+using PacketLab.Protocols.IP;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Arp;
 using PacketLab.Protocols.Ethernet;
-using PacketLab.Protocols.IPv4;
-using PacketLab.Protocols.IPv6;
+using PacketLab.Protocols.IP.IPv4;
+using PacketLab.Protocols.IP.IPv6;
 using PacketLab.Protocols.Udp;
 using PacketLab.Protocols.Tcp;
 
@@ -10,6 +12,13 @@ namespace PacketLab.Cli;
 
 internal static class ProtocolFormatter
 {
+    internal static string Describe(ReassembledIpDecoding result) => result switch
+    {
+        IPv4DecodeResult ipv4 => DescribeIPv4(ipv4),
+        IPv6DecodeResult ipv6 => DescribeIPv6(ipv6),
+        null => throw new InvalidOperationException("Uninitialized reassembled IP decoding.")
+    };
+
     private static string DescribeTcp(TcpParseResult result) => result switch
     {
         TcpSegment tcp => DescribeTcpHeader(tcp.Header)

@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
-using PacketLab.Protocols.IPv6;
+using PacketLab.Protocols.IP.IPv6;
 
-namespace PacketLab.Protocols.UnitTests.IPv6;
+namespace PacketLab.Protocols.UnitTests.IP.IPv6;
 
 public class ParseIPv6ExtensionsTests
 {

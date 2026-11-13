@@ -1,5 +1,7 @@
 using ConsoleAppFramework;
-using PacketLab.Analysis;
+using PacketLab.Analysis.Pcap;
+using PacketLab.Analysis.IpReassembly;
+using PacketLab.Protocols.IP.Reassembly;
 using PacketLab.Protocols;
 using PacketLab.Pcap;
 
@@ -82,11 +84,28 @@ internal static class PcapCommands
     {
         foreach (var item in reader.ReassemblyEvents)
         {
-            Console.WriteLine($"  Reassembly {item.DatagramNumber}: IPv{item.IpVersion} id={item.Identification} {item.Status}; records=[{string.Join(",", item.RecordNumbers)}]; {item.Message}");
+            Console.WriteLine($"  Reassembly {item.DatagramNumber}: IPv{item.IpVersion} id={item.Identification} {DescribeReassemblyStatus(item)}; records=[{string.Join(",", item.RecordNumbers)}]; {DescribeReassemblyMessage(item)}");
             if (item.Packet is { } packet)
                 Console.WriteLine($"    Reassembled: {ProtocolFormatter.Describe(packet.Decoding)}");
         }
     }
+
+    private static string DescribeReassemblyStatus(IpReassemblyEvent item) => item.Reason switch
+    {
+        IpReassemblyAnalysisReason.EndOfCapture => "IncompleteAtEndOfFile",
+        IpReassemblyAnalysisReason.Aborted => "Aborted",
+        IpReassemblyAnalysisReason.RecordAssociationLimit => "ResourceLimit",
+        _ => item.Status.ToString()
+    };
+
+    private static string DescribeReassemblyMessage(IpReassemblyEvent item) => item.Reason switch
+    {
+        IpReassemblyAnalysisReason.EndOfCapture => "EOF with missing fragments",
+        IpReassemblyAnalysisReason.Aborted => "analysis ended before reassembly completed",
+        IpReassemblyAnalysisReason.RecordAgeLimit => "record age limit reached",
+        IpReassemblyAnalysisReason.RecordAssociationLimit => "record association limit reached",
+        _ => item.Reassembly.Message
+    };
 
     private static int ReadFile(PcapReader reader)
     {

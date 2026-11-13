@@ -1,6 +1,6 @@
-using PacketLab.Protocols.IPv4;
+using PacketLab.Protocols.IP.IPv4;
 
-namespace PacketLab.Protocols.UnitTests.IPv4;
+namespace PacketLab.Protocols.UnitTests.IP.IPv4;
 
 public class ParseIPv4PacketTests
 {

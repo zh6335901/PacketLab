@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 
-namespace PacketLab.Protocols.IPv4;
+namespace PacketLab.Protocols.IP.IPv4;
 
 public readonly record struct IPv4Address(byte Octet0, byte Octet1, byte Octet2, byte Octet3)
 {

@@ -1,17 +1,16 @@
-using System.Collections.Immutable;
-using PacketLab.Protocols;
+using PacketLab.Protocols.IP.IPv4;
+using PacketLab.Protocols.IP.IPv6;
 
-namespace PacketLab.Analysis;
+namespace PacketLab.Protocols.IP.Reassembly;
 
 public enum IpReassemblyStatus
 {
     Pending, Duplicate, Complete, Atomic, Truncated, Invalid, Conflict, Expired,
-    ResourceLimit, IncompleteAtEndOfFile, Aborted
+    ResourceLimit, Incomplete, Discarded
 }
 
-// Datagram numbers are the first observed record number, scoped to one reader/capture.
-public sealed record IpReassemblyEvent(long DatagramNumber, int IpVersion, uint Identification,
-    ImmutableArray<long> RecordNumbers, string Message, IpReassemblyOutcome Outcome)
+public sealed record IpReassemblyUpdate(long DatagramId, int IpVersion, uint Identification,
+    string Message, IpReassemblyOutcome Outcome)
 {
     public IpReassemblyStatus Status => Outcome switch
     {
@@ -42,35 +41,32 @@ public sealed record IpReassemblyDiagnostic
 public sealed record IpReassemblyComplete(ReassembledIpPacket Packet);
 public sealed record IpReassemblyAtomic(ReassembledIpPacket Packet);
 
-// Owned bytes, independent of both the original records and the reader's cache lifetime.
-public sealed record ReassembledIpPacket(ReadOnlyMemory<byte> Frame, ProtocolDecodeResult Decoding);
+public union ReassembledIpDecoding(IPv4DecodeResult, IPv6DecodeResult);
+// Owned IP bytes, independent of input buffers and the reassembler's lifetime.
+public sealed record ReassembledIpPacket(ReadOnlyMemory<byte> Bytes, ReassembledIpDecoding Decoding);
 
 public sealed class IpReassemblyOptions
 {
     public IpReassemblyOptions(int maxDatagrams = 1024, int maxBufferedBytes = 16 * 1024 * 1024,
-        int maxDatagramBytes = 65575, int maxRecordsPerDatagram = 1024,
-        int timeoutSeconds = 60, int maxRecordAge = 100000)
+        int maxDatagramBytes = 65575, int maxFragmentsPerDatagram = 1024, int timeoutSeconds = 60)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxDatagrams);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBufferedBytes);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxDatagramBytes);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(maxDatagramBytes, 65575);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRecordsPerDatagram);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxFragmentsPerDatagram);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(timeoutSeconds);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(timeoutSeconds, 60);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRecordAge);
         MaxDatagrams = maxDatagrams;
         MaxBufferedBytes = maxBufferedBytes;
         MaxDatagramBytes = maxDatagramBytes;
-        MaxRecordsPerDatagram = maxRecordsPerDatagram;
+        MaxFragmentsPerDatagram = maxFragmentsPerDatagram;
         TimeoutSeconds = timeoutSeconds;
-        MaxRecordAge = maxRecordAge;
     }
 
     public int MaxDatagrams { get; }
     public int MaxBufferedBytes { get; }
     public int MaxDatagramBytes { get; }
-    public int MaxRecordsPerDatagram { get; }
+    public int MaxFragmentsPerDatagram { get; }
     public int TimeoutSeconds { get; }
-    public int MaxRecordAge { get; }
 }

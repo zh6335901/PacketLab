@@ -1,7 +1,8 @@
+using PacketLab.Protocols.IP;
 using PacketLab.Protocols.Udp;
 using PacketLab.Protocols.Tcp;
 
-namespace PacketLab.Protocols.IPv4;
+namespace PacketLab.Protocols.IP.IPv4;
 
 public union IPv4DecodeResult(DecodedIPv4, IPv4ParseResult.IncompleteHeader, IPv4ParseResult.InvalidVersion,
     IPv4ParseResult.InvalidHeaderLength, IPv4ParseResult.InvalidTotalLength);
