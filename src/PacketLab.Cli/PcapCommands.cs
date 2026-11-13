@@ -50,6 +50,7 @@ internal static class PcapCommands
 
     private static int InspectFile(PcapAnalysisReader reader)
     {
+        using var lifetime = reader;
         if (reader.LinkLayer == LinkLayerProtocol.Unsupported)
         {
             Console.Error.WriteLine($"Unsupported link type {reader.Header.LinkType}. Ethernet inspection requires LinkType 1.");
@@ -58,18 +59,32 @@ internal static class PcapCommands
 
         while (true)
         {
-            switch (reader.ReadNext())
+            var result = reader.ReadNext();
+            switch (result)
             {
                 case AnalyzedPacket packet:
                     PrintFrame(packet);
+                    PrintReassembly(reader);
                     break;
                 case PcapEndOfFile:
+                    PrintReassembly(reader);
                     return 0;
                 case PcapError error:
+                    PrintReassembly(reader);
                     return PrintError(error);
                 default:
                     throw new InvalidOperationException("ReadNext returned an uninitialized result.");
             }
+        }
+    }
+
+    private static void PrintReassembly(PcapAnalysisReader reader)
+    {
+        foreach (var item in reader.ReassemblyEvents)
+        {
+            Console.WriteLine($"  Reassembly {item.DatagramNumber}: IPv{item.IpVersion} id={item.Identification} {item.Status}; records=[{string.Join(",", item.RecordNumbers)}]; {item.Message}");
+            if (item.Packet is { } packet)
+                Console.WriteLine($"    Reassembled: {ProtocolFormatter.Describe(packet.Decoding)}");
         }
     }
 
