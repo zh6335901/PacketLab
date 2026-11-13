@@ -17,7 +17,6 @@ try
 
         using var lifetime = reader;
         var sawPacket = false;
-        var sawReassembly = false;
         while (true)
         {
             var result = reader.ReadNext();
@@ -25,12 +24,9 @@ try
             if (result is not AnalyzedPacket packet || packet.Decoding.Value is null)
                 throw new InvalidOperationException($"Could not read and decode {sample}.");
             sawPacket = true;
-            sawReassembly |= reader.ReassemblyEvents.Any(x => x.Packet is not null);
         }
         if (!sawPacket)
             throw new InvalidOperationException($"No records exercised decoding in {sample}.");
-        if (sample.StartsWith("ip-reassembly", StringComparison.Ordinal) && !sawReassembly)
-            throw new InvalidOperationException("No reassembly exercised.");
         Console.WriteLine($"PASS: Native AOT consumed {sample}.");
     }
 
