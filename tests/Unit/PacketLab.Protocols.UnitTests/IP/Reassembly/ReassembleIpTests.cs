@@ -466,6 +466,58 @@ public class ReassembleIpTests
     }
 
     [Test]
+    [Arguments(0, 0, 0)]
+    [Arguments(1, 1, 1)]
+    [Arguments(2, 2, 2)]
+    [Arguments(3, 3, 3)]
+    [Arguments(2, 3, 3)]
+    [Arguments(3, 2, 3)]
+    [Arguments(1, 3, 3)]
+    [Arguments(3, 1, 3)]
+    public async Task IPv4_reassembly_preserves_ecn_and_recalculates_the_header_checksum(byte firstEcn, byte tailEcn, byte expected)
+    {
+        var first = Fragment(4, 0, true, Payload[..16]); first[1] = (byte)(0xa8 | firstEcn);
+        var tail = Fragment(4, 16, false, Payload[16..]); tail[1] = tailEcn;
+        foreach (var packets in new[] { new[] { first, tail }, new[] { tail, first } })
+        {
+            using var reassembler = new IpFragmentReassembler();
+            reassembler.Process(packets[0]);
+            var complete = reassembler.Process(packets[1])!;
+            var decoding = complete.Packet!.Decoding;
+            var ip = decoding is IPv4DecodeResult v4 && v4 is DecodedIPv4 d4 ? d4.Packet : throw new InvalidOperationException();
+            await Assert.That(ip.Header.Ecn).IsEqualTo(expected);
+            await Assert.That(ip.Header.Dscp).IsEqualTo((byte)42);
+            await Assert.That(ip.ChecksumStatus).IsEqualTo(IPv4ChecksumStatus.Match);
+        }
+    }
+
+    [Test]
+    public async Task IPv4_duplicate_fragment_contributes_its_ce_marking()
+    {
+        var first = Fragment(4, 0, true, Payload[..16]); first[1] = 2;
+        var duplicate = first.ToArray(); duplicate[1] = 3;
+        var tail = Fragment(4, 16, false, Payload[16..]); tail[1] = 2;
+        using var reassembler = new IpFragmentReassembler();
+        reassembler.Process(first);
+        await Assert.That(reassembler.Process(duplicate)!.Status).IsEqualTo(IpReassemblyStatus.Duplicate);
+        var complete = reassembler.Process(tail)!;
+        await Assert.That(complete.Packet!.Bytes.Span[1] & 3).IsEqualTo(3);
+    }
+
+    [Test]
+    [Arguments(0, 3)]
+    [Arguments(3, 0)]
+    public async Task IPv4_ce_and_not_ect_fragments_discard_the_identity(byte firstEcn, byte tailEcn)
+    {
+        var first = Fragment(4, 0, true, Payload[..16]); first[1] = firstEcn;
+        var tail = Fragment(4, 16, false, Payload[16..]); tail[1] = tailEcn;
+        using var reassembler = new IpFragmentReassembler();
+        reassembler.Process(first);
+        await Assert.That(reassembler.Process(tail)!.Status).IsEqualTo(IpReassemblyStatus.Conflict);
+        await Assert.That(reassembler.Process(first)!.Status).IsEqualTo(IpReassemblyStatus.Conflict);
+    }
+
+    [Test]
     public async Task Fragment_limit_bounds_storage_without_counting_ignored_duplicates()
     {
         using var reassembler = new IpFragmentReassembler(new(maxFragmentsPerDatagram: 1));

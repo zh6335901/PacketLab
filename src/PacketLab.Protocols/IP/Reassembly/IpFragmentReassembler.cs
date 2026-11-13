@@ -137,6 +137,16 @@ public sealed class IpFragmentReassembler : IDisposable
             Fail(state, IpReassemblyStatus.Conflict, "incompatible IP or extension header context", events);
             return;
         }
+        if (state.Version == 4)
+        {
+            // RFC 3168 §5.3: even duplicate fragments may carry a new CE marking.
+            buffer.EcnCodepoints |= 1 << (fragment.Prefix.Span[1] & 3);
+            if ((buffer.EcnCodepoints & 0b1001) == 0b1001)
+            {
+                Fail(state, IpReassemblyStatus.Conflict, "CE and Not-ECT fragments cannot be combined", events);
+                return;
+            }
+        }
         var end = fragment.Offset + fragment.Bytes.Length;
         if ((buffer.Length is FinalLength { Value: var length } && (end > length || (fragment.More && end >= length) || (!fragment.More && end != length))) ||
             (!fragment.More && buffer.Parts.Any(x => x.Offset + x.Bytes.Length > end || (x.More && x.Offset + x.Bytes.Length >= end))))
@@ -201,7 +211,7 @@ public sealed class IpFragmentReassembler : IDisposable
             {
                 var payload = new byte[total];
                 foreach (var part in buffer.Parts) part.Bytes.CopyTo(payload, part.Offset);
-                var packet = BuildPacket(first, fragment, payload);
+                var packet = BuildPacket(first, fragment, payload, (buffer.EcnCodepoints & 0b1000) != 0);
                 events.Add(Event(state, IpReassemblyStatus.Complete, "all fragment bytes captured", Decode(packet, fragment.Key.Version)));
                 Remove(fragment.Key, state);
                 return;
@@ -317,7 +327,8 @@ public sealed class IpFragmentReassembler : IDisposable
         };
     }
 
-    private static byte[] BuildPacket(ReadOnlyMemory<byte> prefix, Fragment fragment, ReadOnlySpan<byte> payload)
+    private static byte[] BuildPacket(ReadOnlyMemory<byte> prefix, Fragment fragment, ReadOnlySpan<byte> payload,
+        bool congestionExperienced = false)
     {
         var bytes = new byte[prefix.Length + payload.Length];
         prefix.Span.CopyTo(bytes);
@@ -325,6 +336,7 @@ public sealed class IpFragmentReassembler : IDisposable
         var ip = bytes.AsSpan();
         if (fragment.Key.Version == 4)
         {
+            if (congestionExperienced) ip[1] |= 3;
             BinaryPrimitives.WriteUInt16BigEndian(ip[2..], (ushort)ip.Length);
             ip[6] = ip[7] = ip[10] = ip[11] = 0;
             uint sum = 0;
@@ -369,6 +381,7 @@ public sealed class IpFragmentReassembler : IDisposable
     private sealed record FinalLength(int Value);
     private sealed class Collecting
     {
+        internal int EcnCodepoints { get; set; }
         internal List<Part> Parts { get; } = [];
         internal byte[]? Context { get; set; }
         internal FirstHeaderState First { get; set; } = new MissingFirstHeader();
