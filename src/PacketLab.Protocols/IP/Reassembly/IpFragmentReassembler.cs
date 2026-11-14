@@ -297,7 +297,8 @@ public sealed class IpFragmentReassembler : IDisposable
         if (version == 4 && DecodedIPv4.Decode(bytes) is DecodedIPv4 v4 && v4.Payload is IPv4FragmentPayload f4)
         {
             var header = v4.Packet.Header;
-            return new(new(4, header.Source.ToString(), header.Destination.ToString(), f4.Identification, f4.Protocol),
+            return new(new(4, new(0, BinaryPrimitives.ReadUInt32BigEndian(bytes.Span[12..])),
+                    new(0, BinaryPrimitives.ReadUInt32BigEndian(bytes.Span[16..])), f4.Identification, f4.Protocol),
                 f4.Offset * 8, f4.MoreFragments, false, f4.Protocol, f4.DeclaredLength, f4.Bytes,
                 bytes[..header.HeaderLength], 0,
                 header.DontFragment || header.ReservedFlag ? new InvalidFragment("invalid IPv4 fragmentation flags") : new ValidFragment());
@@ -310,7 +311,7 @@ public sealed class IpFragmentReassembler : IDisposable
         if (declared < 0) return null;
         var available = Math.Min((int)declared, Math.Max(0, bytes.Length - offset));
         var previous = v6.Extensions.LastOrDefault(x => x.Offset < extension.Offset);
-        var fragment = new Fragment(new(6, v6.Header.Source.ToString(), v6.Header.Destination.ToString(), f6.Identification, 0),
+        var fragment = new Fragment(new(6, v6.Header.Source, v6.Header.Destination, f6.Identification, 0),
             f6.OffsetBytes, f6.MoreFragments, f6.IsAtomic, f6.NextHeader, (uint)declared,
             bytes.Slice(offset, available), bytes[..extension.Offset],
             previous is null ? 6 : previous.Offset, new ValidFragment());
@@ -372,7 +373,8 @@ public sealed class IpFragmentReassembler : IDisposable
     private static ReassembledIpPacket Decode(byte[] bytes, int version) =>
         new(bytes, version == 4 ? DecodedIPv4.Decode(bytes) : DecodedIPv6.Decode(bytes));
 
-    private readonly record struct Key(int Version, string Source, string Destination, uint Identification, byte Protocol);
+    // IPv4 addresses are zero-extended; Version keeps the address families distinct.
+    private readonly record struct Key(int Version, IPv6Address Source, IPv6Address Destination, uint Identification, byte Protocol);
     private sealed record Fragment(Key Key, int Offset, bool More, bool Atomic, byte NextHeader,
         uint DeclaredLength, ReadOnlyMemory<byte> Bytes, ReadOnlyMemory<byte> Prefix, int PreviousNextHeader, FragmentValidity Validity);
     private union FragmentValidity(ValidFragment, InvalidFragment);

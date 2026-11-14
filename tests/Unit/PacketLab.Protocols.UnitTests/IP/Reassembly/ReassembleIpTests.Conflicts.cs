@@ -7,6 +7,24 @@ namespace PacketLab.Protocols.UnitTests.IP.Reassembly;
 public partial class ReassembleIpTests
 {
     [Test]
+    public async Task Matching_numeric_addresses_in_different_ip_versions_remain_separate()
+    {
+        using var reassembler = new IpFragmentReassembler();
+        var ipv4 = Fragment(4, 0, true, Payload[..16], nextHeader: 0);
+        var ipv6 = Fragment(6, 0, true, Payload[..16]);
+        ipv6.AsSpan(8, 32).Clear();
+        ipv4.AsSpan(12, 4).CopyTo(ipv6.AsSpan(20, 4));
+        ipv4.AsSpan(16, 4).CopyTo(ipv6.AsSpan(36, 4));
+
+        var first = reassembler.Process(ipv4)!;
+        var second = reassembler.Process(ipv6)!;
+        await Assert.That(first.Status).IsEqualTo(IpReassemblyStatus.Pending);
+        await Assert.That(second.Status).IsEqualTo(IpReassemblyStatus.Pending);
+        await Assert.That(first.DatagramId).IsNotEqualTo(second.DatagramId);
+        await Assert.That(reassembler.Finish().Length).IsEqualTo(2);
+    }
+
+    [Test]
     [Arguments(4)]
     [Arguments(6)]
     public async Task Partial_overlap_discards_the_whole_identity_until_expiry(int version)
