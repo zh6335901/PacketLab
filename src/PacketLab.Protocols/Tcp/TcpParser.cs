@@ -91,11 +91,6 @@ public static class TcpParser
         return new TcpSegment(header, declaredLength, options, data[header.HeaderLength..], checksum);
     }
 
-    private static TcpChecksumStatus Validate(ReadOnlySpan<byte> bytes, ulong sum)
-    {
-        for (var i = 0; i < bytes.Length; i += 2)
-            sum += i + 1 < bytes.Length ? BinaryPrimitives.ReadUInt16BigEndian(bytes[i..]) : (uint)bytes[i] << 8;
-        while (sum > ushort.MaxValue) sum = (sum & 0xffff) + (sum >> 16);
-        return sum == ushort.MaxValue ? TcpChecksumStatus.Match : TcpChecksumStatus.Mismatch;
-    }
+    private static TcpChecksumStatus Validate(ReadOnlySpan<byte> bytes, ulong sum) =>
+        InternetChecksum.IsValid(bytes, sum) ? TcpChecksumStatus.Match : TcpChecksumStatus.Mismatch;
 }

@@ -13,6 +13,35 @@ public partial class ReassembleIpTests
     private static readonly byte[] Payload = Convert.FromHexString("04D20035001800000102030405060708090A0B0C0D0E0F10");
 
     [Test]
+    [Arguments(0)]
+    [Arguments(0x40)]
+    [Arguments(0x80)]
+    [Arguments(0xc0)]
+    public async Task Unfragmented_ipv4_does_not_join_a_pending_datagram_with_the_same_identity(byte flags)
+    {
+        using var reassembler = new IpFragmentReassembler();
+        var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
+        var packet = Fragment(4, 0, false, Payload);
+        packet[6] = flags;
+
+        await Assert.That(reassembler.FindDatagram(packet)).IsNull();
+        await Assert.That(reassembler.Process(packet)).IsNull();
+        await Assert.That(reassembler.IsRetained(pending.DatagramId)).IsTrue();
+        var completed = reassembler.Process(Fragment(4, 16, false, Payload[16..]))!;
+        await Assert.That(completed.DatagramId).IsEqualTo(pending.DatagramId);
+        await Assert.That(completed.Status).IsEqualTo(IpReassemblyStatus.Complete);
+    }
+
+    [Test]
+    public void Truncated_ipv4_headers_do_not_enter_reassembly() =>
+        Prop.ForAll((byte length, bool more) =>
+        {
+            using var reassembler = new IpFragmentReassembler();
+            var packet = Fragment(4, 0, more, Payload).AsMemory(0, length % 20);
+            return reassembler.FindDatagram(packet) is null && reassembler.Process(packet) is null;
+        }).Check(Config.QuickThrowOnFailure);
+
+    [Test]
     [Arguments(4)]
     [Arguments(6)]
     public async Task Truncated_fragments_cannot_be_completed_by_later_fragments(int version)
