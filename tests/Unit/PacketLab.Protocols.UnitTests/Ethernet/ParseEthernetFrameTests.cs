@@ -1,3 +1,5 @@
+using FsCheck;
+using FsCheck.Fluent;
 using PacketLab.Protocols.Ethernet;
 
 namespace PacketLab.Protocols.UnitTests.Ethernet;
@@ -41,17 +43,37 @@ public class ParseEthernetFrameTests
     }
 
     [Test]
-    [Arguments("0600", 0x0600)]
-    [Arguments("ABCD", 0xABCD)]
-    [Arguments("0806", 0x0806)]
-    public async Task A_complete_header_preserves_addresses_and_raw_type(string hex, int value)
+    public void Address_type_and_payload_survive_each_field_range()
     {
-        var result = EthernetParser.Parse(Convert.FromHexString("FFFFFFFFFFFF020000000001" + hex));
-        var frame = result is EthernetFrame ethernet ? ethernet : throw new InvalidOperationException("Expected Ethernet II.");
-        await Assert.That(frame.Destination.ToString()).IsEqualTo("FF:FF:FF:FF:FF:FF");
-        await Assert.That(frame.Source.ToString()).IsEqualTo("02:00:00:00:00:01");
-        await Assert.That(frame.EtherType).IsEqualTo((ushort)value);
-        await Assert.That(frame.RemainingBytes.IsEmpty).IsTrue();
+        if (!PreservesFields(0x0600, 0xffffffffffff, 0x020000000001, []))
+            throw new InvalidOperationException("Minimum Ethernet II type failed.");
+        Prop.ForAll((DoNotSize<ushort> field, (DoNotSize<ulong> Destination, DoNotSize<ulong> Source) mac, byte[] payload) =>
+        {
+            var destination = mac.Destination.Item;
+            var source = mac.Source.Item;
+            return PreservesFields((ushort)(field.Item % 1501), destination, source, payload)
+                && PreservesFields((ushort)(1501 + field.Item % 35), destination, source, payload)
+                && PreservesFields((ushort)(1536 + field.Item % 64000), destination, source, payload);
+        }).Check(Config.QuickThrowOnFailure);
+    }
+
+    private static bool PreservesFields(ushort field, ulong destination, ulong source, byte[] payload)
+    {
+        var dst = Convert.FromHexString(destination.ToString("X16")[4..]);
+        var src = Convert.FromHexString(source.ToString("X16")[4..]);
+        byte[] frame = [.. dst, .. src, (byte)(field >> 8), (byte)field, .. payload];
+        var (actual, d, s, rest) = EthernetParser.Parse(frame) switch
+        {
+            EthernetParseResult.Ieee8023Length item when field <= 1500 =>
+                (item.Length, item.Destination, item.Source, item.RemainingBytes),
+            EthernetParseResult.InvalidLengthOrType item when field is >= 1501 and <= 1535 =>
+                (item.Value, item.Destination, item.Source, item.RemainingBytes),
+            EthernetFrame item when field >= 1536 =>
+                (item.EtherType, item.Destination, item.Source, item.RemainingBytes),
+            _ => throw new InvalidOperationException($"Unexpected Ethernet classification for {field}.")
+        };
+        return actual == field && d.ToString() == BitConverter.ToString(dst).Replace('-', ':')
+            && s.ToString() == BitConverter.ToString(src).Replace('-', ':') && rest.Span.SequenceEqual(payload);
     }
 
     [Test]
