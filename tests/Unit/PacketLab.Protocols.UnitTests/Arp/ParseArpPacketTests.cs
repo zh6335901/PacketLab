@@ -1,5 +1,6 @@
+using FsCheck;
+using FsCheck.Fluent;
 using PacketLab.Protocols.Arp;
-using PacketLab.Protocols.Ethernet;
 
 namespace PacketLab.Protocols.UnitTests.Arp;
 
@@ -9,6 +10,7 @@ public class ParseArpPacketTests
     [Arguments("0001", "000000000000", "00000000")]
     [Arguments("0001", "102030405060", "C0000201")]
     [Arguments("0002", "102030405060", "C0000201")]
+    [Arguments("ABCD", "102030405060", "C0000201")]
     public async Task Ethernet_ipv4_packets_preserve_all_fields(string operation, string targetHardware, string senderProtocol)
     {
         var packet = Parse("000108000604" + operation + "020000000001" + senderProtocol + targetHardware + "C0000202");
@@ -25,38 +27,59 @@ public class ParseArpPacketTests
     }
 
     [Test]
-    [Arguments("0001080006040001020000000001C0000201000000000000C0000202", "020000000001", "C0000201", "000000000000", "C0000202", 1)]
-    [Arguments("123456780203ABCD0102030405060708090A", "0102", "030405", "0607", "08090A", 0xABCD)]
-    [Arguments("123456780000ABCD", "", "", "", "", 0xABCD)]
-    public async Task Declared_lengths_split_addresses_and_preserve_padding(string hex, string senderHardware,
-        string senderProtocol, string targetHardware, string targetProtocol, int operation)
+    public void Declared_lengths_split_addresses_and_preserve_padding()
     {
-        var original = Parse(hex);
-        var packet = Parse(hex + "00AABB00");
-        await Assert.That(packet.HardwareType).IsEqualTo(original.HardwareType);
-        await Assert.That(packet.ProtocolType).IsEqualTo(original.ProtocolType);
-        await Assert.That(packet.HardwareAddressLength).IsEqualTo(original.HardwareAddressLength);
-        await Assert.That(packet.ProtocolAddressLength).IsEqualTo(original.ProtocolAddressLength);
-        await Assert.That(packet.Operation).IsEqualTo((ushort)operation);
-        await Assert.That(Convert.ToHexString(packet.SenderHardwareAddress.Span)).IsEqualTo(senderHardware);
-        await Assert.That(Convert.ToHexString(packet.SenderProtocolAddress.Span)).IsEqualTo(senderProtocol);
-        await Assert.That(Convert.ToHexString(packet.TargetHardwareAddress.Span)).IsEqualTo(targetHardware);
-        await Assert.That(Convert.ToHexString(packet.TargetProtocolAddress.Span)).IsEqualTo(targetProtocol);
-        await Assert.That(Convert.ToHexString(packet.RemainingBytes.Span)).IsEqualTo("00AABB00");
+        var empty = new Addresses([], [], [], []);
+        var hardwareOnly = new Addresses([1], [], [2], []);
+        var protocolOnly = new Addresses([], [3], [], [4]);
+        if (!FieldsMatch(empty, [], 0) || !FieldsMatch(hardwareOnly, [0], 1) || !FieldsMatch(protocolOnly, [], 2))
+            throw new InvalidOperationException("Failed to preserve a zero-length address field.");
+        Prop.ForAll(((byte[] Sender, byte[] Target) hardware, (byte[] Sender, byte[] Target) protocol,
+            (byte[] Padding, ushort Operation) fields) =>
+            FieldsMatch(Addresses.Create(hardware, protocol), fields.Padding, fields.Operation)).Check(Config.QuickThrowOnFailure);
+    }
+
+    private static bool FieldsMatch(Addresses addresses, byte[] padding, ushort operation)
+    {
+        byte[] wire = [.. addresses.Encode(operation), .. padding];
+        return ArpParser.Parse(wire) is ArpPacket packet
+            && packet.HardwareType == 0x1234 && packet.ProtocolType == 0x5678 && packet.Operation == operation
+            && packet.HardwareAddressLength == addresses.SenderHardware.Length
+            && packet.ProtocolAddressLength == addresses.SenderProtocol.Length
+            && packet.SenderHardwareAddress.Span.SequenceEqual(addresses.SenderHardware)
+            && packet.TargetHardwareAddress.Span.SequenceEqual(addresses.TargetHardware)
+            && packet.SenderProtocolAddress.Span.SequenceEqual(addresses.SenderProtocol)
+            && packet.TargetProtocolAddress.Span.SequenceEqual(addresses.TargetProtocol)
+            && packet.RemainingBytes.Span.SequenceEqual(padding);
+    }
+
+    private sealed record Addresses(byte[] SenderHardware, byte[] SenderProtocol, byte[] TargetHardware, byte[] TargetProtocol)
+    {
+        internal static Addresses Create((byte[] Sender, byte[] Target) hardware, (byte[] Sender, byte[] Target) protocol)
+        {
+            int h = Math.Min(byte.MaxValue, Math.Min(hardware.Sender.Length, hardware.Target.Length));
+            int p = Math.Min(byte.MaxValue, Math.Min(protocol.Sender.Length, protocol.Target.Length));
+            return new(hardware.Sender[..h], protocol.Sender[..p], hardware.Target[..h], protocol.Target[..p]);
+        }
+
+        internal byte[] Encode(ushort operation) =>
+            [0x12, 0x34, 0x56, 0x78, (byte)SenderHardware.Length, (byte)SenderProtocol.Length,
+                (byte)(operation >> 8), (byte)operation, .. SenderHardware, .. SenderProtocol, .. TargetHardware, .. TargetProtocol];
     }
 
     [Test]
-    [Arguments(0, 8)]
-    [Arguments(7, 8)]
-    [Arguments(27, 28)]
-    public async Task Truncation_reports_required_and_captured_lengths(int captured, int required)
-    {
-        var bytes = Convert.FromHexString("0001080006040001020000000001C0000201000000000000C0000202")[..captured];
-        var result = ArpParser.Parse(bytes);
-        await Assert.That(result is ArpParseResult.IncompleteHeader incomplete &&
-            incomplete.RequiredLength == required && incomplete.CapturedLength == captured &&
-            incomplete.RemainingBytes.Span.SequenceEqual(bytes)).IsTrue();
-    }
+    public void Truncation_reports_required_and_captured_lengths() =>
+        Prop.ForAll(((byte[] Sender, byte[] Target) hardware, (byte[] Sender, byte[] Target) protocol, DoNotSize<ushort> cut) =>
+        {
+            var wire = Addresses.Create(hardware, protocol).Encode(1);
+            return Truncated(wire, 0) && Truncated(wire, 7) && Truncated(wire, wire.Length - 1)
+                && Truncated(wire, cut.Item % wire.Length);
+        }).Check(Config.QuickThrowOnFailure);
+
+    private static bool Truncated(byte[] wire, int length) =>
+        ArpParser.Parse(wire.AsMemory(0, length)) is ArpParseResult.IncompleteHeader error
+        && error.RequiredLength == (length < 8 ? 8 : wire.Length) && error.CapturedLength == length
+        && error.RemainingBytes.Span.SequenceEqual(wire.AsSpan(0, length));
 
     private static ArpPacket Parse(string hex) => ArpParser.Parse(Convert.FromHexString(hex)) is ArpPacket packet
         ? packet : throw new InvalidOperationException("Expected a complete ARP packet.");

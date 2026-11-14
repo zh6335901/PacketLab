@@ -1,3 +1,5 @@
+using FsCheck;
+using FsCheck.Fluent;
 using static PacketLab.Pcap.UnitTests.ReaderAssertions;
 
 namespace PacketLab.Pcap.UnitTests;
@@ -116,17 +118,53 @@ public class ReadPacketTests
     }
 
     [Test]
-    [Arguments(0)]
-    [Arguments(1)]
-    [Arguments(2)]
-    public async Task Reading_reports_expected_and_received_lengths_when_payload_is_incomplete(int length)
+    public void Reading_reports_expected_and_received_lengths_when_payload_is_incomplete() =>
+        Prop.ForAll((byte[][] preceding, byte[] data, ushort selector) =>
+        {
+            byte[] last = [0xca, .. data];
+            var file = Records([.. preceding, last]);
+            int received = selector % last.Length;
+            int start = file.Length - last.Length;
+            using var stream = new MemoryStream(file[..(start + received)]);
+            if (PcapReader.Open(stream) is not PcapReader reader) return false;
+            foreach (var expected in preceding)
+                if (reader.ReadNext() is not PcapPacket packet || !packet.Data.Span.SequenceEqual(expected)) return false;
+            return reader.ReadNext() is PcapError error && error.Offset == stream.Length
+                && Equals(error.Value, new PcapError.IncompletePacketData(start, preceding.Length + 1, last.Length, received));
+        }).Check(Config.QuickThrowOnFailure);
+
+    [Test]
+    public void Record_data_and_order_survive_subsequent_reads_and_disposal() =>
+        Prop.ForAll((byte[][] records) =>
+        {
+            var packets = new List<PcapPacket>();
+            using (var stream = new MemoryStream(Records(records)))
+            {
+                if (PcapReader.Open(stream) is not PcapReader reader) return false;
+                foreach (var _ in records)
+                {
+                    if (reader.ReadNext() is not PcapPacket packet) return false;
+                    packets.Add(packet);
+                }
+                if (reader.ReadNext() is not PcapEndOfFile) return false;
+            }
+            return packets.Select((p, i) => p.Timestamp.Seconds == i && p.Data.Span.SequenceEqual(records[i])).All(equal => equal);
+        }).Check(Config.QuickThrowOnFailure);
+
+    private static byte[] Records(byte[][] payloads)
     {
-        using var stream = new MemoryStream(PcapSamples.Single("big-nano")[..(40 + length)]);
-        var openResult = PcapReader.Open(stream);
-        var reader = await openResult.ShouldSucceed();
-        var errorResult = reader.ReadNext();
-        var error = await errorResult.ShouldFail(new PcapError.IncompletePacketData(40, 1, 3, length));
-        await Location(error, 40 + length, 1);
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+        writer.Write(Convert.FromHexString(PcapSamples.LittleMicroHeader));
+        for (int i = 0; i < payloads.Length; i++)
+        {
+            writer.Write((uint)i);
+            writer.Write(0u);
+            writer.Write((uint)payloads[i].Length);
+            writer.Write((uint)payloads[i].Length);
+            writer.Write(payloads[i]);
+        }
+        return stream.ToArray();
     }
 
     [Test]
