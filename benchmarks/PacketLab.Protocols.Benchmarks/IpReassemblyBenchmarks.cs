@@ -7,7 +7,7 @@ using PacketLab.Protocols.Udp;
 
 namespace PacketLab.Protocols.Benchmarks;
 
-public enum FragmentSequence { IPv4Two, IPv4Sixteen, IPv4SixteenOutOfOrder, IPv6Two }
+public enum FragmentSequence { IPv4Two, IPv4Sixteen, IPv4SixteenOutOfOrder, IPv6Two, IPv4ManyOutOfOrder }
 
 [MemoryDiagnoser]
 public class IpReassemblyBenchmarks
@@ -23,7 +23,12 @@ public class IpReassemblyBenchmarks
     {
         bool ipv6 = Sequence == FragmentSequence.IPv6Two;
         var udp = PacketSamples.Udp(2040, true, ipv6 ? PacketSamples.IPv6AddressSum : PacketSamples.IPv4AddressSum);
-        int count = Sequence is FragmentSequence.IPv4Two or FragmentSequence.IPv6Two ? 2 : 16;
+        int count = Sequence switch
+        {
+            FragmentSequence.IPv4Two or FragmentSequence.IPv6Two => 2,
+            FragmentSequence.IPv4ManyOutOfOrder => 256,
+            _ => 16
+        };
         int partLength = udp.Length / count;
         fragments = new ReadOnlyMemory<byte>[count];
         for (int i = 0; i < count; i++)
@@ -34,7 +39,7 @@ public class IpReassemblyBenchmarks
             fragments[i] = ipv6 ? PacketSamples.IPv6Fragment(part, offset, more)
                 : PacketSamples.IPv4(part, offset: offset, more: more);
         }
-        if (Sequence == FragmentSequence.IPv4SixteenOutOfOrder)
+        if (Sequence is FragmentSequence.IPv4SixteenOutOfOrder or FragmentSequence.IPv4ManyOutOfOrder)
         {
             var last = fragments[^1];
             Array.Copy(fragments, 1, fragments, 2, count - 2);
@@ -81,7 +86,7 @@ public class ReassemblyClockBenchmarks
 {
     private IpFragmentReassembler reassembler = null!;
 
-    [Params(0, 32)]
+    [Params(0, 32, 1024)]
     public int PendingDatagrams { get; set; }
 
     [GlobalSetup]
