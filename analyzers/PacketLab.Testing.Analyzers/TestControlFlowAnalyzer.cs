@@ -36,16 +36,62 @@ public sealed class TestControlFlowAnalyzer : DiagnosticAnalyzer
             !symbol.GetAttributes().Any(a => SymbolEqualityComparer.Default.Equals(a.AttributeClass, testAttribute)))
             return;
 
-        var constructs = method.DescendantNodes(EnterExecutableCode)
-            .OfType<InvocationExpressionSyntax>()
-            .Where(invocation => context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken).Symbol
-                is IMethodSymbol called && called.Name != "Multiple" &&
-                SymbolEqualityComparer.Default.Equals(called.ContainingType, assertType))
-            .SelectMany(invocation => invocation.Ancestors().TakeWhile(node => node != method))
-            .Select(ControlFlowName).Where(name => name is not null).Distinct().ToArray();
-        if (constructs.Length != 0)
+        var constructs = new List<string>();
+        var models = new Dictionary<SyntaxTree, SemanticModel> { [method.SyntaxTree] = context.SemanticModel };
+        foreach (var invocation in method.DescendantNodes(EnterExecutableCode).OfType<InvocationExpressionSyntax>())
+        {
+            var enclosing = invocation.Ancestors().TakeWhile(node => node != method)
+                .Select(ControlFlowName).OfType<string>().Except(constructs).ToArray();
+            if (enclosing.Length == 0) continue;
+            if (context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken).Symbol is IMethodSymbol called &&
+                ReachesAssertion(called, assertType, context, models))
+                constructs.AddRange(enclosing);
+        }
+        if (constructs.Count != 0)
             context.ReportDiagnostic(Diagnostic.Create(Rule, method.Identifier.GetLocation(),
                 symbol.Name, string.Join(", ", constructs)));
+    }
+
+    private static bool ReachesAssertion(IMethodSymbol called, INamedTypeSymbol assertType,
+        SyntaxNodeAnalysisContext context, Dictionary<SyntaxTree, SemanticModel> models)
+    {
+        var pending = new Stack<IMethodSymbol>();
+        var visited = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+        pending.Push(called);
+        while (pending.Count > 0)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            var method = pending.Pop();
+            method = (method.ReducedFrom ?? method).OriginalDefinition;
+            method = method.PartialImplementationPart ?? method;
+            if (!visited.Add(method)) continue;
+            if (SymbolEqualityComparer.Default.Equals(method.ContainingType, assertType))
+            {
+                if (method.Name != "Multiple") return true;
+                continue;
+            }
+            foreach (var reference in method.DeclaringSyntaxReferences)
+            {
+                var declaration = reference.GetSyntax(context.CancellationToken);
+                SyntaxNode? body = declaration switch
+                {
+                    MethodDeclarationSyntax m => (SyntaxNode?)m.Body ?? m.ExpressionBody,
+                    LocalFunctionStatementSyntax f => (SyntaxNode?)f.Body ?? f.ExpressionBody,
+                    _ => null
+                };
+                if (body is null || !context.Compilation.ContainsSyntaxTree(body.SyntaxTree)) continue;
+                if (!models.TryGetValue(body.SyntaxTree, out var model))
+                {
+#pragma warning disable RS1030 // A called helper can be in another file. Reuse its model for this test.
+                    models[body.SyntaxTree] = model = context.Compilation.GetSemanticModel(body.SyntaxTree);
+#pragma warning restore RS1030
+                }
+                foreach (var invocation in body.DescendantNodes(EnterExecutableCode).OfType<InvocationExpressionSyntax>())
+                    if (model.GetSymbolInfo(invocation, context.CancellationToken).Symbol is IMethodSymbol target)
+                        pending.Push(target);
+            }
+        }
+        return false;
     }
 
     private static bool EnterExecutableCode(SyntaxNode node) =>

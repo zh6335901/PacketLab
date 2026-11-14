@@ -70,6 +70,46 @@ public class AnalyzeTestControlFlowTests
     }
 
     [Test]
+    public async Task Loop_calling_a_local_assertion_function_reports()
+    {
+        var diagnostic = (await Analyze(TestSource("""
+            void Check(bool value) => Assert.That(value);
+            foreach (var value in new[] { flag }) Check(value);
+            """))).Single();
+        await Assert.That(diagnostic.GetMessage()).Contains("inside foreach");
+    }
+
+    [Test]
+    public async Task Branch_calling_a_chain_of_helpers_reports()
+    {
+        var diagnostic = (await Analyze(TestSource("if (flag) Checks.Check(flag);"), helperSource: """
+            using TUnit.Assertions;
+            static class Checks
+            {
+                public static void Check<T>(T value) => Verify(value);
+                static void Verify<T>(T value) { Assert.That(value); }
+            }
+            """)).Single();
+        await Assert.That(diagnostic.GetMessage()).Contains("Test 'Case' contains assertions inside if");
+    }
+
+    [Test]
+    public async Task Recursive_calls_without_a_reachable_assertion_do_not_report()
+    {
+        var diagnostics = await Analyze(TestSource("""
+            void First() => Second();
+            void Second()
+            {
+                void Unused() => Assert.Fail("unused");
+                System.Action deferred = () => Assert.Fail("deferred");
+                First();
+            }
+            if (flag) First();
+            """));
+        await Assert.That(diagnostics.Length).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task Helpers_are_not_analyzed_as_test_methods()
     {
         var source = """
@@ -172,10 +212,12 @@ public class AnalyzeTestControlFlowTests
         """;
 
     private static async Task<ImmutableArray<Diagnostic>> Analyze(string source,
-        CSharpCompilationOptions? options = null, bool allowErrors = false)
+        CSharpCompilationOptions? options = null, bool allowErrors = false, string? helperSource = null)
     {
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), path: "Case.cs");
-        var compilation = CSharpCompilation.Create("TestCase", [tree], References,
+        SyntaxTree[] trees = helperSource is null ? [tree] :
+            [tree, CSharpSyntaxTree.ParseText(helperSource, (CSharpParseOptions)tree.Options, path: "Checks.cs")];
+        var compilation = CSharpCompilation.Create("TestCase", trees, References,
             options ?? new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         if (!allowErrors)
             await Assert.That(string.Join("\n", compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error))).IsEqualTo("");
