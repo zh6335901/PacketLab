@@ -9,6 +9,7 @@ description: Use when writing, changing, organizing, or reviewing tests.
 
 - Name each test after one clear behavior and assert only what is needed to verify it.
 - Use examples for specific cases and regressions. Use property-based tests for rules that hold across many input combinations.
+- Check that generators can produce inputs that expose the bugs you want to catch. Keep fixed examples for protocol boundaries and known regressions.
 - Write separate tests for distinct behaviors; use parameterization or loops for input variations of the same behavior, without branching between unrelated expectations.
 - Add tests only when they provide additional verification value; avoid redundant or speculative coverage.
 - For correctness checks, assert observable behavior rather than implementation details.
