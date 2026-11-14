@@ -1,3 +1,5 @@
+using FsCheck;
+using FsCheck.Fluent;
 using static PacketLab.Pcap.UnitTests.ReaderAssertions;
 
 namespace PacketLab.Pcap.UnitTests;
@@ -5,40 +7,62 @@ namespace PacketLab.Pcap.UnitTests;
 public class ReadStreamTests
 {
     [Test]
-    public async Task Error_offsets_are_relative_to_open_at_the_current_stream_position()
-    {
-        using var stream = new MemoryStream([0xaa, 0xbb, 0xcc, .. PcapSamples.Single("little-micro")[..42]]);
-        stream.Position = 3;
-        var openResult = PcapReader.Open(stream);
-        var reader = await openResult.ShouldSucceed();
-        var result = reader.ReadNext();
-        var error = await result.ShouldFail(new PcapError.IncompletePacketData(40, 1, 3, 2));
-        await Assert.That(error.Offset).IsEqualTo(42L);
-        await Assert.That(error.RecordNumber).IsEqualTo((long?)1);
-        await Assert.That(stream.Position).IsEqualTo(45L);
-    }
+    public void Error_offsets_are_relative_to_open_at_the_current_stream_position() =>
+        Prop.ForAll((byte[] prefix, byte selector) =>
+        {
+            int received = selector % 3;
+            int cut = 40 + received;
+            using var stream = new MemoryStream([.. prefix, .. PcapSamples.Single("little-micro")[..cut]]);
+            stream.Position = prefix.Length;
+            return PcapReader.Open(stream) is PcapReader reader && reader.ReadNext() is PcapError error
+                && Equals(error.Value, new PcapError.IncompletePacketData(40, 1, 3, received))
+                && error.Offset == cut && error.RecordNumber == 1 && stream.Position == prefix.Length + cut;
+        }).Check(Config.QuickThrowOnFailure);
 
     [Test]
-    [Arguments(1)]
-    [Arguments(7)]
-    public async Task Short_reads_on_nonseekable_streams_return_all_packets_and_eof(int chunkSize)
+    public void Short_reads_on_nonseekable_streams_preserve_records_and_terminal_result() =>
+        Prop.ForAll((byte[] sizes, DoNotSize<ushort> selector) =>
+        {
+            var bytes = Convert.FromHexString(PcapSamples.Multiple);
+            int[] chunks = [1, .. sizes.Select(size => 1 + size % 16)];
+            return ReadsKnownCapture(bytes, chunks) && SameReads(bytes, chunks)
+                && SameReads(bytes[..(selector.Item % bytes.Length)], chunks);
+        }).Check(Config.QuickThrowOnFailure);
+
+    private static bool ReadsKnownCapture(byte[] bytes, int[] chunks)
     {
-        using var stream = new ProbeStream(Convert.FromHexString(PcapSamples.Multiple)) { ChunkSize = chunkSize };
-        var openResult = PcapReader.Open(stream);
-        var reader = await openResult.ShouldSucceed();
-        var firstResult = reader.ReadNext();
-        var first = await firstResult.ShouldSucceed();
-        await Assert.That(Convert.ToHexString(first.Data.Span)).IsEqualTo("DEADBE");
-        var secondResult = reader.ReadNext();
-        var second = await secondResult.ShouldSucceed();
-        await Assert.That(Convert.ToHexString(second.Data.Span)).IsEqualTo("AABB");
-        var thirdResult = reader.ReadNext();
-        var third = await thirdResult.ShouldSucceed();
-        await Assert.That(third.Data.IsEmpty).IsTrue();
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
-        await Assert.That(stream.IsDisposed).IsFalse();
+        using var stream = new ProbeStream(bytes) { ChunkSizes = chunks };
+        if (PcapReader.Open(stream) is not PcapReader reader) return false;
+        foreach (var expected in new[] { "DEADBE", "AABB", "" })
+            if (reader.ReadNext() is not PcapPacket packet || Convert.ToHexString(packet.Data.Span) != expected) return false;
+        return reader.ReadNext() is PcapEndOfFile && reader.ReadNext() is PcapEndOfFile && !stream.IsDisposed;
     }
+
+    private static bool SameReads(byte[] bytes, int[] chunks)
+    {
+        using var stream = new ProbeStream(bytes) { ChunkSizes = chunks };
+        using var baseline = new MemoryStream(bytes);
+        var expected = PcapReader.Open(baseline);
+        var actual = PcapReader.Open(stream);
+        if (expected is PcapError openError)
+            return actual is PcapError other && Equals(openError.Value, other.Value) && !stream.IsDisposed;
+        if (expected is not PcapReader regular || actual is not PcapReader shortReads) return false;
+        PcapReadResult terminal;
+        while ((terminal = regular.ReadNext()) is PcapPacket packet)
+        {
+            if (shortReads.ReadNext() is not PcapPacket received || received.Timestamp != packet.Timestamp
+                || received.OriginalLength != packet.OriginalLength || !received.Data.Span.SequenceEqual(packet.Data.Span))
+                return false;
+        }
+        return SameTerminal(terminal, shortReads.ReadNext()) && SameTerminal(terminal, shortReads.ReadNext()) && !stream.IsDisposed;
+    }
+
+    private static bool SameTerminal(PcapReadResult expected, PcapReadResult actual) => expected switch
+    {
+        PcapEndOfFile => actual is PcapEndOfFile,
+        PcapError error => actual is PcapError other && Equals(error.Value, other.Value) && error.Offset == other.Offset,
+        _ => false
+    };
 
     [Test]
     public async Task Opening_propagates_the_original_io_exception_without_closing_the_stream()

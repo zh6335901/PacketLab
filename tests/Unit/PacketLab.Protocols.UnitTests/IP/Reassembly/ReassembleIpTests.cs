@@ -1,4 +1,6 @@
 using System.Buffers.Binary;
+using FsCheck.Fluent;
+using FsCheck;
 using PacketLab.Protocols.IP.IPv4;
 using PacketLab.Protocols.IP.IPv6;
 using PacketLab.Protocols.IP.Reassembly;
@@ -6,38 +8,9 @@ using PacketLab.Protocols.Udp;
 
 namespace PacketLab.Protocols.UnitTests.IP.Reassembly;
 
-public class ReassembleIpTests
+public partial class ReassembleIpTests
 {
     private static readonly byte[] Payload = Convert.FromHexString("04D20035001800000102030405060708090A0B0C0D0E0F10");
-
-    [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Partial_overlap_discards_the_whole_identity_until_expiry(int version)
-    {
-        var packets = Packets(Fragment(version, 0, true, Payload[..16]), Fragment(version, 8, true, Payload[8..]),
-            Fragment(version, 16, false, Payload[16..]), Fragment(version, 0, true, Payload[..16]),
-            Fragment(version, 0, true, Payload[..16], 2), Fragment(version, 16, false, Payload[16..], 2));
-        using var sequence = new FragmentSequence(packets);
-        sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
-        sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
-        sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Complete);
-    }
-
-    [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Same_range_with_different_bytes_is_a_conflict(int version)
-    {
-        var changed = Payload[..16]; changed[8] ^= 1;
-        var packets = Packets(Fragment(version, 0, true, Payload[..16]), Fragment(version, 0, true, changed));
-        using var sequence = new FragmentSequence(packets);
-        sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
-    }
 
     [Test]
     [Arguments(4)]
@@ -55,13 +28,13 @@ public class ReassembleIpTests
     [Test]
     [Arguments(4)]
     [Arguments(6)]
-    public async Task Non_final_fragment_requires_eight_byte_alignment(int version)
-    {
-        var packets = Packets(Fragment(version, 0, true, Payload[..15]));
-        using var sequence = new FragmentSequence(packets);
-        sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Invalid);
-    }
+    public void Non_final_fragment_requires_eight_byte_alignment(int version) =>
+        Prop.ForAll((byte blocks) => Enumerable.Range(1, 7).All(remainder =>
+        {
+            using var reassembler = new IpFragmentReassembler();
+            var fragment = Fragment(version, 8, true, new byte[(blocks + 1) * 8 + remainder]);
+            return reassembler.Process(fragment)?.Status == IpReassemblyStatus.Invalid;
+        })).Check(Config.QuickThrowOnFailure);
 
     [Test]
     [Arguments(4)]
@@ -77,42 +50,22 @@ public class ReassembleIpTests
     [Test]
     [Arguments(4)]
     [Arguments(6)]
-    public async Task Conflicting_final_lengths_are_rejected(int version)
+    public async Task Empty_non_atomic_fragment_is_invalid(int version)
     {
-        var packets = Packets(Fragment(version, 16, false, Payload[16..]), Fragment(version, 8, false, Payload[16..]));
-        using var sequence = new FragmentSequence(packets);
-        sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
+        var packets = Packets(Fragment(version, 16, false, []));
+        using var sequence = new FragmentSequence(packets); sequence.Next();
+        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Invalid);
     }
 
     [Test]
-    public async Task Atomic_fragment_is_independent_of_a_conflicting_ipv6_identity()
+    [Arguments(0x40)]
+    [Arguments(0x80)]
+    public async Task Invalid_ipv4_fragmentation_flags_are_diagnosed(byte flag)
     {
-        var packets = Packets(Fragment(6, 0, true, Payload[..16]), Fragment(6, 8, true, Payload[8..]),
-            Fragment(6, 0, false, Payload), Fragment(6, 16, false, Payload[16..]));
-        using var sequence = new FragmentSequence(packets);
-        sequence.Next(); sequence.Next(); sequence.Next();
-        var atomic = sequence.Updates.Single();
-        await Assert.That(atomic.Status).IsEqualTo(IpReassemblyStatus.Atomic);
-        await Assert.That(atomic.Packet!.Bytes.Span[6]).IsEqualTo((byte)17);
-        await Assert.That(Udp(atomic).IsComplete).IsTrue();
-        sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
-    }
-
-    [Test]
-    public async Task IPv6_extension_headers_before_and_after_fragment_survive_reassembly()
-    {
-        var withDestination = new byte[] { 17, 0, 0, 0, 0, 0, 0, 0 }.Concat(Payload).ToArray();
-        var packets = Packets(Fragment(6, 24, false, withDestination[24..], nextHeader: 60, hopByHop: true),
-            Fragment(6, 0, true, withDestination[..24], nextHeader: 60, hopByHop: true));
-        using var sequence = new FragmentSequence(packets);
-        sequence.Next(); sequence.Next();
-        var result = sequence.Updates.Single();
-        await Assert.That(result.Status).IsEqualTo(IpReassemblyStatus.Complete);
-        await Assert.That(result.Packet!.Bytes.Span[40]).IsEqualTo((byte)60);
-        await Assert.That(result.Packet.Bytes.Span[48..56].SequenceEqual(withDestination[..8])).IsTrue();
-        await Assert.That(Udp(result).Payload.Span.SequenceEqual(Payload[8..])).IsTrue();
+        var frame = Fragment(4, 0, true, Payload[..16]); frame[6] |= flag;
+        var packets = Packets(frame);
+        using var sequence = new FragmentSequence(packets); sequence.Next();
+        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Invalid);
     }
 
     [Test]
@@ -129,12 +82,50 @@ public class ReassembleIpTests
     }
 
     [Test]
-    public async Task IPv6_incompatible_next_header_is_a_conflict_within_the_same_identity()
+    public async Task IPv6_hop_by_hop_after_fragment_is_invalid_even_when_reconstruction_would_move_it_first()
     {
-        var packets = Packets(Fragment(6, 0, true, Payload[..16]), Fragment(6, 16, false, Payload[16..], nextHeader: 6));
+        var payload = new byte[] { 17, 0, 0, 0, 0, 0, 0, 0 }.Concat(Payload[..8]).ToArray();
+        var packets = Packets(Fragment(6, 0, true, payload, nextHeader: 0));
+        using var sequence = new FragmentSequence(packets); sequence.Next();
+        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Invalid);
+    }
+
+    [Test]
+    [Arguments(16, 5, IpReassemblyStatus.Invalid)]
+    [Arguments(24, 4, IpReassemblyStatus.Invalid)]
+    [Arguments(24, 7, IpReassemblyStatus.Invalid)]
+    [Arguments(24, 6, IpReassemblyStatus.Pending)]
+    [Arguments(24, 5, IpReassemblyStatus.Pending)]
+    public async Task IPv6_first_fragment_must_contain_the_whole_tcp_header(int length, byte dataOffset, IpReassemblyStatus status)
+    {
+        var tcp = new byte[length]; tcp[12] = (byte)(dataOffset << 4);
+        var packets = Packets(Fragment(6, 0, true, tcp, nextHeader: 6));
+        using var sequence = new FragmentSequence(packets); sequence.Next();
+        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(status);
+    }
+
+    [Test]
+    public async Task Atomic_tcp_with_exactly_twenty_header_bytes_is_complete()
+    {
+        var tcp = new byte[20]; tcp[12] = 0x50;
+        var packets = Packets(Fragment(6, 0, false, tcp, nextHeader: 6));
+        using var sequence = new FragmentSequence(packets); sequence.Next();
+        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Atomic);
+    }
+
+    [Test]
+    public async Task IPv6_extension_headers_before_and_after_fragment_survive_reassembly()
+    {
+        var withDestination = new byte[] { 17, 0, 0, 0, 0, 0, 0, 0 }.Concat(Payload).ToArray();
+        var packets = Packets(Fragment(6, 24, false, withDestination[24..], nextHeader: 60, hopByHop: true),
+            Fragment(6, 0, true, withDestination[..24], nextHeader: 60, hopByHop: true));
         using var sequence = new FragmentSequence(packets);
         sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
+        var result = sequence.Updates.Single();
+        await Assert.That(result.Status).IsEqualTo(IpReassemblyStatus.Complete);
+        await Assert.That(result.Packet!.Bytes.Span[40]).IsEqualTo((byte)60);
+        await Assert.That(result.Packet.Bytes.Span[48..56].SequenceEqual(withDestination[..8])).IsTrue();
+        await Assert.That(Udp(result).Payload.Span.SequenceEqual(Payload[8..])).IsTrue();
     }
 
     [Test]
@@ -171,80 +162,6 @@ public class ReassembleIpTests
         await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.ResourceLimit);
     }
 
-#pragma warning disable PL0003 // Each permutation verifies the same reconstruction invariant.
-    [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Every_arrival_permutation_of_three_fragments_reconstructs_the_same_payload(int version)
-    {
-        int[][] orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
-        var fragments = new[] { Fragment(version, 0, true, Payload[..8]), Fragment(version, 8, true, Payload[8..16]), Fragment(version, 16, false, Payload[16..]) };
-        foreach (var order in orders)
-        {
-            var packets = Packets(order.Select(x => fragments[x]).ToArray());
-            using var sequence = new FragmentSequence(packets); sequence.Next(); sequence.Next(); sequence.Next();
-            var result = sequence.Updates.Single();
-            await Assert.That(result.Status).IsEqualTo(IpReassemblyStatus.Complete);
-            await Assert.That(Udp(result).Payload.Span.SequenceEqual(Payload[8..])).IsTrue();
-        }
-    }
-
-#pragma warning restore PL0003
-
-    [Test]
-    [Arguments(4, 12)]
-    [Arguments(4, 16)]
-    [Arguments(4, 9)]
-    [Arguments(6, 8)]
-    [Arguments(6, 24)]
-    public async Task Source_destination_and_ipv4_protocol_are_part_of_the_identity(int version, int changedByte)
-    {
-        var tail = Fragment(version, 16, false, Payload[16..]); tail[changedByte] ^= 1;
-        var packets = Packets(Fragment(version, 0, true, Payload[..16]), tail);
-        using var sequence = new FragmentSequence(packets); sequence.Next(); sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Length).IsEqualTo(2);
-        await Assert.That(sequence.Updates.All(x => x.Status == IpReassemblyStatus.Incomplete)).IsTrue();
-    }
-
-    [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Bytes_beyond_the_declared_ip_length_are_not_fragment_payload(int version)
-    {
-        var tail = Fragment(version, 16, false, Payload[16..]).Concat(new byte[] { 0xaa, 0xbb, 0xcc }).ToArray();
-        var packets = Packets(Fragment(version, 0, true, Payload[..16]), tail);
-        using var sequence = new FragmentSequence(packets); sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Packet!.Bytes.Length).IsEqualTo(version == 4 ? 44 : 64);
-    }
-
-    [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Empty_non_atomic_fragment_is_invalid(int version)
-    {
-        var packets = Packets(Fragment(version, 16, false, []));
-        using var sequence = new FragmentSequence(packets); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Invalid);
-    }
-
-    [Test]
-    public async Task IPv6_hop_by_hop_after_fragment_is_invalid_even_when_reconstruction_would_move_it_first()
-    {
-        var payload = new byte[] { 17, 0, 0, 0, 0, 0, 0, 0 }.Concat(Payload[..8]).ToArray();
-        var packets = Packets(Fragment(6, 0, true, payload, nextHeader: 0));
-        using var sequence = new FragmentSequence(packets); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Invalid);
-    }
-
-    [Test]
-    public async Task IPv6_changed_per_fragment_extension_context_is_rejected()
-    {
-        var tail = Fragment(6, 16, false, Payload[16..], hopByHop: true); tail[42] = 1;
-        var packets = Packets(Fragment(6, 0, true, Payload[..16], hopByHop: true), tail);
-        using var sequence = new FragmentSequence(packets); sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
-    }
-
     [Test]
     public async Task Reassembly_preserves_unavailable_ipv6_routing_checksum_context()
     {
@@ -279,39 +196,6 @@ public class ReassembleIpTests
         var frame = sequence.Updates.Single().Packet!.Bytes;
         await Assert.That(frame.Span[20..24].SequenceEqual(new byte[] { 1, 1, 0, 0 })).IsTrue();
         await Assert.That(Udp(sequence.Updates.Single()).IsComplete).IsTrue();
-    }
-
-    [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Duplicate_final_fragment_is_safe_before_the_missing_first_fragment_arrives(int version)
-    {
-        var tail = Fragment(version, 16, false, Payload[16..]);
-        var packets = Packets(tail, tail, Fragment(version, 0, true, Payload[..16]));
-        using var sequence = new FragmentSequence(packets); sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Duplicate);
-        sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Complete);
-    }
-
-    [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Fragment_beyond_an_already_known_final_boundary_is_rejected(int version)
-    {
-        var packets = Packets(Fragment(version, 8, false, Payload[16..]), Fragment(version, 24, true, Payload[..8]));
-        using var sequence = new FragmentSequence(packets); sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
-    }
-
-    [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Final_fragment_cannot_end_before_an_already_buffered_fragment(int version)
-    {
-        var packets = Packets(Fragment(version, 24, true, Payload[..8]), Fragment(version, 8, false, Payload[16..]));
-        using var sequence = new FragmentSequence(packets); sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
     }
 
     [Test]
@@ -369,29 +253,6 @@ public class ReassembleIpTests
     }
 
     [Test]
-    [Arguments(0x40)]
-    [Arguments(0x80)]
-    public async Task Invalid_ipv4_fragmentation_flags_are_diagnosed(byte flag)
-    {
-        var frame = Fragment(4, 0, true, Payload[..16]); frame[6] |= flag;
-        var packets = Packets(frame);
-        using var sequence = new FragmentSequence(packets); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Invalid);
-    }
-
-    [Test]
-    public async Task Different_options_in_repeated_ipv4_first_fragments_are_not_safe_duplicates()
-    {
-        var first = Fragment(4, 0, true, Payload[..16]);
-        first = first[..20].Concat(new byte[] { 1, 1, 0, 0 }).Concat(first[20..]).ToArray();
-        first[0] = 0x46; first[3] += 4;
-        var duplicate = first.ToArray(); duplicate[20] = 0;
-        var packets = Packets(first, duplicate);
-        using var sequence = new FragmentSequence(packets); sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
-    }
-
-    [Test]
     public async Task Aggregate_buffer_limit_applies_across_distinct_datagrams()
     {
         var packets = Packets(Fragment(4, 16, false, Payload[16..]), Fragment(4, 16, false, Payload[16..], 2));
@@ -403,54 +264,11 @@ public class ReassembleIpTests
     }
 
     [Test]
-    [Arguments(16, 5, IpReassemblyStatus.Invalid)]
-    [Arguments(24, 4, IpReassemblyStatus.Invalid)]
-    [Arguments(24, 7, IpReassemblyStatus.Invalid)]
-    [Arguments(24, 6, IpReassemblyStatus.Pending)]
-    [Arguments(24, 5, IpReassemblyStatus.Pending)]
-    public async Task IPv6_first_fragment_must_contain_the_whole_tcp_header(int length, byte dataOffset, IpReassemblyStatus status)
-    {
-        var tcp = new byte[length]; tcp[12] = (byte)(dataOffset << 4);
-        var packets = Packets(Fragment(6, 0, true, tcp, nextHeader: 6));
-        using var sequence = new FragmentSequence(packets); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(status);
-    }
-
-    [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Identical_bytes_at_different_overlapping_offsets_are_not_duplicates(int version)
-    {
-        var bytes = new byte[16]; bytes[4] = bytes[12] = 0; bytes[5] = bytes[13] = 24;
-        var packets = Packets(Fragment(version, 0, true, bytes), Fragment(version, 8, true, bytes));
-        using var sequence = new FragmentSequence(packets); sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
-    }
-
-    [Test]
     public async Task Header_storage_is_included_in_the_buffer_limit_before_payload_is_accepted()
     {
         var packets = Packets(Fragment(4, 0, true, Payload[..16]));
         using var sequence = new FragmentSequence(packets, new(maxBufferedBytes: 55)); sequence.Next();
         await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.ResourceLimit);
-    }
-
-    [Test]
-    public async Task Incompatible_ipv6_flow_context_is_not_silently_combined()
-    {
-        var tail = Fragment(6, 16, false, Payload[16..]); tail[3] = 1;
-        var packets = Packets(Fragment(6, 0, true, Payload[..16]), tail);
-        using var sequence = new FragmentSequence(packets); sequence.Next(); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Conflict);
-    }
-
-    [Test]
-    public async Task Atomic_tcp_with_exactly_twenty_header_bytes_is_complete()
-    {
-        var tcp = new byte[20]; tcp[12] = 0x50;
-        var packets = Packets(Fragment(6, 0, false, tcp, nextHeader: 6));
-        using var sequence = new FragmentSequence(packets); sequence.Next();
-        await Assert.That(sequence.Updates.Single().Status).IsEqualTo(IpReassemblyStatus.Atomic);
     }
 
     [Test]
@@ -666,5 +484,4 @@ public class ReassembleIpTests
         payload.CopyTo(frame, header);
         return frame;
     }
-
 }

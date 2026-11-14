@@ -2,7 +2,7 @@ namespace PacketLab.Pcap.UnitTests;
 
 internal sealed class ProbeStream(byte[] bytes) : Stream
 {
-    internal int ChunkSize { get; init; } = int.MaxValue;
+    internal int[] ChunkSizes { get; init; } = [];
     internal int? FailAt { get; set; }
     internal Exception Failure { get; init; } = new IOException("injected read failure");
     internal int BytesRead { get; private set; }
@@ -20,7 +20,8 @@ internal sealed class ProbeStream(byte[] bytes) : Stream
         ReadCalls++;
         if (FailAt is { } failureOffset && BytesRead >= failureOffset)
             throw Failure;
-        int count = Math.Min(buffer.Length, Math.Min(ChunkSize, bytes.Length - BytesRead));
+        int chunk = ChunkSizes.Length == 0 ? int.MaxValue : ChunkSizes[(ReadCalls - 1) % ChunkSizes.Length];
+        int count = Math.Min(buffer.Length, Math.Min(chunk, bytes.Length - BytesRead));
         if (FailAt is { } boundary)
             count = Math.Min(count, boundary - BytesRead);
         bytes.AsSpan(BytesRead, count).CopyTo(buffer);

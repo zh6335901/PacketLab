@@ -1,3 +1,5 @@
+using FsCheck;
+using FsCheck.Fluent;
 using System.Buffers.Binary;
 using PacketLab.Protocols.IP.IPv6;
 
@@ -247,6 +249,33 @@ public class ParseIPv6ExtensionsTests
         }
     }
 #pragma warning restore PL0003
+
+    [Test]
+    public void Extension_slices_and_upper_payload_match_the_original_chain() =>
+        Prop.ForAll((byte mask, byte[] lengths, byte[] payload) =>
+        {
+            var input = ExtensionHeaders.Create(mask, lengths, 17);
+            var wire = input.Bytes.Concat(payload).ToArray();
+            if (wire.Length == 0) wire = payload = [0];
+            var chain = Parse(input.First, Convert.ToHexString(wire)).Extensions;
+            var upper = Upper(chain);
+            return chain.Headers.Select(h => Hex(h.Bytes)).SequenceEqual(input.Headers.Select(h => Convert.ToHexString(h)))
+                && upper.Offset == 40 + input.Bytes.Length && upper.Protocol == 17 && upper.DeclaredLength == payload.Length
+                && upper.Bytes.Span.SequenceEqual(payload) && HasKnownContext(chain) && chain.Diagnostics.IsEmpty;
+        }).Check(Config.QuickThrowOnFailure);
+
+    [Test]
+    public void Truncated_extension_chains_only_reference_captured_bytes() =>
+        Prop.ForAll((byte mask, byte[] lengths, DoNotSize<ushort> selector) =>
+        {
+            var input = ExtensionHeaders.Create(mask, lengths, 17);
+            byte[] wire = [.. input.Bytes, 0xaa, 0xbb];
+            int cut = selector.Item % wire.Length;
+            var chain = Parse(input.First, Convert.ToHexString(wire.AsSpan(0, cut)), (ushort)wire.Length).Extensions;
+            return chain.Headers.All(h => h.Offset >= 40 && h.Offset + h.Length <= 40 + cut
+                    && h.Bytes.Span.SequenceEqual(wire.AsSpan(h.Offset - 40, h.Length)))
+                && chain.RemainingOffset >= 40 && chain.RemainingOffset + chain.RemainingBytes.Length == 40 + cut;
+        }).Check(Config.QuickThrowOnFailure);
 
     private static IPv6Packet Parse(byte next, string payload, ushort? length = null)
     {
