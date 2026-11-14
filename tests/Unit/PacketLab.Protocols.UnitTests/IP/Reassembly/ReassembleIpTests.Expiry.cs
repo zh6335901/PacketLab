@@ -5,6 +5,33 @@ namespace PacketLab.Protocols.UnitTests.IP.Reassembly;
 public partial class ReassembleIpTests
 {
     [Test]
+    [Arguments(30, false)]
+    [Arguments(60, true)]
+    public async Task Expiry_near_the_timestamp_limit_uses_elapsed_time_without_overflow(int elapsedSeconds, bool expired)
+    {
+        using var reassembler = new IpFragmentReassembler();
+        reassembler.AdvanceTime(ulong.MaxValue - (ulong)elapsedSeconds * 1_000_000_000UL);
+        var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
+        var updates = reassembler.AdvanceTime(ulong.MaxValue);
+        await Assert.That(updates.Length).IsEqualTo(expired ? 1 : 0);
+        await Assert.That(reassembler.IsRetained(pending.DatagramId)).IsEqualTo(!expired);
+    }
+
+    [Test]
+    public async Task Removing_the_oldest_entry_does_not_expire_younger_entries_early()
+    {
+        using var reassembler = new IpFragmentReassembler();
+        var oldest = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
+        reassembler.AdvanceTime(30_000_000_000);
+        var younger = reassembler.Process(Fragment(4, 0, true, Payload[..16], 2))!;
+        reassembler.Expire(oldest.DatagramId);
+        await Assert.That(reassembler.AdvanceTime(60_000_000_000).IsEmpty).IsTrue();
+        await Assert.That(reassembler.IsRetained(younger.DatagramId)).IsTrue();
+        await Assert.That(reassembler.AdvanceTime(89_999_999_999).IsEmpty).IsTrue();
+        await Assert.That(reassembler.AdvanceTime(90_000_000_000).Single().DatagramId).IsEqualTo(younger.DatagramId);
+    }
+
+    [Test]
     [Arguments(1)]
     [Arguments(32)]
     [Arguments(1024)]

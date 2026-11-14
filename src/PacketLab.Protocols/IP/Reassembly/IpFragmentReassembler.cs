@@ -9,6 +9,7 @@ public sealed class IpFragmentReassembler : IDisposable
 {
     private readonly Dictionary<Key, Datagram> datagrams = [];
     private ulong clock;
+    private ulong oldestStartTime;
     private int bufferedBytes;
 
     private readonly IpReassemblyOptions options;
@@ -32,15 +33,28 @@ public sealed class IpFragmentReassembler : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         clock = Math.Max(clock, nanoseconds);
+        if (datagrams.Count == 0) return [];
+        var timeout = (ulong)options.TimeoutSeconds * 1_000_000_000UL;
+        return clock - oldestStartTime < timeout ? [] : ExpireDatagrams(timeout);
+    }
+
+    private ImmutableArray<IpReassemblyUpdate> ExpireDatagrams(ulong timeout)
+    {
+        var nextOldest = clock;
         ImmutableArray<IpReassemblyUpdate>.Builder? events = null;
         // Dictionary.Remove preserves enumeration on .NET Core 3.0 and later.
         foreach (var (key, state) in datagrams)
         {
-            if (clock - state.StartTime < (ulong)options.TimeoutSeconds * 1_000_000_000UL) continue;
+            if (clock - state.StartTime < timeout)
+            {
+                nextOldest = Math.Min(nextOldest, state.StartTime);
+                continue;
+            }
             (events ??= ImmutableArray.CreateBuilder<IpReassemblyUpdate>())
                 .Add(Event(state, IpReassemblyStatus.Expired, "reassembly timeout reached"));
             Remove(key, state);
         }
+        oldestStartTime = nextOldest;
         return events?.ToImmutable() ?? [];
     }
 
@@ -120,6 +134,8 @@ public sealed class IpFragmentReassembler : IDisposable
                 events.Add(Event(state, IpReassemblyStatus.ResourceLimit, "datagram table limit reached (including discarded identities)"));
                 return;
             }
+            // Starts are monotonic. Removing the oldest entry can only cause an extra early scan.
+            if (datagrams.Count == 0) oldestStartTime = clock;
             datagrams.Add(fragment.Key, state);
         }
         if (state.Buffer is Discarded discarded)
