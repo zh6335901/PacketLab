@@ -1,3 +1,6 @@
+using FsCheck;
+using FsCheck.Fluent;
+using System.Buffers.Binary;
 using static PacketLab.Pcap.UnitTests.ReaderAssertions;
 
 namespace PacketLab.Pcap.UnitTests;
@@ -5,24 +8,31 @@ namespace PacketLab.Pcap.UnitTests;
 public class OpenPcapTests
 {
     [Test]
-    [Arguments("little-micro", "04030201D0C0B0A0", "FFFF0000")]
-    [Arguments("big-micro", "01020304A0B0C0D0", "0000FFFF")]
-    public async Task Opening_preserves_historical_reserved_fields_and_unknown_link_type(
-        string sample, string reserved, string link)
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task Opening_preserves_historical_reserved_fields_and_link_type(bool littleEndian)
     {
-        // draft-ietf-opsawg-pcap-09 §4: Reserved1/2 are ignored, unlike R/Reserved3.
-        var bytes = PcapSamples.Replace(PcapSamples.Single(sample), 8, reserved);
-        bytes = PcapSamples.Replace(bytes, 20, link);
+        await Assert.That(ReadsHeader(littleEndian, 0x01020304u, 0xA0B0C0D0u, ushort.MaxValue)).IsTrue();
+        Prop.ForAll((DoNotSize<uint> reserved1, DoNotSize<uint> reserved2, DoNotSize<ushort> link) =>
+            ReadsHeader(littleEndian, reserved1.Item, reserved2.Item, link.Item)).Check(Config.QuickThrowOnFailure);
+    }
+
+    private static bool ReadsHeader(bool littleEndian, uint reserved1, uint reserved2, ushort link)
+    {
+        var bytes = PcapSamples.Single(littleEndian ? "little-micro" : "big-micro");
+        WriteWord(8, reserved1);
+        WriteWord(12, reserved2);
+        WriteWord(20, link);
         using var stream = new MemoryStream(bytes);
-        var openResult = PcapReader.Open(stream);
-        var reader = await openResult.ShouldSucceed();
-        await Assert.That(reader.Header.Reserved1).IsEqualTo(0x01020304u);
-        await Assert.That(reader.Header.Reserved2).IsEqualTo(0xa0b0c0d0u);
-        await Assert.That(reader.Header.LinkType).IsEqualTo(ushort.MaxValue);
-        await Assert.That(reader.Header.RawLinkType).IsEqualTo(65535u);
-        var packetResult = reader.ReadNext();
-        var packet = await packetResult.ShouldSucceed();
-        await Assert.That(Convert.ToHexString(packet.Data.Span)).IsEqualTo("DEADBE");
+        return PcapReader.Open(stream) is PcapReader reader && reader.Header.Reserved1 == reserved1
+            && reader.Header.Reserved2 == reserved2 && reader.Header.LinkType == link && reader.Header.RawLinkType == link
+            && reader.ReadNext() is PcapPacket packet && Convert.ToHexString(packet.Data.Span) == "DEADBE";
+
+        void WriteWord(int offset, uint value)
+        {
+            if (littleEndian) BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(offset), value);
+            else BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(offset), value);
+        }
     }
 
     [Test]

@@ -176,19 +176,21 @@ public class AnalyzeTestControlFlowTests
                 [TUnit.Core.Test] public void Other() { if (true) Assert.That(true); }
             }
             """;
-        var diagnostic = (await Analyze(source)).Single();
+        var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+            generalDiagnosticOption: ReportDiagnostic.Error);
+        var diagnostic = (await Analyze(source, options)).Single();
         await Assert.That(diagnostic.GetMessage()).Contains("Test 'Other'");
+        await Assert.That(diagnostic.Severity).IsEqualTo(DiagnosticSeverity.Error);
     }
 
     [Test]
-    public async Task Explicit_warning_configuration_keeps_the_rule_nonblocking_under_warnings_as_errors()
+    public async Task Warnings_as_errors_makes_unsuppressed_test_control_flow_blocking()
     {
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-            generalDiagnosticOption: ReportDiagnostic.Error,
-            specificDiagnosticOptions: new Dictionary<string, ReportDiagnostic> { ["PL0003"] = ReportDiagnostic.Warn });
+            generalDiagnosticOption: ReportDiagnostic.Error);
         var diagnostic = (await Analyze(TestSource("if (flag) Assert.That(flag);"), options)).Single();
-        await Assert.That(diagnostic.Severity).IsEqualTo(DiagnosticSeverity.Warning);
-        await Assert.That(diagnostic.IsWarningAsError).IsFalse();
+        await Assert.That(diagnostic.Severity).IsEqualTo(DiagnosticSeverity.Error);
+        await Assert.That(diagnostic.IsWarningAsError).IsTrue();
     }
 
     [Test]

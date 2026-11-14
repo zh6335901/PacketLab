@@ -1,4 +1,7 @@
+using FsCheck;
+using FsCheck.Fluent;
 using PacketLab.Protocols.IP.IPv6;
+using IPv6Address = PacketLab.Protocols.IP.IPv6.IPv6Address;
 
 namespace PacketLab.Protocols.UnitTests.IP.IPv6;
 
@@ -19,16 +22,18 @@ public class ParseIPv6PacketTests
     }
 
     [Test]
-    [Arguments("6000000000003BFF", 0, 0u, 255)]
-    [Arguments("6FFFFFFF00003B01", 255, 0xfffffu, 1)]
-    [Arguments("6018000000003B80", 1, 0x80000u, 128)]
-    public async Task Bit_field_edges_do_not_bleed_into_adjacent_fields(string prefix, byte trafficClass, uint flowLabel, byte hopLimit)
+    public void Bit_fields_do_not_bleed_into_adjacent_fields()
     {
-        var header = Parse(prefix + Addresses).Header;
-        await Assert.That(header.Version).IsEqualTo((byte)6);
-        await Assert.That(header.TrafficClass).IsEqualTo(trafficClass);
-        await Assert.That(header.FlowLabel).IsEqualTo(flowLabel);
-        await Assert.That(header.HopLimit).IsEqualTo(hopLimit);
+        if (!(FieldsMatch(0, 0, 255) && FieldsMatch(255, 0xfffff, 1) && FieldsMatch(1, 0x80000, 128)))
+            throw new InvalidOperationException("IPv6 bit field boundary mismatch.");
+        Prop.ForAll((byte traffic, DoNotSize<uint> flow, byte hop) =>
+            FieldsMatch(traffic, flow.Item & 0xfffff, hop)).Check(Config.QuickThrowOnFailure);
+    }
+
+    private static bool FieldsMatch(byte traffic, uint flow, byte hop)
+    {
+        var header = Parse($"6{traffic:X2}{flow:X5}00003B{hop:X2}" + Addresses).Header;
+        return header.Version == 6 && header.TrafficClass == traffic && header.FlowLabel == flow && header.HopLimit == hop;
     }
 
     public static IEnumerable<int> ShortLengths() => Enumerable.Range(0, 40);
@@ -62,24 +67,26 @@ public class ParseIPv6PacketTests
     }
 
     [Test]
-    [Arguments(40, "", "", false)]
-    [Arguments(42, "CAFE", "", false)]
-    [Arguments(44, "CAFE0102", "", true)]
-    [Arguments(48, "CAFE0102", "DEADBEEF", true)]
-    public async Task Declared_length_bounds_payload_and_preserves_trailing_bytes(int length, string payloadHex, string trailingHex, bool complete)
+    public void Declared_length_bounds_payload_and_preserves_trailing_bytes() =>
+        Prop.ForAll((byte[] data, byte[] tail, ushort selector) =>
+        {
+            byte[] payload = [0xca, .. data];
+            byte[] header = Convert.FromHexString("6ABCDEF0" + payload.Length.ToString("X4") + "FD00" + Addresses);
+            int cut = selector % payload.Length;
+            return HasSlices(header, payload.Length, payload[..cut], [])
+                && HasSlices(header, payload.Length, payload, []) && HasSlices(header, payload.Length, payload, tail);
+        }).Check(Config.QuickThrowOnFailure);
+
+    private static bool HasSlices(byte[] header, int declared, byte[] data, byte[] tail)
     {
-        var bytes = Convert.FromHexString(Header + "CAFE0102DEADBEEF");
-        var packet = IPv6Parser.Parse(bytes.AsMemory(0, length)) is IPv6Packet parsed ? parsed
-            : throw new InvalidOperationException("Expected a complete header.");
-        await Assert.That(packet.Header).IsEqualTo(Parse(Header).Header);
+        byte[] bytes = [.. header, .. data, .. tail];
+        if (IPv6Parser.Parse(bytes) is not IPv6Packet packet) return false;
         var payload = Known(packet);
-        await Assert.That(payload.DeclaredLength).IsEqualTo((ushort)4);
-        await Assert.That(payload.DeclaredDatagramLength).IsEqualTo(44);
-        await Assert.That(payload.IsDatagramComplete).IsEqualTo(complete);
-        await Assert.That(Convert.ToHexString(payload.Bytes.Span)).IsEqualTo(payloadHex);
-        await Assert.That(Convert.ToHexString(payload.TrailingBytes.Span)).IsEqualTo(trailingHex);
-        await Assert.That(payload.Bytes.Equals(bytes.AsMemory(40, payloadHex.Length / 2))).IsTrue();
-        await Assert.That(payload.TrailingBytes.Equals(bytes.AsMemory(Math.Min(length, 44), trailingHex.Length / 2))).IsTrue();
+        return packet.Header == Parse(Convert.ToHexString(header)).Header
+            && payload.DeclaredLength == declared && payload.DeclaredDatagramLength == 40UL + (uint)declared
+            && payload.IsDatagramComplete == (declared == data.Length)
+            && payload.Bytes.Equals(bytes.AsMemory(40, data.Length))
+            && payload.TrailingBytes.Equals(bytes.AsMemory(40 + data.Length, tail.Length));
     }
 
     [Test]

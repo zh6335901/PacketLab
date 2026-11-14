@@ -2,7 +2,6 @@
   <Import Project="../Directory.Build.props" />
   <PropertyGroup>
     <EnablePacketLabAnalyzers>false</EnablePacketLabAnalyzers>
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);PL0003</WarningsNotAsErrors>
     <OutputType>Exe</OutputType>
     <TargetFramework>net11.0</TargetFramework>
   </PropertyGroup>
