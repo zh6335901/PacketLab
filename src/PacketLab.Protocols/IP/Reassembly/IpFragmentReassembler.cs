@@ -277,6 +277,9 @@ public sealed class IpFragmentReassembler : IDisposable
     {
         if (bytes.IsEmpty) return null;
         var version = bytes.Span[0] >> 4;
+        // Unfragmented IPv4 packets cannot enter reassembly; avoid decoding their transport payload again.
+        if (version == 4 && bytes.Length >= 8 &&
+            (BinaryPrimitives.ReadUInt16BigEndian(bytes.Span[6..]) & 0x3fff) == 0) return null;
         if (version == 4 && DecodedIPv4.Decode(bytes) is DecodedIPv4 v4 && v4.Payload is IPv4FragmentPayload f4)
         {
             var header = v4.Packet.Header;
