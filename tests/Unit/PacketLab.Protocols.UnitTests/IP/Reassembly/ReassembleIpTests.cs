@@ -466,29 +466,36 @@ public class ReassembleIpTests
     }
 
     [Test]
-    [Arguments(0, 0, 0)]
-    [Arguments(1, 1, 1)]
-    [Arguments(2, 2, 2)]
-    [Arguments(3, 3, 3)]
-    [Arguments(2, 3, 3)]
-    [Arguments(3, 2, 3)]
-    [Arguments(1, 3, 3)]
-    [Arguments(3, 1, 3)]
-    public async Task IPv4_reassembly_preserves_ecn_and_recalculates_the_header_checksum(byte firstEcn, byte tailEcn, byte expected)
+    [Arguments(0, 0, 0, false)]
+    [Arguments(0, 0, 0, true)]
+    [Arguments(1, 1, 1, false)]
+    [Arguments(1, 1, 1, true)]
+    [Arguments(2, 2, 2, false)]
+    [Arguments(2, 2, 2, true)]
+    [Arguments(3, 3, 3, false)]
+    [Arguments(3, 3, 3, true)]
+    [Arguments(2, 3, 3, false)]
+    [Arguments(2, 3, 3, true)]
+    [Arguments(3, 2, 3, false)]
+    [Arguments(3, 2, 3, true)]
+    [Arguments(1, 3, 3, false)]
+    [Arguments(1, 3, 3, true)]
+    [Arguments(3, 1, 3, false)]
+    [Arguments(3, 1, 3, true)]
+    public async Task IPv4_reassembly_preserves_ecn_and_recalculates_checksum_in_either_arrival_order(
+        byte firstEcn, byte tailEcn, byte expected, bool tailArrivesFirst)
     {
         var first = Fragment(4, 0, true, Payload[..16]); first[1] = (byte)(0xa8 | firstEcn);
         var tail = Fragment(4, 16, false, Payload[16..]); tail[1] = tailEcn;
-        foreach (var packets in new[] { new[] { first, tail }, new[] { tail, first } })
-        {
-            using var reassembler = new IpFragmentReassembler();
-            reassembler.Process(packets[0]);
-            var complete = reassembler.Process(packets[1])!;
-            var decoding = complete.Packet!.Decoding;
-            var ip = decoding is IPv4DecodeResult v4 && v4 is DecodedIPv4 d4 ? d4.Packet : throw new InvalidOperationException();
-            await Assert.That(ip.Header.Ecn).IsEqualTo(expected);
-            await Assert.That(ip.Header.Dscp).IsEqualTo((byte)42);
-            await Assert.That(ip.ChecksumStatus).IsEqualTo(IPv4ChecksumStatus.Match);
-        }
+        var packets = tailArrivesFirst ? new[] { tail, first } : new[] { first, tail };
+        using var reassembler = new IpFragmentReassembler();
+        reassembler.Process(packets[0]);
+        var complete = reassembler.Process(packets[1])!;
+        var decoding = complete.Packet!.Decoding;
+        var ip = decoding is IPv4DecodeResult v4 && v4 is DecodedIPv4 d4 ? d4.Packet : throw new InvalidOperationException();
+        await Assert.That(ip.Header.Ecn).IsEqualTo(expected);
+        await Assert.That(ip.Header.Dscp).IsEqualTo((byte)42);
+        await Assert.That(ip.ChecksumStatus).IsEqualTo(IPv4ChecksumStatus.Match);
     }
 
     [Test]
