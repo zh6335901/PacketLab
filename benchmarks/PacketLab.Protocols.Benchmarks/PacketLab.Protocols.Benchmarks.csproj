@@ -5,7 +5,7 @@
     <PacketLabProductRoot Condition="'$(PacketLabProductRoot)' == ''">$(MSBuildThisFileDirectory)../..</PacketLabProductRoot>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="$(PacketLabProductRoot)/src/PacketLab.Pcap/PacketLab.Pcap.csproj" />
+    <ProjectReference Include="$(PacketLabProductRoot)/src/PacketLab.Protocols/PacketLab.Protocols.csproj" />
     <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
   </ItemGroup>
 </Project>

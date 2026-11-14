@@ -40,9 +40,9 @@ public union UdpParseResult(UdpDatagram, UdpParseResult.IpLengthTooShort, UdpPar
     public sealed record LengthExceedsIpPayload(UdpHeader Header, uint DeclaredUpperLayerLength, ReadOnlyMemory<byte> RemainingBytes);
 }
 
-internal static class UdpParser
+public static class UdpParser
 {
-    internal static UdpParseResult Parse(ReadOnlyMemory<byte> data, uint declaredLength, bool ipv6, ulong? addressSum)
+    public static UdpParseResult Parse(ReadOnlyMemory<byte> data, uint declaredLength, bool ipv6, ulong? pseudoHeaderAddressSum)
     {
         // The network layer owns the declaration; captured padding cannot extend it.
         data = data[..(int)Math.Min((ulong)data.Length, declaredLength)];
@@ -64,8 +64,8 @@ internal static class UdpParser
         UdpChecksum checksum = header.Checksum == 0
             ? ipv6 ? UdpChecksumStatus.ZeroNotAllowed : UdpChecksumStatus.NotPresent
             : data.Length < length ? new UdpChecksumUnavailable(UdpUnavailableReason.PayloadTruncated)
-            : addressSum is null ? new UdpChecksumUnavailable(UdpUnavailableReason.PseudoHeaderUnavailable)
-            : Validate(bytes[..end], addressSum.Value + 17 + (length >> 16) + (length & 0xffff));
+            : pseudoHeaderAddressSum is null ? new UdpChecksumUnavailable(UdpUnavailableReason.PseudoHeaderUnavailable)
+            : Validate(bytes[..end], pseudoHeaderAddressSum.Value + 17 + (length >> 16) + (length & 0xffff));
         return new UdpDatagram(header, length, data[8..end], declaredLength - length, data[end..], checksum);
     }
 

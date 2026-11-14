@@ -1,3 +1,5 @@
+#load "Set-BenchmarkAffinity.fsx"
+
 open System
 open System.Diagnostics
 open System.Globalization
@@ -12,12 +14,12 @@ let comparerRev = "8588cdaa63ba6dd580067a654f175452a36513cf"
 let threshold = "5%"
 let directory path = Directory.CreateDirectory(path).FullName
 
-let run cwd log environment program (args: string list) =
+let runProcess launch cwd log environment program (args: string list) =
     let start = ProcessStartInfo(program, WorkingDirectory = cwd, UseShellExecute = false,
                                  RedirectStandardOutput = true, RedirectStandardError = true)
     for arg in args do start.ArgumentList.Add(arg)
     for key, value in environment do start.Environment[key] <- value
-    use child = Process.Start(start)
+    use child: Process = launch start
     let stdout = child.StandardOutput.ReadToEndAsync()
     let stderr = child.StandardError.ReadToEndAsync()
     child.WaitForExit()
@@ -33,6 +35,9 @@ let run cwd log environment program (args: string list) =
             |> Option.orElseWith (fun () -> Array.tryLast lines) |> Option.defaultValue "No output"
         failwith $"{program} {List.head args} exited {child.ExitCode}: {reason}"
     output.Trim()
+
+let run cwd log environment program args =
+    runProcess (fun start -> Process.Start(start)) cwd log environment program args
 
 let git cwd args = run cwd None [] "git" args
 let export repo sha destination paths =
@@ -99,11 +104,13 @@ type Side = {
     Sha: string
     Products: ResizeArray<string>
     Environments: Set<string>
+    CpuModels: Set<string>
+    Affinity: string option
     Rows: Map<string, Measurement>
     Errors: ResizeArray<string>
 }
 
-let runSide temp output project candidate (name, revision) =
+let runSide temp output project candidate affinity (name, revision) =
     printfn "Measuring %s %s" name revision
     let folder = directory (output </> name)
     let log = folder </> "run.log"
@@ -113,6 +120,7 @@ let runSide temp output project candidate (name, revision) =
     let bench = harness </> project
     let env = ["PacketLabProductRoot", product; "DOTNET_CLI_UI_LANGUAGE", "en-US"]
     let products, errors = ResizeArray(), ResizeArray()
+    let mutable observedAffinity = None
     try
         export root revision product []
         export root candidate harness []
@@ -133,18 +141,30 @@ let runSide temp output project candidate (name, revision) =
                 let hash = SHA256.HashData(assembly) |> Convert.ToHexString
                 products.Add($"{path} — {file} SHA-256 {hash}")
         if products.Count = 0 then failwith "No product project references in the benchmark output"
-        run (Path.GetDirectoryName bench) (Some log) env "dotnet"
+        let launch start =
+            let child = BenchmarkAffinity.start affinity start
+            try
+                observedAffinity <- BenchmarkAffinity.verify affinity child
+                child
+            with _ ->
+                use failedChild = child
+                if not failedChild.HasExited then failedChild.Kill(true)
+                reraise()
+        runProcess launch (Path.GetDirectoryName bench) (Some log) env "dotnet"
             [target; "--filter"; "*"; "--inProcess"; "--iterationCount"; "12"; "--warmupCount"; "3"
              "--iterationTime"; "250"; "--exporters"; "fulljson"; "--artifacts"; folder] |> ignore
     with ex -> errors.Add(ex.Message)
     let failures = executionErrors log
     let mutable rows, environments = Map.empty, Set.empty
+    let mutable cpuModels = Set.empty
     let results = folder </> "results"
     if Directory.Exists(results) then
         for file in Directory.GetFiles(results, "*full.json") do
             try
                 let raw = JsonNode.Parse(File.ReadAllText(file))
                 let host = raw["HostEnvironmentInfo"]
+                field "ProcessorName" host |> optionalString
+                |> Option.iter (fun model -> cpuModels <- Set.add model cpuModels)
                 let environment = ["DotNetCliVersion"; "RuntimeVersion"; "Architecture"]
                                   |> List.map (fun key -> requiredString key host) |> String.concat " / "
                 environments <- Set.add environment environments
@@ -155,7 +175,8 @@ let runSide temp output project candidate (name, revision) =
                         let failure = field "DisplayInfo" row |> optionalString |> Option.bind (fun id -> Map.tryFind id failures)
                         rows <- Map.add key (readMeasurement row failure) rows
             with ex -> errors.Add($"{Path.GetFileName(file)}: {ex.Message}")
-    { Name = name; Sha = revision; Products = products; Errors = errors; Rows = rows; Environments = environments }
+    { Name = name; Sha = revision; Products = products; Errors = errors; Rows = rows; Environments = environments
+      CpuModels = cpuModels; Affinity = observedAffinity }
 
 let comparePair temp log comparer left right =
     // ResultsComparer omits unchanged cases. Compare a single matched pair so its summary identifies the verdict.
@@ -170,14 +191,27 @@ let comparePair temp log comparer left right =
     elif output.Contains("worse: 1,") then "Slower"
     else failwith $"Unexpected ResultsComparer output: {output}"
 
-let report output project scenarios baseline candidate compare =
+let shortScenarioName project (fullName: string) =
+    let prefix = Path.GetFileNameWithoutExtension(project: string) + "."
+    if fullName.StartsWith(prefix, StringComparison.Ordinal) then
+        let relative = fullName.Substring(prefix.Length)
+        let separator = relative.IndexOf('.')
+        if separator > 0 && relative[..separator - 1].EndsWith("Benchmarks", StringComparison.Ordinal) then
+            relative.Remove(separator - "Benchmarks".Length, "Benchmarks".Length)
+        else relative
+    else fullName
+
+let report output project scenarios affinity baseline candidate compare =
     let lines = ResizeArray<string>()
     let mutable failed = false
     lines.Add("# Benchmark comparison\n")
     lines.Add($"- Benchmark source: {candidate.Sha} / {project}")
+    lines.Add($"- Benchmark CPU policy: {BenchmarkAffinity.describe affinity}")
     lines.Add($"- ResultsComparer: {comparerRev}, threshold {threshold}, noise filter 0.3 ns")
     for side in [baseline; candidate] do
         lines.Add($"- {side.Name} product: {side.Sha} ([run log]({side.Name}/run.log))")
+        for cpu in side.CpuModels do lines.Add($"  - CPU: {cpu}")
+        lines.Add("  - Benchmark process affinity at launch: " + defaultArg side.Affinity "unverified")
         for env in side.Environments do lines.Add($"  - SDK / runtime / architecture: {env}")
         for path in side.Products do lines.Add("  - " + path)
         for error in side.Errors do
@@ -185,9 +219,19 @@ let report output project scenarios baseline candidate compare =
             lines.Add("  - " + error)
     lines.Add("\n| Scenario | Base median (ns) | Candidate median (ns) | Change | Base B/op | Candidate B/op | Verdict / diagnostic |")
     lines.Add("|---|---:|---:|---:|---:|---:|---|")
-    let expected = Set.ofList scenarios
     let observed = Seq.append baseline.Rows.Keys candidate.Rows.Keys |> Set.ofSeq
-    for key in scenarios @ Set.toList (Set.difference observed expected) do
+    let byShortName = observed |> Seq.groupBy (shortScenarioName project) |> Map.ofSeq
+    let resolve name =
+        if observed.Contains name then name
+        else
+            match Map.tryFind name byShortName |> Option.map List.ofSeq with
+            | Some [fullName] -> fullName
+            | Some _ -> failwith $"Ambiguous scenario '{name}'; use its BenchmarkDotNet FullName"
+            | None -> name
+    let keys = List.map resolve scenarios
+    let expected = Set.ofList keys
+    if expected.Count <> keys.Length then failwith "Multiple manifest entries refer to the same benchmark"
+    for key in keys @ Set.toList (Set.difference observed expected) do
         let diagnostics = ResizeArray<string>()
         if not (expected.Contains key) then diagnostics.Add("Scenario absent from candidate manifest")
         let lookup side =
@@ -217,7 +261,12 @@ let report output project scenarios baseline candidate compare =
             | _ -> ""
         if diagnostics.Count <> 0 then failed <- true
         let result = if diagnostics.Count = 0 then verdict else String.concat " / " diagnostics
-        let cells = [key; ns left; ns right; change; allocation left; allocation right; result]
+        let shortName = shortScenarioName project key
+        let label =
+            match Map.tryFind shortName byShortName with
+            | Some matches when Seq.length matches > 1 -> key
+            | _ -> shortName
+        let cells = [label; ns left; ns right; change; allocation left; allocation right; result]
         lines.Add("| " + (cells |> List.map (fun s -> s.Replace("|", "\\|").ReplaceLineEndings(" ")) |> String.concat " | ") + " |")
     let path = output </> "report.md"
     File.WriteAllLines(path, lines)
@@ -234,17 +283,19 @@ let main project baseRef candidateRef =
     let scenarios = JsonNode.Parse(git root ["show"; $"{candidate}:{manifest}"]).AsArray()
                     |> Seq.map (fun node -> node.GetValue<string>()) |> List.ofSeq
     if scenarios.IsEmpty || List.exists String.IsNullOrWhiteSpace scenarios || List.distinct scenarios <> scenarios then
-        failwith $"{manifest} must list unique BenchmarkDotNet FullName strings"
+        failwith $"{manifest} must list unique scenario names"
     let output = directory (root </> "artifacts/benchmarks" </> ("compare-" + Guid.NewGuid().ToString("N")))
     printfn "Benchmark comparison: %s" output
     let temp = Directory.CreateTempSubdirectory("pl-").FullName
     try
-        let measure = runSide temp output project candidate
+        let affinity = BenchmarkAffinity.detect()
+        printfn "Benchmark CPU policy: %s" (BenchmarkAffinity.describe affinity)
+        let measure = runSide temp output project candidate affinity
         let left = measure ("base", baseline)
         let right = measure ("candidate", candidate)
         let log = output </> "comparer.log"
         let comparer = lazy (buildComparer temp log)
-        report output project scenarios left right (fun a b -> comparePair temp log comparer.Value a b)
+        report output project scenarios affinity left right (fun a b -> comparePair temp log comparer.Value a b)
     finally
         // Git pack files can be read-only on Windows.
         for file in Directory.EnumerateFiles(temp, "*", SearchOption.AllDirectories) do

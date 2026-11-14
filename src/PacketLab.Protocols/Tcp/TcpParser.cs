@@ -67,9 +67,9 @@ internal static class TcpDecoder
         TcpParser.Parse(upper.Bytes, upper.DeclaredLength, IpChecksumAddresses.Sum(upper.ChecksumContext));
 }
 
-internal static class TcpParser
+public static class TcpParser
 {
-    internal static TcpParseResult Parse(ReadOnlyMemory<byte> data, uint declaredLength, ulong? addressSum)
+    public static TcpParseResult Parse(ReadOnlyMemory<byte> data, uint declaredLength, ulong? pseudoHeaderAddressSum)
     {
         data = data[..(int)Math.Min((ulong)data.Length, declaredLength)];
         if (declaredLength < 20) return new TcpParseResult.IpLengthTooShort(declaredLength, data);
@@ -86,7 +86,7 @@ internal static class TcpParser
         var options = TcpOptionParser.Parse(data[20..Math.Min(data.Length, header.HeaderLength)], header.HeaderLength - 20);
         if (data.Length < header.HeaderLength) return new TcpParseResult.OptionsTruncated(header, declaredLength, options, data);
         TcpChecksum checksum = data.Length < declaredLength ? new TcpChecksumUnavailable(TcpUnavailableReason.PayloadTruncated)
-            : addressSum is not { } sum ? new TcpChecksumUnavailable(TcpUnavailableReason.PseudoHeaderUnavailable)
+            : pseudoHeaderAddressSum is not { } sum ? new TcpChecksumUnavailable(TcpUnavailableReason.PseudoHeaderUnavailable)
             : Validate(bytes, sum + 6 + (declaredLength >> 16) + (declaredLength & 0xffff));
         return new TcpSegment(header, declaredLength, options, data[header.HeaderLength..], checksum);
     }

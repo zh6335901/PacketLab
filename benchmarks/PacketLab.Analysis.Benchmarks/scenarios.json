@@ -1,6 +1,7 @@
 [
-  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.ReadToEnd(FrameSize: 64)",
-  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.AnalyzeToEnd(FrameSize: 64)",
-  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.ReadToEnd(FrameSize: 1500)",
-  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.AnalyzeToEnd(FrameSize: 1500)"
+  "PcapAnalysisReader.Read64",
+  "PcapAnalysisReader.AnalyzeEthernet64",
+  "PcapAnalysisReader.Read1500",
+  "PcapAnalysisReader.AnalyzeEthernet1500",
+  "PcapAnalysisReader.AnalyzeIPv4Udp1500"
 ]
