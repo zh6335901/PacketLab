@@ -14,7 +14,7 @@ on:
         description: Repository-relative Benchmark project
         required: true
         type: string
-        default: benchmarks/PacketLab.Pcap.Benchmarks/PacketLab.Pcap.Benchmarks.csproj
+        default: benchmarks/PacketLab.Analysis.Benchmarks/PacketLab.Analysis.Benchmarks.csproj
 
 permissions:
   contents: read

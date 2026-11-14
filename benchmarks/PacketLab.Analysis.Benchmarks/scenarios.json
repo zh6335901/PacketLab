@@ -1,6 +1,7 @@
 [
-  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.ReadToEnd(FrameSize: 64)",
-  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.AnalyzeToEnd(FrameSize: 64)",
-  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.ReadToEnd(FrameSize: 1500)",
-  "PacketLab.Analysis.Benchmarks.PcapAnalysisReaderBenchmarks.AnalyzeToEnd(FrameSize: 1500)"
+  "PcapAnalysisReader.ReadToEnd(FrameSize: 64)",
+  "PcapAnalysisReader.AnalyzeToEnd(FrameSize: 64)",
+  "PcapAnalysisReader.ReadToEnd(FrameSize: 1500)",
+  "PcapAnalysisReader.AnalyzeToEnd(FrameSize: 1500)",
+  "IPv4UdpCapture.AnalyzeIPv4UdpToEnd"
 ]

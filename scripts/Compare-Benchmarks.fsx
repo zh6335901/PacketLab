@@ -191,6 +191,16 @@ let comparePair temp log comparer left right =
     elif output.Contains("worse: 1,") then "Slower"
     else failwith $"Unexpected ResultsComparer output: {output}"
 
+let shortScenarioName project (fullName: string) =
+    let prefix = Path.GetFileNameWithoutExtension(project: string) + "."
+    if fullName.StartsWith(prefix, StringComparison.Ordinal) then
+        let relative = fullName.Substring(prefix.Length)
+        let separator = relative.IndexOf('.')
+        if separator > 0 && relative[..separator - 1].EndsWith("Benchmarks", StringComparison.Ordinal) then
+            relative.Remove(separator - "Benchmarks".Length, "Benchmarks".Length)
+        else relative
+    else fullName
+
 let report output project scenarios affinity baseline candidate compare =
     let lines = ResizeArray<string>()
     let mutable failed = false
@@ -209,9 +219,19 @@ let report output project scenarios affinity baseline candidate compare =
             lines.Add("  - " + error)
     lines.Add("\n| Scenario | Base median (ns) | Candidate median (ns) | Change | Base B/op | Candidate B/op | Verdict / diagnostic |")
     lines.Add("|---|---:|---:|---:|---:|---:|---|")
-    let expected = Set.ofList scenarios
     let observed = Seq.append baseline.Rows.Keys candidate.Rows.Keys |> Set.ofSeq
-    for key in scenarios @ Set.toList (Set.difference observed expected) do
+    let byShortName = observed |> Seq.groupBy (shortScenarioName project) |> Map.ofSeq
+    let resolve name =
+        if observed.Contains name then name
+        else
+            match Map.tryFind name byShortName |> Option.map List.ofSeq with
+            | Some [fullName] -> fullName
+            | Some _ -> failwith $"Ambiguous scenario '{name}'; use its BenchmarkDotNet FullName"
+            | None -> name
+    let keys = List.map resolve scenarios
+    let expected = Set.ofList keys
+    if expected.Count <> keys.Length then failwith "Multiple manifest entries refer to the same benchmark"
+    for key in keys @ Set.toList (Set.difference observed expected) do
         let diagnostics = ResizeArray<string>()
         if not (expected.Contains key) then diagnostics.Add("Scenario absent from candidate manifest")
         let lookup side =
@@ -241,7 +261,12 @@ let report output project scenarios affinity baseline candidate compare =
             | _ -> ""
         if diagnostics.Count <> 0 then failed <- true
         let result = if diagnostics.Count = 0 then verdict else String.concat " / " diagnostics
-        let cells = [key; ns left; ns right; change; allocation left; allocation right; result]
+        let shortName = shortScenarioName project key
+        let label =
+            match Map.tryFind shortName byShortName with
+            | Some matches when Seq.length matches > 1 -> key
+            | _ -> shortName
+        let cells = [label; ns left; ns right; change; allocation left; allocation right; result]
         lines.Add("| " + (cells |> List.map (fun s -> s.Replace("|", "\\|").ReplaceLineEndings(" ")) |> String.concat " | ") + " |")
     let path = output </> "report.md"
     File.WriteAllLines(path, lines)
@@ -258,7 +283,7 @@ let main project baseRef candidateRef =
     let scenarios = JsonNode.Parse(git root ["show"; $"{candidate}:{manifest}"]).AsArray()
                     |> Seq.map (fun node -> node.GetValue<string>()) |> List.ofSeq
     if scenarios.IsEmpty || List.exists String.IsNullOrWhiteSpace scenarios || List.distinct scenarios <> scenarios then
-        failwith $"{manifest} must list unique BenchmarkDotNet FullName strings"
+        failwith $"{manifest} must list unique scenario names"
     let output = directory (root </> "artifacts/benchmarks" </> ("compare-" + Guid.NewGuid().ToString("N")))
     printfn "Benchmark comparison: %s" output
     let temp = Directory.CreateTempSubdirectory("pl-").FullName
