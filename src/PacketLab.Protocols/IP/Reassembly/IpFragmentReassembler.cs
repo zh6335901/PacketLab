@@ -32,14 +32,16 @@ public sealed class IpFragmentReassembler : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         clock = Math.Max(clock, nanoseconds);
-        var events = ImmutableArray.CreateBuilder<IpReassemblyUpdate>();
-        foreach (var (key, state) in datagrams.ToArray())
+        ImmutableArray<IpReassemblyUpdate>.Builder? events = null;
+        // Dictionary.Remove preserves enumeration on .NET Core 3.0 and later.
+        foreach (var (key, state) in datagrams)
         {
             if (clock - state.StartTime < (ulong)options.TimeoutSeconds * 1_000_000_000UL) continue;
-            events.Add(Event(state, IpReassemblyStatus.Expired, "reassembly timeout reached"));
+            (events ??= ImmutableArray.CreateBuilder<IpReassemblyUpdate>())
+                .Add(Event(state, IpReassemblyStatus.Expired, "reassembly timeout reached"));
             Remove(key, state);
         }
-        return events.ToImmutable();
+        return events?.ToImmutable() ?? [];
     }
 
     // Hosts may expire state according to their own input/lifecycle policy.
