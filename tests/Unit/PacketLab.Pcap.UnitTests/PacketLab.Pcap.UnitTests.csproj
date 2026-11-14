@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <PackageReference Include="FsCheck" Version="3.6.0" />
     <ProjectReference Include="../../../src/PacketLab.Pcap/PacketLab.Pcap.csproj" />
   </ItemGroup>
 </Project>

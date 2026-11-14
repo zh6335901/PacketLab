@@ -1,3 +1,5 @@
+using FsCheck;
+using FsCheck.Fluent;
 using PacketLab.Protocols.IP;
 using PacketLab.Protocols.Arp;
 using PacketLab.Protocols.Ethernet;
@@ -9,18 +11,6 @@ namespace PacketLab.Protocols.UnitTests;
 
 public class DecodeProtocolsTests
 {
-    [Test]
-    [Arguments("0800")]
-    [Arguments("0806")]
-    [Arguments("8100")]
-    [Arguments("05DC")]
-    [Arguments("05DD")]
-    [Arguments("88B5")]
-    public async Task Other_outer_types_do_not_dispatch_ipv6(string type)
-    {
-        var result = Decode(type, "6000000000003B4020010DB8000000000000000000000001FF020000000000000000000000000002");
-        await Assert.That(result is DecodedEthernet frame && frame.Payload is IPv6DecodeResult).IsFalse();
-    }
 
     [Test]
     public async Task Incomplete_ethernet_and_unsupported_link_layer_do_not_dispatch_payload()
@@ -32,29 +22,7 @@ public class DecodeProtocolsTests
         await Assert.That(unsupported is ProtocolDecodeResult.UnsupportedLinkLayer).IsTrue();
     }
 
-    [Test]
-    [Arguments("0800")]
-    [Arguments("86DD")]
-    [Arguments("8100")]
-    [Arguments("05DC")]
-    [Arguments("05DD")]
-    public async Task Other_outer_types_do_not_dispatch_arp(string type)
-    {
-        var result = Decode(type, "0001080006040001020000000001C0000201000000000000C0000202");
-        await Assert.That(result is DecodedEthernet frame && frame.Payload is ArpParseResult).IsFalse();
-    }
 
-    [Test]
-    [Arguments("0806")]
-    [Arguments("86DD")]
-    [Arguments("8100")]
-    [Arguments("05DC")]
-    [Arguments("05DD")]
-    public async Task Other_outer_types_do_not_dispatch_ipv4(string type)
-    {
-        var result = Decode(type, "450000141234400040113C6EC0000201C6336402");
-        await Assert.That(result is DecodedEthernet frame && frame.Payload is IPv4DecodeResult).IsFalse();
-    }
 
     [Test]
     public async Task Ipv4_dispatch_preserves_each_layer_and_places_udp_failure_inside_ip_payload()
@@ -107,12 +75,38 @@ public class DecodeProtocolsTests
     }
 
     [Test]
-    public async Task Unknown_ether_type_has_an_explicit_payload_branch_with_original_bytes()
+    [Arguments("450000141234400040113C6EC0000201C6336402")]
+    [Arguments("0001080006040001020000000001C0000201000000000000C0000202")]
+    [Arguments("6000000000003B4020010DB8000000000000000000000001FF020000000000000000000000000002")]
+    public async Task Recognizable_payloads_follow_the_outer_field(string bait) =>
+        await Assert.That(MatchesRepresentativeFields(bait)).IsTrue();
+
+    [Test]
+    public void Outer_field_selects_decoder_regardless_of_payload() =>
+        Prop.ForAll((DoNotSize<ushort> field, byte[] payload) =>
+        {
+            var bytes = Convert.ToHexString(payload);
+            return MatchesRepresentativeFields(bytes) && DispatchMatches(field.Item, bytes);
+        }).Check(Config.QuickThrowOnFailure);
+
+    private static bool MatchesRepresentativeFields(string bytes) =>
+        DispatchMatches(0x0800, bytes) && DispatchMatches(0x0806, bytes) && DispatchMatches(0x86DD, bytes)
+        && DispatchMatches(1500, bytes) && DispatchMatches(1501, bytes) && DispatchMatches(1536, bytes)
+        && DispatchMatches(0x8100, bytes) && DispatchMatches(0x88B5, bytes);
+
+    private static bool DispatchMatches(ushort field, string bytes)
     {
-        var frame = Decode("88B5", "CAFE") is DecodedEthernet ethernet ? ethernet : throw new InvalidOperationException();
-        var payload = frame.Payload is UnsupportedEtherType unsupported ? unsupported : throw new InvalidOperationException();
-        await Assert.That(payload.EtherType).IsEqualTo((ushort)0x88b5);
-        await Assert.That(Convert.ToHexString(payload.Bytes.Span)).IsEqualTo("CAFE");
+        var result = Decode(field.ToString("X4"), bytes);
+        return field switch
+        {
+            <= 1500 => result is EthernetParseResult.Ieee8023Length length && length.Length == field,
+            <= 1535 => result is EthernetParseResult.InvalidLengthOrType invalid && invalid.Value == field,
+            0x0800 => result is DecodedEthernet v4 && v4.Payload is IPv4DecodeResult,
+            0x0806 => result is DecodedEthernet arp && arp.Payload is ArpParseResult,
+            0x86dd => result is DecodedEthernet v6 && v6.Payload is IPv6DecodeResult,
+            _ => result is DecodedEthernet frame && frame.Payload is UnsupportedEtherType other
+                && other.EtherType == field && Convert.ToHexString(other.Bytes.Span) == bytes
+        };
     }
 
     [Test]
@@ -125,14 +119,19 @@ public class DecodeProtocolsTests
     }
 
     [Test]
-    public async Task Non_udp_ipv4_fragment_stops_at_reassembly_instead_of_protocol_dispatch()
+    [Arguments("2001", 6, 1, true)]
+    [Arguments("1FFF", 6, 0x1FFF, false)]
+    [Arguments("1FFF", 17, 0x1FFF, false)]
+    public async Task Ipv4_fragments_preserve_metadata_and_bytes_before_reassembly(
+        string fragmentField, byte protocol, ushort offset, bool moreFragments)
     {
-        var ip = DecodedIPv4.Decode(Convert.FromHexString("450000161234200140060000C0000201C6336402CAFE")) is DecodedIPv4 decoded
+        var packet = Convert.FromHexString($"450000161234{fragmentField}40{protocol:X2}0000C0000201C6336402CAFE");
+        var ip = DecodedIPv4.Decode(packet) is DecodedIPv4 decoded
             ? decoded : throw new InvalidOperationException();
         var fragment = ip.Payload is IPv4FragmentPayload value ? value : throw new InvalidOperationException();
-        await Assert.That(fragment.Protocol).IsEqualTo((byte)6);
-        await Assert.That(fragment.Offset).IsEqualTo((ushort)1);
-        await Assert.That(fragment.MoreFragments).IsTrue();
+        await Assert.That(fragment.Protocol).IsEqualTo(protocol);
+        await Assert.That(fragment.Offset).IsEqualTo(offset);
+        await Assert.That(fragment.MoreFragments).IsEqualTo(moreFragments);
         await Assert.That(fragment.Identification).IsEqualTo((ushort)0x1234);
         await Assert.That(fragment.DeclaredLength).IsEqualTo(2u);
         await Assert.That(Convert.ToHexString(fragment.Bytes.Span)).IsEqualTo("CAFE");

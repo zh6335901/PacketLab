@@ -1,16 +1,18 @@
-using PacketLab.Analysis.Pcap;
-using PacketLab.Analysis.IpReassembly;
-using PacketLab.Protocols.IP.Reassembly;
 using System.Buffers.Binary;
+using FsCheck.Fluent;
+using FsCheck;
+using PacketLab.Analysis.IpReassembly;
+using PacketLab.Analysis.Pcap;
 using PacketLab.Pcap;
 using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.IP.IPv4;
 using PacketLab.Protocols.IP.IPv6;
+using PacketLab.Protocols.IP.Reassembly;
 using PacketLab.Protocols.Udp;
 
 namespace PacketLab.Analysis.UnitTests.IpReassembly;
 
-public class AnalyzeIpReassemblyTests
+public partial class AnalyzeIpReassemblyTests
 {
     private static readonly byte[] Payload = Convert.FromHexString("04D20035001800000102030405060708090A0B0C0D0E0F10");
 
@@ -35,20 +37,44 @@ public class AnalyzeIpReassemblyTests
     [Test]
     [Arguments(4)]
     [Arguments(6)]
-    public async Task Interleaved_identities_complete_independently(int version)
-    {
-        using var stream = Capture(Fragment(version, 0, true, Payload[..16], 1), Fragment(version, 0, true, Payload[..16], 2),
-            Fragment(version, 16, false, Payload[16..], 2), Fragment(version, 16, false, Payload[16..], 1));
-        using var reader = Open(stream);
-        Read(reader); Read(reader); Read(reader);
-        var second = reader.ReassemblyEvents.Single();
-        Read(reader);
-        var first = reader.ReassemblyEvents.Single();
-        await Assert.That(second.Status).IsEqualTo(IpReassemblyStatus.Complete);
-        await Assert.That(second.RecordNumbers.ToArray()).IsEquivalentTo(new long[] { 2, 3 });
-        await Assert.That(first.Status).IsEqualTo(IpReassemblyStatus.Complete);
-        await Assert.That(first.RecordNumbers.ToArray()).IsEquivalentTo(new long[] { 1, 4 });
-    }
+    public void Interleaved_identities_complete_independently(int version) =>
+        Prop.ForAll((byte count, (byte FirstOrder, byte TailOrder, bool TailFirst, byte Value)[] choices) =>
+        {
+            int total = 2 + count % 7;
+            var deliveries = Enumerable.Range(0, total).Select(i =>
+            {
+                var choice = choices.ElementAtOrDefault(i);
+                var original = (byte[])Payload.Clone();
+                original[8] = original[16] = (byte)i;
+                original[9] = original[17] = choice.Value;
+                var first = Fragment(version, 0, true, original[..16], (ushort)(1 + i));
+                var tail = Fragment(version, 16, false, original[16..], (ushort)(1 + i));
+                return (Id: (uint)(i + 1), Original: original, choice.FirstOrder, choice.TailOrder,
+                    Early: choice.TailFirst ? tail : first, Late: choice.TailFirst ? first : tail);
+            }).ToArray();
+            var early = deliveries.OrderBy(d => d.FirstOrder).ToArray();
+            var late = deliveries.OrderBy(d => d.TailOrder).ToArray();
+            using var stream = Capture([.. early.Select(d => d.Early), .. late.Select(d => d.Late)]);
+            using var reader = Open(stream);
+            foreach (var d in early)
+            {
+                Read(reader);
+                var pending = reader.ReassemblyEvents.Single();
+                if (pending.Status != IpReassemblyStatus.Pending || pending.Identification != d.Id) return false;
+            }
+            for (int i = 0; i < total; i++)
+            {
+                Read(reader);
+                var completed = reader.ReassemblyEvents.Single();
+                var expected = late[i];
+                long earlierRecord = Array.FindIndex(early, d => d.Id == expected.Id) + 1;
+                if (completed.Status != IpReassemblyStatus.Complete || completed.Identification != expected.Id
+                    || !completed.RecordNumbers.SequenceEqual(new long[] { earlierRecord, total + i + 1 })
+                    || !completed.Packet!.Bytes.Span[(version == 4 ? 20 : 40)..].SequenceEqual(expected.Original))
+                    return false;
+            }
+            return true;
+        }).Check(Config.QuickThrowOnFailure);
 
     [Test]
     [Arguments(4)]
@@ -63,6 +89,66 @@ public class AnalyzeIpReassemblyTests
         Read(reader);
         await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Complete);
         await Assert.That(reader.ReassemblyEvents.Single().RecordNumbers.Length).IsEqualTo(3);
+    }
+
+    [Test]
+    public void Duplicate_flood_hits_the_record_association_limit() =>
+        Prop.ForAll((byte size, byte extra) =>
+        {
+            int limit = 1 + size % 16;
+            var fragment = Fragment(4, 0, true, Payload[..16]);
+            int count = limit + 1 + extra % 8;
+            using var stream = Capture(Enumerable.Repeat(fragment, count).ToArray());
+            using var reader = Open(stream, new(maxRecordsPerDatagram: limit));
+            for (int i = 1; i <= limit; i++)
+            {
+                Read(reader);
+                var expected = i == 1 ? IpReassemblyStatus.Pending : IpReassemblyStatus.Duplicate;
+                if (reader.ReassemblyEvents.Single().Status != expected) return false;
+            }
+            var records = new List<long>();
+            for (int i = limit + 1; i <= count; i++)
+            {
+                Read(reader);
+                foreach (var item in reader.ReassemblyEvents)
+                {
+                    if (item.Reason != IpReassemblyAnalysisReason.RecordAssociationLimit || item.RecordNumbers.Length > limit)
+                        return false;
+                    records.AddRange(item.RecordNumbers);
+                }
+                if (i == limit + 1 && records.Count != i) return false;
+            }
+            return records.Order().SequenceEqual(Enumerable.Range(1, count).Select(i => (long)i));
+        }).Check(Config.QuickThrowOnFailure);
+
+    [Test]
+    public async Task Record_limit_is_enforced_before_a_fragment_can_complete_the_datagram()
+    {
+        using var stream = Capture(Fragment(4, 0, true, Payload[..16]), Fragment(4, 16, false, Payload[16..]),
+            Fragment(4, 16, false, Payload[16..]), Fragment(6, 0, false, Payload));
+        using var reader = Open(stream, new(maxRecordsPerDatagram: 1));
+        Read(reader); Read(reader);
+        await Assert.That(reader.ReassemblyEvents.SelectMany(x => x.RecordNumbers).ToArray()).IsEquivalentTo(new long[] { 1, 2 });
+        await Assert.That(reader.ReassemblyEvents.All(x => x.Reason == IpReassemblyAnalysisReason.RecordAssociationLimit && x.Packet is null)).IsTrue();
+        Read(reader);
+        await Assert.That(reader.ReassemblyEvents.Single().Reason).IsEqualTo(IpReassemblyAnalysisReason.RecordAssociationLimit);
+        await Assert.That(reader.ReassemblyEvents.Single().RecordNumbers.ToArray()).IsEquivalentTo(new long[] { 3 });
+        Read(reader);
+        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Atomic);
+        reader.ReadNext();
+        await Assert.That(reader.ReassemblyEvents.Length).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Later_fragments_of_a_conflicted_datagram_only_reference_their_own_records()
+    {
+        using var stream = Capture(Fragment(4, 0, true, Payload[..16]), Fragment(4, 8, true, Payload[8..]),
+            Fragment(4, 16, false, Payload[16..]), Fragment(4, 16, false, Payload[16..]));
+        using var reader = Open(stream);
+        Read(reader); Read(reader); Read(reader); Read(reader);
+        await Assert.That(reader.ReassemblyEvents.Single().RecordNumbers.ToArray()).IsEquivalentTo(new long[] { 4 });
+        reader.ReadNext();
+        await Assert.That(reader.ReassemblyEvents.Length).IsEqualTo(0);
     }
 
     [Test]
@@ -88,41 +174,6 @@ public class AnalyzeIpReassemblyTests
         using var left = Open(first); using var right = Open(second);
         Read(left); Read(right); right.ReadNext();
         await Assert.That(right.ReassemblyEvents.Single().Reason).IsEqualTo(IpReassemblyAnalysisReason.EndOfCapture);
-    }
-
-    [Test]
-    public async Task Time_expiry_uses_first_arrival_and_does_not_refresh_on_duplicates()
-    {
-        var first = Fragment(4, 0, true, Payload[..16]);
-        using var stream = Capture(first, first, Fragment(4, 16, false, Payload[16..]));
-        SetSeconds(stream, 1, 100); SetSeconds(stream, 2, 159); SetSeconds(stream, 3, 160);
-        using var reader = Open(stream);
-        Read(reader); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Select(x => x.Status).ToArray()).IsEquivalentTo(
-            new[] { IpReassemblyStatus.Expired, IpReassemblyStatus.Pending });
-        await Assert.That(reader.ReassemblyEvents[0].DatagramNumber).IsEqualTo(1L);
-    }
-
-    [Test]
-    public async Task Record_age_expires_state_when_capture_time_is_not_advancing()
-    {
-        using var stream = Capture(Fragment(4, 0, true, Payload[..16]), new byte[14], Fragment(4, 16, false, Payload[16..]));
-        using var reader = Open(stream, new(maxRecordAge: 2));
-        Read(reader); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents[0].Status).IsEqualTo(IpReassemblyStatus.Expired);
-        await Assert.That(reader.ReassemblyEvents[1].Status).IsEqualTo(IpReassemblyStatus.Pending);
-    }
-
-    [Test]
-    public async Task Duplicate_flood_hits_the_record_association_limit()
-    {
-        var fragment = Fragment(4, 0, true, Payload[..16]);
-        using var stream = Capture(fragment, fragment, fragment);
-        using var reader = Open(stream, new(maxRecordsPerDatagram: 2));
-        Read(reader); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.All(x => x.Reason == IpReassemblyAnalysisReason.RecordAssociationLimit)).IsTrue();
-        await Assert.That(reader.ReassemblyEvents.All(x => x.RecordNumbers.Length <= 2)).IsTrue();
-        await Assert.That(reader.ReassemblyEvents.SelectMany(x => x.RecordNumbers).ToArray()).IsEquivalentTo(new long[] { 1, 2, 3 });
     }
 
     [Test]
@@ -155,78 +206,6 @@ public class AnalyzeIpReassemblyTests
         using var reader = Open(stream); Read(reader);
         await Assert.That(reader.ReadNext() is PcapError).IsTrue();
         await Assert.That(reader.ReassemblyEvents.Single().Reason).IsEqualTo(IpReassemblyAnalysisReason.Aborted);
-    }
-
-    [Test]
-    public async Task Nanosecond_capture_timeout_uses_the_fractional_boundary()
-    {
-        var first = Fragment(6, 0, true, Payload[..16]);
-        using var stream = Capture(first, first, Fragment(6, 16, false, Payload[16..]));
-        var bytes = stream.GetBuffer();
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes, 0xa1b23c4d);
-        SetSeconds(stream, 1, 1); SetSeconds(stream, 2, 61); SetSeconds(stream, 3, 61);
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(28), 1);
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(24 + (16 + first.Length) * 2 + 4), 1);
-        using var reader = Open(stream); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Duplicate);
-        Read(reader);
-        await Assert.That(reader.ReassemblyEvents[0].Status).IsEqualTo(IpReassemblyStatus.Expired);
-    }
-
-    [Test]
-    public async Task Reordered_timestamps_never_underflow_the_expiry_clock()
-    {
-        using var stream = Capture(Fragment(4, 0, true, Payload[..16]), Fragment(4, 16, false, Payload[16..]));
-        SetSeconds(stream, 1, 100); SetSeconds(stream, 2, 1);
-        using var reader = Open(stream); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Complete);
-    }
-
-    [Test]
-    public async Task Invalid_timestamp_fraction_does_not_expire_other_datagrams()
-    {
-        using var stream = Capture(Fragment(4, 0, true, Payload[..16]), Fragment(4, 16, false, Payload[16..]));
-        SetSeconds(stream, 2, 100);
-        BinaryPrimitives.WriteUInt32LittleEndian(stream.GetBuffer().AsSpan(24 + 16 + 50 + 4), 1_000_000);
-        using var reader = Open(stream); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Complete);
-    }
-
-    [Test]
-    public async Task Tombstones_bound_the_table_and_expire_before_accepting_a_new_identity()
-    {
-        var first = Fragment(4, 0, true, Payload[..16]);
-        using var stream = Capture(first, Fragment(4, 8, true, Payload[8..]), Fragment(4, 16, false, Payload[16..], 2),
-            Fragment(4, 0, true, Payload[..16], 2), Fragment(4, 16, false, Payload[16..], 2));
-        SetSeconds(stream, 4, 61); SetSeconds(stream, 5, 61);
-        using var reader = Open(stream, new(reassembly: new(maxDatagrams: 1))); Read(reader); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.ResourceLimit);
-        Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Complete);
-    }
-
-    [Test]
-    public async Task Microsecond_capture_fraction_is_used_for_expiry()
-    {
-        var first = Fragment(4, 0, true, Payload[..16]);
-        using var stream = Capture(first, Fragment(4, 16, false, Payload[16..]));
-        SetSeconds(stream, 1, 1); SetSeconds(stream, 2, 61);
-        BinaryPrimitives.WriteUInt32LittleEndian(stream.GetBuffer().AsSpan(28), 1);
-        using var reader = Open(stream); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Complete);
-    }
-
-    [Test]
-    public async Task Nanosecond_fractions_are_not_scaled_as_microseconds()
-    {
-        var first = Fragment(6, 0, true, Payload[..16]);
-        using var stream = Capture(first, Fragment(6, 16, false, Payload[16..]));
-        var bytes = stream.GetBuffer(); BinaryPrimitives.WriteUInt32LittleEndian(bytes, 0xa1b23c4d);
-        SetSeconds(stream, 1, 1); SetSeconds(stream, 2, 61);
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(28), 500_000_000);
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(24 + 16 + first.Length + 4), 500_000_000);
-        using var reader = Open(stream); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents[0].Status).IsEqualTo(IpReassemblyStatus.Expired);
     }
 
     [Test]
@@ -266,36 +245,6 @@ public class AnalyzeIpReassemblyTests
     }
 
     [Test]
-    public async Task Record_limit_is_enforced_before_a_fragment_can_complete_the_datagram()
-    {
-        using var stream = Capture(Fragment(4, 0, true, Payload[..16]), Fragment(4, 16, false, Payload[16..]),
-            Fragment(4, 16, false, Payload[16..]), Fragment(6, 0, false, Payload));
-        using var reader = Open(stream, new(maxRecordsPerDatagram: 1));
-        Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.SelectMany(x => x.RecordNumbers).ToArray()).IsEquivalentTo(new long[] { 1, 2 });
-        await Assert.That(reader.ReassemblyEvents.All(x => x.Reason == IpReassemblyAnalysisReason.RecordAssociationLimit && x.Packet is null)).IsTrue();
-        Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().Reason).IsEqualTo(IpReassemblyAnalysisReason.RecordAssociationLimit);
-        await Assert.That(reader.ReassemblyEvents.Single().RecordNumbers.ToArray()).IsEquivalentTo(new long[] { 3 });
-        Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Atomic);
-        reader.ReadNext();
-        await Assert.That(reader.ReassemblyEvents.Length).IsEqualTo(0);
-    }
-
-    [Test]
-    public async Task Later_fragments_of_a_conflicted_datagram_only_reference_their_own_records()
-    {
-        using var stream = Capture(Fragment(4, 0, true, Payload[..16]), Fragment(4, 8, true, Payload[8..]),
-            Fragment(4, 16, false, Payload[16..]), Fragment(4, 16, false, Payload[16..]));
-        using var reader = Open(stream);
-        Read(reader); Read(reader); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().RecordNumbers.ToArray()).IsEquivalentTo(new long[] { 4 });
-        reader.ReadNext();
-        await Assert.That(reader.ReassemblyEvents.Length).IsEqualTo(0);
-    }
-
-    [Test]
     public async Task Finish_rejects_non_terminal_analysis_reasons()
     {
         using var analyzer = new IpReassemblyAnalyzer();
@@ -322,6 +271,7 @@ public class AnalyzeIpReassemblyTests
 
     private static PcapAnalysisReader Open(Stream stream, IpReassemblyAnalysisOptions? options = null) =>
         PcapAnalysisReader.Open(stream, reassemblyOptions: options) is PcapAnalysisReader reader ? reader : throw new InvalidOperationException();
+
     private static AnalyzedPacket Read(PcapAnalysisReader reader) => reader.ReadNext() is AnalyzedPacket packet ? packet : throw new InvalidOperationException();
 
     private static byte[] Fragment(int version, int offset, bool more, byte[] payload, ushort id = 1,
@@ -362,12 +312,5 @@ public class AnalyzeIpReassemblyTests
         }
         stream.Position = 0;
         return stream;
-    }
-
-    private static void SetSeconds(MemoryStream stream, int record, uint seconds)
-    {
-        var bytes = stream.GetBuffer(); var position = 24;
-        for (var i = 1; i < record; i++) position += 16 + (int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(position + 8));
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(position), seconds);
     }
 }

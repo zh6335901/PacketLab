@@ -1,3 +1,6 @@
+using FsCheck;
+using FsCheck.Fluent;
+using System.Buffers.Binary;
 using PacketLab.Protocols.IP.IPv4;
 
 namespace PacketLab.Protocols.UnitTests.IP.IPv4;
@@ -110,22 +113,37 @@ public class ParseIPv4PacketTests
     }
 
     [Test]
-    [Arguments(20, "", "", false)]
-    [Arguments(22, "CAFE", "", false)]
-    [Arguments(24, "CAFE0102", "", true)]
-    [Arguments(28, "CAFE0102", "DEADBEEF", true)]
-    public async Task Total_length_bounds_payload_and_keeps_trailing_bytes_separate(int length, string payload, string trailing, bool complete)
+    public void Total_length_bounds_payload_and_keeps_trailing_bytes_separate() =>
+        Prop.ForAll((byte[] options, byte[] payload, (byte[] Tail, DoNotSize<ushort> Cut) capture) =>
+        {
+            var header = ValidHeader(options, payload.Length);
+            int cut = capture.Cut.Item % (payload.Length + 1);
+            return HasSlices(header, payload.Length, payload[..cut], [])
+                && HasSlices(header, payload.Length, payload, [])
+                && HasSlices(header, payload.Length, payload, capture.Tail);
+        }).Check(Config.QuickThrowOnFailure);
+
+    private static bool HasSlices(byte[] header, int declared, byte[] captured, byte[] tail)
     {
-        var bytes = Convert.FromHexString(Datagram + "DEADBEEF")[..length];
-        var packet = IPv4Parser.Parse(bytes) is IPv4Packet parsed ? parsed
-            : throw new InvalidOperationException("Expected a complete header.");
-        await Assert.That(packet.CapturedLength).IsEqualTo(length);
-        await Assert.That(packet.Header.TotalLength).IsEqualTo((ushort)24);
-        await Assert.That(packet.IsDatagramComplete).IsEqualTo(complete);
-        await Assert.That(Convert.ToHexString(packet.Payload.Span)).IsEqualTo(payload);
-        await Assert.That(Convert.ToHexString(packet.TrailingBytes.Span)).IsEqualTo(trailing);
-        await Assert.That(packet.ChecksumStatus).IsEqualTo(IPv4ChecksumStatus.Match);
+        byte[] wire = [.. header, .. captured, .. tail];
+        return IPv4Parser.Parse(wire) is IPv4Packet packet && packet.CapturedLength == wire.Length
+            && packet.Header.TotalLength == header.Length + declared
+            && packet.IsDatagramComplete == (captured.Length == declared)
+            && packet.Payload.Span.SequenceEqual(captured) && packet.TrailingBytes.Span.SequenceEqual(tail)
+            && packet.ChecksumStatus == IPv4ChecksumStatus.Match;
     }
+
+    [Test]
+    public void Truncating_any_header_preserves_the_captured_prefix() =>
+        Prop.ForAll((byte[] options, DoNotSize<ushort> selector) =>
+        {
+            var header = ValidHeader(options, 0);
+            int captured = selector.Item % header.Length;
+            return IPv4Parser.Parse(header.AsMemory(0, captured)) is IPv4ParseResult.IncompleteHeader error
+                && error.RequiredLength == (captured < 20 ? 20 : header.Length)
+                && error.CapturedLength == captured && error.RemainingBytes.Span.SequenceEqual(header.AsSpan(0, captured))
+                && ((IPv4ParseResult)error).ChecksumStatus == IPv4ChecksumStatus.Unavailable;
+        }).Check(Config.QuickThrowOnFailure);
 
     [Test]
     public async Task Header_only_datagram_keeps_all_extra_bytes_out_of_payload()
@@ -138,19 +156,35 @@ public class ParseIPv4PacketTests
     }
 
     [Test]
-    [Arguments(8, IPv4ChecksumStatus.Mismatch)]
-    [Arguments(10, IPv4ChecksumStatus.Mismatch)]
-    [Arguments(20, IPv4ChecksumStatus.Mismatch)]
-    [Arguments(23, IPv4ChecksumStatus.Mismatch)]
-    [Arguments(24, IPv4ChecksumStatus.Match)]
-    [Arguments(28, IPv4ChecksumStatus.Match)]
-    public async Task Checksum_covers_header_options_and_padding_but_not_payload_or_trailing_bytes(int offset, IPv4ChecksumStatus expected)
+    public void Checksum_covers_header_options_and_padding_but_not_payload_or_trailing_bytes() =>
+        Prop.ForAll((byte[] options, DoNotSize<ushort> position, byte bit) =>
+        {
+            var header = ValidHeader(options, 1);
+            byte[] wire = [.. header, 0xca, 0xfe];
+            int offset = 4 + position.Item % (header.Length - 4);
+            wire[offset] ^= (byte)(1 << (bit % 8));
+            var changed = IPv4Parser.Parse(wire);
+            wire[offset] ^= (byte)(1 << (bit % 8));
+            wire[header.Length] ^= 1;
+            var changedPayload = IPv4Parser.Parse(wire);
+            wire[header.Length] ^= 1;
+            wire[^1] ^= 0x80;
+            return changed.ChecksumStatus == IPv4ChecksumStatus.Mismatch && changedPayload.ChecksumStatus == IPv4ChecksumStatus.Match
+                && IPv4Parser.Parse(wire) is IPv4Packet { Header.Source: { Octet0: 192, Octet3: 1 },
+                    ChecksumStatus: IPv4ChecksumStatus.Match };
+        }).Check(Config.QuickThrowOnFailure);
+
+    private static byte[] ValidHeader(byte[] options, int payloadLength)
     {
-        var bytes = Convert.FromHexString(WithOptions + "FF");
-        bytes[offset] ^= 1;
-        var result = IPv4Parser.Parse(bytes);
-        await Assert.That(result is IPv4Packet { Header.Source: { Octet0: 192, Octet3: 1 } }).IsTrue();
-        await Assert.That(result.ChecksumStatus).IsEqualTo(expected);
+        int length = 20 + Math.Min(10, options.Length / 4) * 4;
+        byte[] header = [.. Convert.FromHexString(Datagram)[..20], .. options[..(length - 20)]];
+        header[0] = (byte)(0x40 | length / 4);
+        BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(2), (ushort)(length + payloadLength));
+        header[10] = header[11] = 0;
+        int sum = Enumerable.Range(0, length / 2).Sum(i => BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(2 * i)));
+        while (sum > ushort.MaxValue) sum = (sum & ushort.MaxValue) + (sum >> 16);
+        BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(10), (ushort)~sum);
+        return header;
     }
 
     [Test]
