@@ -10,11 +10,14 @@ on:
       candidate:
         description: Candidate Git reference (defaults to the selected workflow commit)
         type: string
-      project:
-        description: Repository-relative Benchmark project
+      suite:
+        description: Benchmark suite
         required: true
-        type: string
-        default: benchmarks/PacketLab.Analysis.Benchmarks/PacketLab.Analysis.Benchmarks.csproj
+        type: choice
+        default: Analysis
+        options:
+          - Analysis
+          - Protocols
 
 permissions:
   contents: read
@@ -37,14 +40,16 @@ jobs:
         timeout-minutes: 25
         shell: pwsh
         env:
-          BENCHMARK_PROJECT: ${{ inputs.project }}
+          BENCHMARK_SUITE: ${{ inputs.suite }}
           BASE_REF: ${{ inputs.base }}
           CANDIDATE_REF: ${{ inputs.candidate || github.sha }}
         run: |
+          $projectName = "PacketLab.$env:BENCHMARK_SUITE.Benchmarks"
+          $project = "benchmarks/$projectName/$projectName.csproj"
           New-Item -ItemType Directory -Force artifacts/benchmarks | Out-Null
-          "Project=$env:BENCHMARK_PROJECT Base=$env:BASE_REF Candidate=$env:CANDIDATE_REF" |
+          "Project=$project Base=$env:BASE_REF Candidate=$env:CANDIDATE_REF" |
             Set-Content artifacts/benchmarks/comparison.log
-          dotnet fsi scripts/Compare-Benchmarks.fsx $env:BENCHMARK_PROJECT $env:BASE_REF $env:CANDIDATE_REF 2>&1 |
+          dotnet fsi scripts/Compare-Benchmarks.fsx $project $env:BASE_REF $env:CANDIDATE_REF 2>&1 |
             Tee-Object -FilePath artifacts/benchmarks/comparison.log -Append
           exit $LASTEXITCODE
 
