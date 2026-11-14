@@ -185,6 +185,7 @@ public sealed class IpFragmentReassembler : IDisposable
         buffer.Context ??= fragment.Prefix.ToArray();
         if (fragment.Offset == 0) buffer.First = new FirstHeader(fragment.Prefix.ToArray());
         buffer.Parts.Add(new(fragment.Offset, fragment.More, fragment.Bytes.ToArray()));
+        buffer.PayloadBytes += fragment.Bytes.Length;
         buffer.Bytes += needed;
         bufferedBytes += needed;
         if (!fragment.More) buffer.Length = new FinalLength(end);
@@ -201,13 +202,8 @@ public sealed class IpFragmentReassembler : IDisposable
                 Fail(state, IpReassemblyStatus.ResourceLimit, "single datagram byte limit reached", events);
                 return;
             }
-            var position = 0;
-            foreach (var part in buffer.Parts.OrderBy(x => x.Offset))
-            {
-                if (part.Offset != position) break;
-                position += part.Bytes.Length;
-            }
-            if (position == total)
+            // Accepted parts cannot overlap or exceed the final length, so equal byte counts prove coverage.
+            if (buffer.PayloadBytes == total)
             {
                 var payload = new byte[total];
                 foreach (var part in buffer.Parts) part.Bytes.CopyTo(payload, part.Offset);
@@ -389,6 +385,7 @@ public sealed class IpFragmentReassembler : IDisposable
         internal byte[]? Context { get; set; }
         internal FirstHeaderState First { get; set; } = new MissingFirstHeader();
         internal LengthState Length { get; set; } = new UnknownLength();
+        internal int PayloadBytes { get; set; }
         internal int Bytes { get; set; }
     }
 }

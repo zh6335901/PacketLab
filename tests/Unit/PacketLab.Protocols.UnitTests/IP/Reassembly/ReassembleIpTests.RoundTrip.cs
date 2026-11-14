@@ -7,6 +7,23 @@ namespace PacketLab.Protocols.UnitTests.IP.Reassembly;
 
 public partial class ReassembleIpTests
 {
+    [Test]
+    [Arguments(4)]
+    [Arguments(6)]
+    public async Task Duplicate_boundary_fragments_do_not_fill_a_missing_middle(int version)
+    {
+        using var reassembler = new IpFragmentReassembler();
+        var first = Fragment(version, 0, true, Payload[..8]);
+        var last = Fragment(version, 16, false, Payload[16..]);
+        await Assert.That(reassembler.Process(first)!.Status).IsEqualTo(IpReassemblyStatus.Pending);
+        await Assert.That(reassembler.Process(last)!.Status).IsEqualTo(IpReassemblyStatus.Pending);
+        await Assert.That(reassembler.Process(first)!.Status).IsEqualTo(IpReassemblyStatus.Duplicate);
+        await Assert.That(reassembler.Process(last)!.Status).IsEqualTo(IpReassemblyStatus.Duplicate);
+        var complete = reassembler.Process(Fragment(version, 8, true, Payload[8..16]))!;
+        await Assert.That(complete.Status).IsEqualTo(IpReassemblyStatus.Complete);
+        await Assert.That(Udp(complete).Payload.Span.SequenceEqual(Payload[8..])).IsTrue();
+    }
+
     private sealed record Delivery(int[] Lengths, int[] Order, int? DuplicateAfter, byte[] UdpPayload)
     {
         public override string ToString() =>
