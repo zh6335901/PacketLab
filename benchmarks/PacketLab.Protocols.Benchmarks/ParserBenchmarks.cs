@@ -36,14 +36,14 @@ public class IPv4ParserBenchmarks
 {
     private ReadOnlyMemory<byte> packet;
 
-    [Params(20, 32)]
+    [Params(20, 32, 60)]
     public int HeaderLength { get; set; }
 
     [GlobalSetup]
     public void Prepare()
     {
         var udp = PacketSamples.Udp(32, true, PacketSamples.IPv4AddressSum);
-        packet = PacketSamples.IPv4(udp, options: HeaderLength == 32);
+        packet = PacketSamples.IPv4(udp, optionBytes: HeaderLength - 20);
         if (Parse() is not IPv4Packet { ChecksumStatus: IPv4ChecksumStatus.Match } parsed ||
             parsed.Header.HeaderLength != HeaderLength || !parsed.Payload.Span.SequenceEqual(udp))
             throw new InvalidDataException("Unexpected IPv4 header or payload.");

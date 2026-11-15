@@ -5,6 +5,7 @@
   "IpReassembly.CompleteDatagram(Sequence: IPv6Two)",
   "IPv4Parser.Parse(HeaderLength: 20)",
   "IPv4Parser.Parse(HeaderLength: 32)",
+  "IPv4Parser.Parse(HeaderLength: 60)",
   "IPv6Parser.Parse(WithExtensions: False)",
   "IPv6Parser.Parse(WithExtensions: True)",
   "LinkLayer.ParseEthernet",
@@ -19,5 +20,17 @@
   "UdpParser.Parse(PayloadLength: 1400, WithChecksum: False)",
   "UdpParser.Parse(PayloadLength: 1400, WithChecksum: True)",
   "UnfragmentedPacket.DecodeFrame",
-  "UnfragmentedPacket.ProbeReassembly"
+  "UnfragmentedPacket.ProbeReassembly",
+  "IpReassembly.CompleteDatagram(Sequence: IPv4ManyOutOfOrder)",
+  "ReassemblyClock.AdvanceTime(PendingDatagrams: 1024)",
+  "TransportSize.ParseTcp(PayloadLength: 0)",
+  "TransportSize.ParseUdp(PayloadLength: 0)",
+  "TransportSize.ParseTcp(PayloadLength: 64)",
+  "TransportSize.ParseUdp(PayloadLength: 64)",
+  "TransportSize.ParseTcp(PayloadLength: 256)",
+  "TransportSize.ParseUdp(PayloadLength: 256)",
+  "TransportSize.ParseTcp(PayloadLength: 9000)",
+  "TransportSize.ParseUdp(PayloadLength: 9000)",
+  "TransportSize.ParseTcp(PayloadLength: 200008)",
+  "TransportSize.ParseUdp(PayloadLength: 200008)"
 ]

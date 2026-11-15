@@ -56,10 +56,10 @@ internal static class PacketSamples
         return bytes;
     }
 
-    internal static byte[] IPv4(ReadOnlySpan<byte> payload, bool options = false,
+    internal static byte[] IPv4(ReadOnlySpan<byte> payload, int optionBytes = 0,
         int identification = 1, int offset = 0, bool more = false)
     {
-        int headerLength = options ? 32 : 20;
+        int headerLength = 20 + optionBytes;
         var packet = new byte[headerLength + payload.Length];
         packet[0] = (byte)(0x40 | headerLength / 4);
         Write16(packet, 2, packet.Length);
@@ -68,7 +68,7 @@ internal static class PacketSamples
         packet[8] = 64;
         packet[9] = 17;
         IPv4Addresses.CopyTo(packet, 12);
-        if (options) packet.AsSpan(20, 12).Fill(1); // Twelve one-byte NOP options.
+        packet.AsSpan(20, optionBytes).Fill(1); // One-byte NOP options.
         Write16(packet, 10, Checksum(packet.AsSpan(0, headerLength)));
         payload.CopyTo(packet.AsSpan(headerLength));
         return packet;
