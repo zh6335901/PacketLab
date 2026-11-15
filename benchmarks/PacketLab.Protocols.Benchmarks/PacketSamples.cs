@@ -26,12 +26,13 @@ internal static class PacketSamples
         return frame;
     }
 
-    internal static byte[] Udp(int payloadLength, bool checksum, ulong addressSum)
+    internal static byte[] Udp(int payloadLength, bool checksum, ulong addressSum, bool ipv6 = false)
     {
         var bytes = new byte[8 + payloadLength];
         Write16(bytes, 0, 12345);
         Write16(bytes, 2, 54321);
-        Write16(bytes, 4, bytes.Length);
+        // IPv6 uses a zero UDP Length for a datagram larger than 65535 bytes.
+        Write16(bytes, 4, ipv6 && bytes.Length > ushort.MaxValue ? 0 : bytes.Length);
         FillPayload(bytes.AsSpan(8));
         if (checksum)
         {
