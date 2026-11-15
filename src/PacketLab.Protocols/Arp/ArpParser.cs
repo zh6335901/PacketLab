@@ -29,11 +29,19 @@ public static class ArpParser
         if (data.Length < length)
             return new ArpParseResult.IncompleteHeader(length, data);
 
-        return new ArpPacket(BinaryPrimitives.ReadUInt16BigEndian(bytes),
-            BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]), hardwareLength, protocolLength,
-            BinaryPrimitives.ReadUInt16BigEndian(bytes[6..]),
-            data.Slice(8, hardwareLength), data.Slice(8 + hardwareLength, protocolLength),
-            data.Slice(8 + hardwareLength + protocolLength, hardwareLength),
-            data.Slice(8 + 2 * hardwareLength + protocolLength, protocolLength), data[length..]);
+        var senderProtocolOffset = 8 + hardwareLength;
+        var targetHardwareOffset = senderProtocolOffset + protocolLength;
+        var targetProtocolOffset = targetHardwareOffset + hardwareLength;
+        return new ArpPacket(
+            HardwareType: BinaryPrimitives.ReadUInt16BigEndian(bytes),
+            ProtocolType: BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]),
+            HardwareAddressLength: hardwareLength,
+            ProtocolAddressLength: protocolLength,
+            Operation: BinaryPrimitives.ReadUInt16BigEndian(bytes[6..]),
+            SenderHardwareAddress: data.Slice(8, hardwareLength),
+            SenderProtocolAddress: data.Slice(senderProtocolOffset, protocolLength),
+            TargetHardwareAddress: data.Slice(targetHardwareOffset, hardwareLength),
+            TargetProtocolAddress: data.Slice(targetProtocolOffset, protocolLength),
+            RemainingBytes: data[length..]);
     }
 }

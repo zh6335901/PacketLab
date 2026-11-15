@@ -215,8 +215,10 @@ public partial class AnalyzeIpReassemblyTests
 
     private static void SetSeconds(MemoryStream stream, int record, uint seconds)
     {
-        var bytes = stream.GetBuffer(); var position = 24;
-        for (var i = 1; i < record; i++) position += 16 + (int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(position + 8));
+        var bytes = stream.GetBuffer();
+        var position = 24;
+        for (var i = 1; i < record; i++)
+            position += 16 + (int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(position + 8));
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(position), seconds);
     }
 }

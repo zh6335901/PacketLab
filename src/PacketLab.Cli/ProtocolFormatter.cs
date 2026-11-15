@@ -51,22 +51,31 @@ internal static class ProtocolFormatter
         _ => throw new InvalidOperationException("Uninitialized TCP checksum result.")
     };
 
-    private static string DescribeTcpOptions(TcpOptions options) =>
-        "; Options " + (options.Items.IsEmpty ? "none" : string.Join(", ", options.Items.Select(option =>
-            $"offset {option.Offset} " + (option.Value switch
-            {
-                TcpOptionValue.End => "EOL",
-                TcpOptionValue.NoOperation => "NOP",
-                TcpOptionValue.MaximumSegmentSize mss => $"MSS {mss.Value}",
-                TcpOptionValue.WindowScale scale => $"Window Scale {scale.ShiftCount}" + (scale.IsInRange ? "" : " (out of range; maximum 14)"),
-                TcpOptionValue.SackPermitted => "SACK Permitted",
-                TcpOptionValue.Sack sack => "SACK [" + string.Join(", ", sack.Blocks.Select(b => $"{b.LeftEdge}-{b.RightEdge}")) + "]",
-                TcpOptionValue.Timestamp ts => $"Timestamp {ts.Value} echo {ts.EchoReply}",
-                TcpOptionValue.Unknown => $"unknown kind {option.Kind} raw {Convert.ToHexString(option.Bytes.Span)}",
-                TcpOptionValue.Invalid invalid => $"kind {option.Kind} {invalid.Reason} (required {invalid.RequiredLength}, available {invalid.AvailableLength})",
-                null => throw new InvalidOperationException("Uninitialized TCP option.")
-            })))) + $"; option bytes {Convert.ToHexString(options.RawBytes.Span)}; padding {options.Padding.Length} bytes"
-        + (options.HasNonZeroPadding ? " (nonzero)" : "");
+    private static string DescribeTcpOptions(TcpOptions options)
+    {
+        var items = options.Items.IsEmpty ? "none" : string.Join(", ", options.Items.Select(DescribeTcpOption));
+        var padding = options.HasNonZeroPadding ? " (nonzero)" : "";
+        return $"; Options {items}; option bytes {Convert.ToHexString(options.RawBytes.Span)}"
+            + $"; padding {options.Padding.Length} bytes{padding}";
+    }
+
+    private static string DescribeTcpOption(TcpOption option)
+    {
+        var description = option.Value switch
+        {
+            TcpOptionValue.End => "EOL",
+            TcpOptionValue.NoOperation => "NOP",
+            TcpOptionValue.MaximumSegmentSize mss => $"MSS {mss.Value}",
+            TcpOptionValue.WindowScale scale => $"Window Scale {scale.ShiftCount}" + (scale.IsInRange ? "" : " (out of range; maximum 14)"),
+            TcpOptionValue.SackPermitted => "SACK Permitted",
+            TcpOptionValue.Sack sack => "SACK [" + string.Join(", ", sack.Blocks.Select(b => $"{b.LeftEdge}-{b.RightEdge}")) + "]",
+            TcpOptionValue.Timestamp ts => $"Timestamp {ts.Value} echo {ts.EchoReply}",
+            TcpOptionValue.Unknown => $"unknown kind {option.Kind} raw {Convert.ToHexString(option.Bytes.Span)}",
+            TcpOptionValue.Invalid invalid => $"kind {option.Kind} {invalid.Reason} (required {invalid.RequiredLength}, available {invalid.AvailableLength})",
+            null => throw new InvalidOperationException("Uninitialized TCP option.")
+        };
+        return $"offset {option.Offset} {description}";
+    }
 
     internal static string Describe(ProtocolDecodeResult result) => result switch
     {
@@ -210,10 +219,7 @@ internal static class ProtocolFormatter
 
     private static string DescribeIPv6Extensions(DecodedIPv6 packet)
     {
-        var headers = packet.Extensions.IsEmpty ? "none" : string.Join(" -> ", packet.Extensions.Select(header =>
-            $"{ExtensionName(header.Type)}({header.Type}) offset {header.Offset} length {header.Length} next {header.NextHeader}"
-            + (header.Fragment is { } fragment
-                ? $" [offset {fragment.Offset} (8-byte units, {fragment.OffsetBytes} bytes) M {Bit(fragment.MoreFragments)} ID 0x{fragment.Identification:X8} {(fragment.IsAtomic ? "atomic" : "reassembly required")}]" : "")));
+        var headers = packet.Extensions.IsEmpty ? "none" : string.Join(" -> ", packet.Extensions.Select(DescribeExtension));
         var upper = packet.Payload switch
         {
             TcpParseResult when packet.Capture is IPv6Payload.KnownLength known =>
@@ -232,6 +238,17 @@ internal static class ProtocolFormatter
 
         string DescribeLocatedProtocol(byte protocol, uint length) =>
             $"upper protocol {protocol} offset {packet.RemainingOffset} declared {length} bytes, available {packet.RemainingBytes.Length} bytes";
+    }
+
+    private static string DescribeExtension(IPv6ExtensionHeader header)
+    {
+        var description = $"{ExtensionName(header.Type)}({header.Type}) offset {header.Offset} length {header.Length} next {header.NextHeader}";
+        if (header.Fragment is not { } fragment)
+            return description;
+
+        var status = fragment.IsAtomic ? "atomic" : "reassembly required";
+        return description + $" [offset {fragment.Offset} (8-byte units, {fragment.OffsetBytes} bytes)"
+            + $" M {Bit(fragment.MoreFragments)} ID 0x{fragment.Identification:X8} {status}]";
     }
 
     private static string ExtensionName(byte type) => type switch

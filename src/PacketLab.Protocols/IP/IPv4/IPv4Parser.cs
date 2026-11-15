@@ -66,10 +66,22 @@ public static class IPv4Parser
             return new IPv4ParseResult.IncompleteHeader(headerLength, data);
 
         var fragment = BinaryPrimitives.ReadUInt16BigEndian(bytes[6..]);
-        var header = new IPv4Header(version, ihl, (byte)(bytes[1] >> 2), (byte)(bytes[1] & 3), totalLength,
-            BinaryPrimitives.ReadUInt16BigEndian(bytes[4..]), (byte)(fragment >> 13), (ushort)(fragment & 0x1fff),
-            bytes[8], bytes[9], BinaryPrimitives.ReadUInt16BigEndian(bytes[10..]),
-            IPv4Address.Read(bytes[12..]), IPv4Address.Read(bytes[16..]), data.Slice(20, headerLength - 20));
+        var header = new IPv4Header(
+            Version: version,
+            Ihl: ihl,
+            Dscp: (byte)(bytes[1] >> 2),
+            Ecn: (byte)(bytes[1] & 3),
+            TotalLength: totalLength,
+            Identification: BinaryPrimitives.ReadUInt16BigEndian(bytes[4..]),
+            Flags: (byte)(fragment >> 13),
+            FragmentOffset: (ushort)(fragment & 0x1fff),
+            Ttl: bytes[8],
+            Protocol: bytes[9],
+            HeaderChecksum: BinaryPrimitives.ReadUInt16BigEndian(bytes[10..]),
+            Source: IPv4Address.Read(bytes[12..]),
+            Destination: IPv4Address.Read(bytes[16..]),
+            Options: data[20..headerLength]);
+
         var capturedEnd = Math.Min(data.Length, totalLength);
         return new IPv4Packet(header, Checksum(bytes[..headerLength]),
             data[headerLength..capturedEnd], data[capturedEnd..]);

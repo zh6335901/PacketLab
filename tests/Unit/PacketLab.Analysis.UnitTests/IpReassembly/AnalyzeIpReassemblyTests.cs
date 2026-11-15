@@ -445,23 +445,38 @@ public partial class AnalyzeIpReassemblyTests
     private static byte[] Fragment(int version, int offset, bool more, byte[] payload, ushort id = 1,
         byte nextHeader = 17, bool hopByHop = false)
     {
-        var header = version == 4 ? 20 : hopByHop ? 56 : 48;
+        var header = version switch
+        {
+            4 => 20,
+            _ when hopByHop => 56,
+            _ => 48
+        };
         var frame = new byte[14 + header + payload.Length];
-        frame[12] = version == 4 ? (byte)8 : (byte)0x86; frame[13] = version == 4 ? (byte)0 : (byte)0xdd;
+        BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(12), version == 4 ? (ushort)0x0800 : (ushort)0x86dd);
         var ip = frame.AsSpan(14);
         if (version == 4)
         {
-            ip[0] = 0x45; ip[8] = 64; ip[9] = nextHeader; ip[12] = 10; ip[16] = 11;
+            ip[0] = 0x45;
+            ip[8] = 64;
+            ip[9] = nextHeader;
+            ip[12] = 10;
+            ip[16] = 11;
             BinaryPrimitives.WriteUInt16BigEndian(ip[2..], (ushort)(20 + payload.Length));
             BinaryPrimitives.WriteUInt16BigEndian(ip[4..], id);
             BinaryPrimitives.WriteUInt16BigEndian(ip[6..], (ushort)(offset / 8 | (more ? 0x2000 : 0)));
         }
         else
         {
-            ip[0] = 0x60; ip[6] = hopByHop ? (byte)0 : (byte)44; ip[7] = 64; ip[23] = 1; ip[39] = 2;
+            ip[0] = 0x60;
+            ip[6] = hopByHop ? (byte)0 : (byte)44;
+            ip[7] = 64;
+            ip[23] = 1;
+            ip[39] = 2;
             BinaryPrimitives.WriteUInt16BigEndian(ip[4..], (ushort)(header - 40 + payload.Length));
-            if (hopByHop) ip[40] = 44;
-            var fragment = ip[(header - 8)..]; fragment[0] = nextHeader;
+            if (hopByHop)
+                ip[40] = 44;
+            var fragment = ip[(header - 8)..];
+            fragment[0] = nextHeader;
             BinaryPrimitives.WriteUInt16BigEndian(fragment[2..], (ushort)(offset | (more ? 1 : 0)));
             BinaryPrimitives.WriteUInt32BigEndian(fragment[4..], id);
         }
@@ -476,7 +491,11 @@ public partial class AnalyzeIpReassemblyTests
         using var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true);
         foreach (var frame in frames)
         {
-            writer.Write(1u); writer.Write(0u); writer.Write((uint)frame.Length); writer.Write(65535u); writer.Write(frame);
+            writer.Write(1u);
+            writer.Write(0u);
+            writer.Write((uint)frame.Length);
+            writer.Write(65535u);
+            writer.Write(frame);
         }
         stream.Position = 0;
         return stream;

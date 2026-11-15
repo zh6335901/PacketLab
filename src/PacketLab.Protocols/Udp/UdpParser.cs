@@ -46,30 +46,44 @@ public static class UdpParser
     public static UdpParseResult Parse(ReadOnlyMemory<byte> data, uint declaredLength, bool ipv6, ulong? pseudoHeaderAddressSum)
     {
         // The network layer owns the declaration; captured padding cannot extend it.
-        data = data[..(int)Math.Min((ulong)data.Length, declaredLength)];
+        if (data.Length > declaredLength)
+            data = data[..(int)declaredLength];
+
         if (declaredLength < 8)
             return new UdpParseResult.IpLengthTooShort(declaredLength, data);
         if (data.Length < 8)
             return new UdpParseResult.HeaderTruncated(declaredLength, data);
+
         var bytes = data.Span;
-        var header = new UdpHeader(BinaryPrimitives.ReadUInt16BigEndian(bytes),
-            BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]), BinaryPrimitives.ReadUInt16BigEndian(bytes[4..]),
-            BinaryPrimitives.ReadUInt16BigEndian(bytes[6..]));
+        var header = new UdpHeader(
+            SourcePort: BinaryPrimitives.ReadUInt16BigEndian(bytes),
+            DestinationPort: BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]),
+            Length: BinaryPrimitives.ReadUInt16BigEndian(bytes[4..]),
+            Checksum: BinaryPrimitives.ReadUInt16BigEndian(bytes[6..]));
+
         // RFC 2675 receiver rule also covers zero Length without a Jumbo option.
         uint length = ipv6 && header.Length == 0 ? declaredLength : header.Length;
         if (length < 8)
             return new UdpParseResult.InvalidLength(header, declaredLength, data);
         if (length > declaredLength)
             return new UdpParseResult.LengthExceedsIpPayload(header, declaredLength, data);
-        var end = (int)Math.Min((ulong)data.Length, length);
-        UdpChecksum checksum = header.Checksum == 0
-            ? ipv6 ? UdpChecksumStatus.ZeroNotAllowed : UdpChecksumStatus.NotPresent
-            : data.Length < length ? new UdpChecksumUnavailable(UdpUnavailableReason.PayloadTruncated)
-            : pseudoHeaderAddressSum is null ? new UdpChecksumUnavailable(UdpUnavailableReason.PseudoHeaderUnavailable)
-            : Validate(bytes[..end], pseudoHeaderAddressSum.Value + 17 + (length >> 16) + (length & 0xffff));
+
+        var end = (int)Math.Min((uint)data.Length, length);
+        var checksum = Checksum(header, bytes[..end], length, ipv6, pseudoHeaderAddressSum);
         return new UdpDatagram(header, length, data[8..end], declaredLength - length, data[end..], checksum);
     }
 
-    private static UdpChecksumStatus Validate(ReadOnlySpan<byte> bytes, ulong sum) =>
-        InternetChecksum.IsValid(bytes, sum) ? UdpChecksumStatus.Match : UdpChecksumStatus.Mismatch;
+    private static UdpChecksum Checksum(
+        UdpHeader header, ReadOnlySpan<byte> bytes, uint length, bool ipv6, ulong? pseudoHeaderAddressSum)
+    {
+        if (header.Checksum == 0)
+            return ipv6 ? UdpChecksumStatus.ZeroNotAllowed : UdpChecksumStatus.NotPresent;
+        if (bytes.Length < length)
+            return new UdpChecksumUnavailable(UdpUnavailableReason.PayloadTruncated);
+        if (pseudoHeaderAddressSum is not { } addressSum)
+            return new UdpChecksumUnavailable(UdpUnavailableReason.PseudoHeaderUnavailable);
+
+        var pseudoHeaderSum = addressSum + 17 + (length >> 16) + (length & 0xffff);
+        return InternetChecksum.IsValid(bytes, pseudoHeaderSum) ? UdpChecksumStatus.Match : UdpChecksumStatus.Mismatch;
+    }
 }

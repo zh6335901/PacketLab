@@ -28,17 +28,28 @@ internal static class IpChecksumAddresses
         for (var i = 0; i < options.Length;)
         {
             var type = options[i];
-            if (type == 0) break;
-            if (type == 1) { i++; continue; }
-            if (i + 2 > options.Length || options[i + 1] < 2 || i + options[i + 1] > options.Length)
+            if (type == 0)
+                break;
+            if (type == 1)
+            {
+                i++;
+                continue;
+            }
+
+            if (i + 2 > options.Length)
                 return null;
             var length = options[i + 1];
+            if (length < 2 || i + length > options.Length)
+                return null;
+
             if (type is 131 or 137)
             {
-                if (sawRoute || length < 3 || (length - 3) % 4 != 0) return null;
+                if (sawRoute || length < 3 || (length - 3) % 4 != 0)
+                    return null;
                 sawRoute = true;
                 var pointer = options[i + 2];
-                if (pointer < 4 || (pointer - 4) % 4 != 0 || pointer > length + 1) return null;
+                if (pointer < 4 || (pointer - 4) % 4 != 0 || pointer > length + 1)
+                    return null;
                 // An exhausted source route has already installed the final destination.
                 if (pointer <= length)
                     destination = IPv4Address.Read(options.Slice(i + length - 4, 4));

@@ -69,28 +69,54 @@ internal static class TcpDecoder
 
 public static class TcpParser
 {
+    internal const int FixedHeaderLength = 20;
+
     public static TcpParseResult Parse(ReadOnlyMemory<byte> data, uint declaredLength, ulong? pseudoHeaderAddressSum)
     {
-        data = data[..(int)Math.Min((ulong)data.Length, declaredLength)];
-        if (declaredLength < 20) return new TcpParseResult.IpLengthTooShort(declaredLength, data);
-        if (data.Length < 20) return new TcpParseResult.HeaderTruncated(declaredLength, data);
-        var bytes = data.Span;
-        var header = new TcpHeader(BinaryPrimitives.ReadUInt16BigEndian(bytes),
-            BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]), BinaryPrimitives.ReadUInt32BigEndian(bytes[4..]),
-            BinaryPrimitives.ReadUInt32BigEndian(bytes[8..]), (byte)(bytes[12] >> 4), (byte)((bytes[12] >> 1) & 7),
-            (TcpFlags)(BinaryPrimitives.ReadUInt16BigEndian(bytes[12..]) & 0x1ff),
-            BinaryPrimitives.ReadUInt16BigEndian(bytes[14..]), BinaryPrimitives.ReadUInt16BigEndian(bytes[16..]),
-            BinaryPrimitives.ReadUInt16BigEndian(bytes[18..]));
-        if (header.DataOffset < 5) return new TcpParseResult.InvalidDataOffset(header, declaredLength, data);
-        if (header.HeaderLength > declaredLength) return new TcpParseResult.HeaderExceedsSegment(header, declaredLength, data);
-        var options = TcpOptionParser.Parse(data[20..Math.Min(data.Length, header.HeaderLength)], header.HeaderLength - 20);
-        if (data.Length < header.HeaderLength) return new TcpParseResult.OptionsTruncated(header, declaredLength, options, data);
-        TcpChecksum checksum = data.Length < declaredLength ? new TcpChecksumUnavailable(TcpUnavailableReason.PayloadTruncated)
-            : pseudoHeaderAddressSum is not { } sum ? new TcpChecksumUnavailable(TcpUnavailableReason.PseudoHeaderUnavailable)
-            : Validate(bytes, sum + 6 + (declaredLength >> 16) + (declaredLength & 0xffff));
-        return new TcpSegment(header, declaredLength, options, data[header.HeaderLength..], checksum);
+        if (data.Length > declaredLength)
+            data = data[..(int)declaredLength];
+
+        if (declaredLength < FixedHeaderLength)
+            return new TcpParseResult.IpLengthTooShort(declaredLength, data);
+        if (data.Length < FixedHeaderLength)
+            return new TcpParseResult.HeaderTruncated(declaredLength, data);
+
+        var header = ReadHeader(data.Span);
+        var headerLength = header.HeaderLength;
+        if (headerLength < FixedHeaderLength)
+            return new TcpParseResult.InvalidDataOffset(header, declaredLength, data);
+        if (headerLength > declaredLength)
+            return new TcpParseResult.HeaderExceedsSegment(header, declaredLength, data);
+
+        var capturedHeaderLength = Math.Min(data.Length, headerLength);
+        var options = TcpOptionParser.Parse(data[FixedHeaderLength..capturedHeaderLength], headerLength - FixedHeaderLength);
+        if (data.Length < headerLength)
+            return new TcpParseResult.OptionsTruncated(header, declaredLength, options, data);
+
+        var checksum = Checksum(data.Span, declaredLength, pseudoHeaderAddressSum);
+        return new TcpSegment(header, declaredLength, options, data[headerLength..], checksum);
     }
 
-    private static TcpChecksumStatus Validate(ReadOnlySpan<byte> bytes, ulong sum) =>
-        InternetChecksum.IsValid(bytes, sum) ? TcpChecksumStatus.Match : TcpChecksumStatus.Mismatch;
+    private static TcpHeader ReadHeader(ReadOnlySpan<byte> bytes) => new(
+        SourcePort: BinaryPrimitives.ReadUInt16BigEndian(bytes),
+        DestinationPort: BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]),
+        SequenceNumber: BinaryPrimitives.ReadUInt32BigEndian(bytes[4..]),
+        AcknowledgmentNumber: BinaryPrimitives.ReadUInt32BigEndian(bytes[8..]),
+        DataOffset: (byte)(bytes[12] >> 4),
+        Reserved: (byte)((bytes[12] >> 1) & 7),
+        Flags: (TcpFlags)(BinaryPrimitives.ReadUInt16BigEndian(bytes[12..]) & 0x1ff),
+        Window: BinaryPrimitives.ReadUInt16BigEndian(bytes[14..]),
+        Checksum: BinaryPrimitives.ReadUInt16BigEndian(bytes[16..]),
+        UrgentPointer: BinaryPrimitives.ReadUInt16BigEndian(bytes[18..]));
+
+    private static TcpChecksum Checksum(ReadOnlySpan<byte> bytes, uint declaredLength, ulong? pseudoHeaderAddressSum)
+    {
+        if (bytes.Length < declaredLength)
+            return new TcpChecksumUnavailable(TcpUnavailableReason.PayloadTruncated);
+        if (pseudoHeaderAddressSum is not { } addressSum)
+            return new TcpChecksumUnavailable(TcpUnavailableReason.PseudoHeaderUnavailable);
+
+        var pseudoHeaderSum = addressSum + 6 + (declaredLength >> 16) + (declaredLength & 0xffff);
+        return InternetChecksum.IsValid(bytes, pseudoHeaderSum) ? TcpChecksumStatus.Match : TcpChecksumStatus.Mismatch;
+    }
 }
