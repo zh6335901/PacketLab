@@ -10,6 +10,21 @@ public class ParseIPv4PacketTests
     private const string Datagram = "45AB0018BEEF21237FFD6DF4C0000201C6336402CAFE0102";
     private const string WithOptions = "46AB001CBEEFA1237FFDEBEEC0000201C633640201010000CAFE0102";
 
+    public static IEnumerable<int> HeaderLengths() => Enumerable.Range(5, 11).Select(ihl => ihl * 4);
+
+    [Test]
+    [MethodDataSource(nameof(HeaderLengths))]
+    public async Task Unaligned_headers_of_every_legal_length_preserve_checksum_and_detect_corruption(int length)
+    {
+        var header = ValidHeader(Enumerable.Repeat((byte)0xff, length - 20).ToArray(), 0);
+        var storage = new byte[header.Length + 1];
+        header.CopyTo(storage, 1);
+        var bytes = storage.AsMemory(1);
+        await Assert.That(IPv4Parser.Parse(bytes).ChecksumStatus).IsEqualTo(IPv4ChecksumStatus.Match);
+        bytes.Span[^1] ^= 1;
+        await Assert.That(IPv4Parser.Parse(bytes).ChecksumStatus).IsEqualTo(IPv4ChecksumStatus.Mismatch);
+    }
+
     [Test]
     public async Task Header_fields_preserve_network_order_bit_fields_and_unknown_protocol()
     {
