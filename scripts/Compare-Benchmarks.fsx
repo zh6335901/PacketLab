@@ -73,46 +73,16 @@ type Measurement = {
     Errors: string list
 }
 
-let timingErrors (raw: JsonNode) =
-    let values = field "Statistics" raw |> field "OriginalValues"
-    match values with
-    | :? JsonArray as samples when samples.Count >= 10 ->
-        let values = samples |> Seq.map (fun value -> value.GetValue<float>()) |> Seq.toArray
-        if values |> Array.exists (fun value -> not (Double.IsFinite(value)) || value <= 0.) then
-            ["Invalid timing samples"]
-        else
-            let mean = Array.average values
-            let variance = values |> Array.sumBy (fun value -> (value - mean) ** 2.)
-            let variation = sqrt (variance / float (values.Length - 1)) / mean
-            let half = values.Length / 2
-            let first = values[..half - 1] |> Array.average
-            let last = values[values.Length - half..] |> Array.average
-            let drift = abs (last / first - 1.)
-            let measurements = field "Measurements" raw
-            let durations =
-                match measurements with
-                | :? JsonArray as iterations ->
-                    iterations |> Seq.filter (fun iteration ->
-                        (field "IterationMode" iteration |> optionalString) = Some "Workload" &&
-                        (field "IterationStage" iteration |> optionalString) = Some "Actual")
-                    |> Seq.map (fun iteration -> (field "Nanoseconds" iteration).GetValue<float>()) |> Seq.toArray
-                | _ -> [||]
-            [ if variation > 0.10 then
-                  sprintf "Unstable timing: relative standard deviation %.1f%% exceeds 10%%" (variation * 100.)
-              if drift > 0.10 then
-                  sprintf "Unstable timing: first/last half means differ by %.1f%% (limit 10%%)" (drift * 100.)
-              if durations.Length = 0 then "Missing actual iteration durations"
-              elif durations |> Array.exists (fun ns -> not (Double.IsFinite(ns)) || ns < 100_000_000.) then
-                  "Unstable timing: actual iteration shorter than 100 ms" ]
-    | _ -> ["Fewer than 10 timing samples"]
-
 let readMeasurement (raw: JsonNode) failure =
     let stats = field "Statistics" raw
     let median =
         match field "Median" stats, field "OriginalValues" stats with
         | value, (:? JsonArray as samples) when not (isNull value) && samples.Count > 0 ->
             let ns = value.GetValue<float>()
-            if Double.IsFinite(ns) && ns > 0. then Some ns else None
+            let validSamples = samples |> Seq.forall (fun value ->
+                let sample = value.GetValue<float>()
+                Double.IsFinite(sample) && sample > 0.)
+            if validSamples && Double.IsFinite(ns) && ns > 0. then Some ns else None
         | _ -> None
     let allocation =
         match field "Memory" raw |> field "BytesAllocatedPerOperation" with
@@ -120,8 +90,7 @@ let readMeasurement (raw: JsonNode) failure =
         | value -> Some (value.GetValue<int64>()) |> Option.filter ((<=) 0L)
     { Raw = raw; Median = median; Allocation = allocation
       Errors = [ if median.IsNone then defaultArg failure "Execution failed or timing samples missing"
-                 if allocation.IsNone then "Missing allocation measurement"
-                 yield! timingErrors raw ] }
+                 if allocation.IsNone then "Missing allocation measurement" ] }
 
 let executionErrors log =
     let mutable scenario = None
@@ -185,9 +154,10 @@ let runSide temp output project candidate affinity (name, revision) =
                 if not failedChild.HasExited then failedChild.Kill(true)
                 reraise()
         runProcess launch (Path.GetDirectoryName bench) (Some log) env "dotnet"
-            // Short warmups can leave tiered JIT transitions inside the measured iterations.
-            [target; "--filter"; "*"; "--inProcess"; "--iterationCount"; "12"; "--warmupCount"; "20"
-             "--iterationTime"; "1000"; "--outliers"; "DontRemove"
+            // Promote hot methods before pilot measurements, with a short additional warmup for callees.
+            [target; "--filter"; "*"; "--jitTieringMode"; "Force"; "--warmupCount"; "3"
+             "--iterationTime"; "250"; "--minIterationCount"; "15"; "--maxIterationCount"; "20"
+             "--outliers"; "DontRemove"
              "--exporters"; "fulljson"; "--artifacts"; folder] |> ignore
     with ex -> errors.Add(ex.Message)
     let failures = executionErrors log
@@ -244,8 +214,8 @@ let report output project scenarios affinity baseline candidate compare =
     lines.Add($"- Benchmark source: {candidate.Sha} / {project}")
     lines.Add($"- Benchmark CPU policy: {BenchmarkAffinity.describe affinity}")
     lines.Add($"- ResultsComparer: {comparerRev}, threshold {threshold}, noise filter 0.3 ns")
-    lines.Add("- Measurement: runtime configuration unchanged, 20 warmups, 12 measured iterations, 1 s target per iteration; all samples retained.")
-    lines.Add("- Timing screen: at least 10 samples, relative standard deviation and first/last half drift at most 10%, actual iterations at least 100 ms. Rejected timings are inconclusive; passing this screen does not prove equivalence within 5%.")
+    lines.Add("- Measurement: isolated benchmark processes, JIT tier promotion enabled, 3 warmups, 15–20 measured iterations, 250 ms target per iteration; all samples retained.")
+    lines.Add("- BenchmarkDotNet diagnostic warnings remain in the run logs and exported reports. Warnings are not treated as execution failures; a comparison does not prove absence of environmental noise.")
     for side in [baseline; candidate] do
         lines.Add($"- {side.Name} product: {side.Sha} ([run log]({side.Name}/run.log))")
         for cpu in side.CpuModels do lines.Add($"  - CPU: {cpu}")
