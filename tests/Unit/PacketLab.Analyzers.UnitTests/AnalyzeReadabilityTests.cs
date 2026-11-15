@@ -82,6 +82,39 @@ public class AnalyzeReadabilityTests
     }
 
     [Test]
+    [Arguments("if (x > 0) return;")]
+    [Arguments("if (x > 0) { return; }")]
+    [Arguments("if (\n x > 0) /* guard */ return;")]
+    [Arguments("if (x > 0)\n return; else return;")]
+    [Arguments("if (x > 0)\n return; else if (y > 0) return;")]
+    [Arguments("for (int i = 0; i < x; i++) break;")]
+    [Arguments("foreach (var n in values) break;")]
+    [Arguments("foreach (var (a, b) in new[] { (x, y) }) break;")]
+    [Arguments("while (x > 0) break;")]
+    [Arguments("do x++; while (x < 0);")]
+    public async Task Single_statement_on_the_header_line_reports_a_warning(string statements)
+    {
+        var diagnostics = await Analyze("0", statements);
+
+        await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0009");
+    }
+
+    [Test]
+    [Arguments("if (x > 0)\n return;")]
+    [Arguments("if (x > 0) {\n return; }")]
+    [Arguments("if (x > 0) { } else if (y > 0)\n return; else\n return;")]
+    [Arguments("for (;;)\n break;")]
+    [Arguments("foreach (var n in values)\n break;")]
+    [Arguments("while (x > 0)\n break;")]
+    [Arguments("do\n x++; while (x < 0);")]
+    public async Task Body_on_a_separate_line_passes(string statements)
+    {
+        var diagnostics = await Analyze("0", statements);
+
+        await Assert.That(diagnostics.IsEmpty).IsTrue();
+    }
+
+    [Test]
     [Arguments("Read(Read(Read(0)))")]
     [Arguments("Read(Read(Read(Read(0))))")]
     [Arguments("Read(Read((int)(Read(Read(Read(0))))))")]

@@ -103,7 +103,8 @@ public static class IPv4Parser
             sum = Vector128.Sum(lanes);
             sum = (sum & 0xffff) + (sum >> 16);
             sum = (sum & 0xffff) + (sum >> 16);
-            if (BitConverter.IsLittleEndian) sum = BinaryPrimitives.ReverseEndianness((ushort)sum);
+            if (BitConverter.IsLittleEndian)
+                sum = BinaryPrimitives.ReverseEndianness((ushort)sum);
         }
         for (var offset = 0; offset < header.Length; offset += 2)
             sum += BinaryPrimitives.ReadUInt16BigEndian(header[offset..]);

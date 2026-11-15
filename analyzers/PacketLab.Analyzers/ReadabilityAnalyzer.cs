@@ -20,7 +20,12 @@ public sealed class ReadabilityAnalyzer : DiagnosticAnalyzer
         "Readability", DiagnosticSeverity.Warning, isEnabledByDefault: true,
         description: "In a call with four or more arguments, multiple computed arguments starting on the same line can obscure the role of each value.");
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [NestedConditional, PackedArguments];
+    private static readonly DiagnosticDescriptor InlineBody = new(
+        "PL0009", "Single-statement body shares the control header's line",
+        "Start the body statement on a new line",
+        "Readability", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [NestedConditional, PackedArguments, InlineBody];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -28,6 +33,43 @@ public sealed class ReadabilityAnalyzer : DiagnosticAnalyzer
         context.EnableConcurrentExecution();
         context.RegisterSyntaxNodeAction(AnalyzeConditional, SyntaxKind.ConditionalExpression);
         context.RegisterSyntaxNodeAction(AnalyzeArguments, SyntaxKind.ArgumentList);
+        context.RegisterSyntaxNodeAction(AnalyzeBody,
+            SyntaxKind.IfStatement, SyntaxKind.ElseClause, SyntaxKind.ForStatement, SyntaxKind.ForEachStatement,
+            SyntaxKind.ForEachVariableStatement, SyntaxKind.WhileStatement, SyntaxKind.DoStatement);
+    }
+
+    private static void AnalyzeBody(SyntaxNodeAnalysisContext context)
+    {
+        if (context.Node is ElseClauseSyntax { Statement: IfStatementSyntax })
+            return;
+
+        var (headerEnd, body) = context.Node switch
+        {
+            IfStatementSyntax branch => (branch.CloseParenToken, branch.Statement),
+            ElseClauseSyntax branch => (branch.ElseKeyword, branch.Statement),
+            ForStatementSyntax loop => (loop.CloseParenToken, loop.Statement),
+            CommonForEachStatementSyntax loop => (loop.CloseParenToken, loop.Statement),
+            WhileStatementSyntax loop => (loop.CloseParenToken, loop.Statement),
+            DoStatementSyntax loop => (loop.DoKeyword, loop.Statement),
+            _ => throw new InvalidOperationException()
+        };
+
+        if (body is BlockSyntax block)
+        {
+            if (block.Statements.Count != 1)
+                return;
+            body = block.Statements[0];
+        }
+
+        var firstToken = body.GetFirstToken();
+        if (headerEnd.IsMissing || firstToken.RawKind == 0)
+            return;
+
+        var lines = body.SyntaxTree.GetText(context.CancellationToken).Lines;
+        var headerLine = lines.GetLineFromPosition(headerEnd.SpanStart).LineNumber;
+        var bodyLine = lines.GetLineFromPosition(firstToken.SpanStart).LineNumber;
+        if (headerLine == bodyLine)
+            context.ReportDiagnostic(Diagnostic.Create(InlineBody, firstToken.GetLocation()));
     }
 
     private static void AnalyzeConditional(SyntaxNodeAnalysisContext context)

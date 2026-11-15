@@ -11,3 +11,4 @@ PL0005 | Readability | Warning | Computed arguments share a line
 PL0006 | Readability | Warning | Multiple assignments in one step
 PL0007 | Readability | Warning | Deeply nested method calls
 PL0008 | Readability | Warning | Complex argument expression
+PL0009 | Readability | Warning | Single-statement body shares the control header's line
