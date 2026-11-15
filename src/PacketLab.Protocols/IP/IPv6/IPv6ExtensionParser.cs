@@ -5,23 +5,69 @@ namespace PacketLab.Protocols.IP.IPv6;
 
 internal static class IPv6ExtensionParser
 {
-    internal static IPv6Packet Parse(IPv6Header header, ReadOnlyMemory<byte> captured)
-    {
-        uint? declared = header.PayloadLength == 0 && header.NextHeader == 0 ? null : header.PayloadLength;
-        var headers = ImmutableArray.CreateBuilder<IPv6ExtensionHeader>();
-        ImmutableArray<IPv6Diagnostic>.Builder? diagnostics = null;
-        var offset = 0;
-        var next = header.NextHeader;
-        var addressesKnown = true;
-        var sawFragment = false;
+    internal static IPv6Packet Parse(IPv6Header header, ReadOnlyMemory<byte> captured) =>
+        new ExtensionReader(header, captured).Read();
 
-        int Available() => (int)Math.Min((ulong)captured.Length, declared ?? (ulong)captured.Length);
-        void Diagnose(IPv6DiagnosticCode code, int at, string message) =>
+    private struct ExtensionReader(IPv6Header header, ReadOnlyMemory<byte> captured)
+    {
+        private readonly IPv6Header header = header;
+        private readonly ReadOnlyMemory<byte> captured = captured;
+        private readonly ImmutableArray<IPv6ExtensionHeader>.Builder headers = ImmutableArray.CreateBuilder<IPv6ExtensionHeader>();
+        private ImmutableArray<IPv6Diagnostic>.Builder? diagnostics;
+        private int offset;
+        private byte next = header.NextHeader;
+
+        internal IPv6Packet Read()
+        {
+            uint? declared = header.PayloadLength == 0 && header.NextHeader == 0 ? null : header.PayloadLength;
+            var addressesKnown = true;
+            var sawFragment = false;
+            while (true)
+            {
+                if (next == 59)
+                    return Finish(declared, new IPv6NoNextHeader());
+                if (next is 6 or 17 or 58 or 4 or 41 or 132)
+                    return Finish(declared, ReadUpperLayer(declared!.Value, addressesKnown));
+                if (next is not (0 or 60 or 43 or 44 or 51))
+                    return Finish(declared, UnsupportedHeader());
+                if (CheckHeaderLength(declared, out var length) is { } failure)
+                    return Finish(declared, failure);
+
+                var bytes = captured.Span.Slice(offset, length);
+                var fragment = ReadFragment(bytes);
+                headers.Add(new(next, bytes[0], 40 + offset, captured.Slice(offset, length), fragment));
+                if (CheckHopByHopPosition(length) is { } positionFailure)
+                    return Finish(declared, positionFailure);
+                if (next is 0 or 60)
+                {
+                    if (ProcessOptions(bytes, ref declared, ref addressesKnown) is { } optionsFailure)
+                    {
+                        offset += length;
+                        return Finish(declared, optionsFailure);
+                    }
+                }
+                if (next == 43 && bytes[3] != 0)
+                {
+                    addressesKnown = false;
+                    Diagnose(IPv6DiagnosticCode.FinalDestinationUnavailable, offset,
+                        $"Routing Type {bytes[2]}, Segments Left {bytes[3]}; final destination and checksum context unavailable");
+                }
+                if (fragment is not null && ProcessFragment(fragment, length, declared, ref sawFragment) is { } result)
+                    return Finish(declared, result);
+                next = bytes[0];
+                offset += length;
+            }
+        }
+
+        private int Available(uint? declared) =>
+            (int)Math.Min((ulong)captured.Length, declared ?? (ulong)captured.Length);
+
+        private void Diagnose(IPv6DiagnosticCode code, int at, string message) =>
             (diagnostics ??= ImmutableArray.CreateBuilder<IPv6Diagnostic>()).Add(new(code, 40 + at, message));
 
-        IPv6Packet Finish(IPv6ExtensionResult result)
+        private IPv6Packet Finish(uint? declared, IPv6ExtensionResult result)
         {
-            var end = Available();
+            var end = Available(declared);
             IPv6Payload payload = declared is uint length
                 ? new IPv6Payload.KnownLength(length, captured[..end], captured[end..])
                 : new IPv6Payload.UndeterminedLength(captured);
@@ -31,49 +77,48 @@ internal static class IPv6ExtensionParser
                 diagnostics?.ToImmutable() ?? [], result));
         }
 
-        IPv6PayloadUnavailable? CheckLength(int required)
+        private IPv6UpperLayer ReadUpperLayer(uint declared, bool addressesKnown)
+        {
+            // Addresses belong only to a located upper layer; protocol and length are stored once.
+            IPv6ChecksumContext context = addressesKnown
+                ? new IPv6ChecksumContext.KnownAddresses(header.Source, header.Destination)
+                : new IPv6ChecksumContext.Unavailable();
+            return new(next, 40 + offset, declared - (uint)offset, captured[offset..Available(declared)], context);
+        }
+
+        private IPv6PayloadUnavailable UnsupportedHeader()
+        {
+            if (next == 50)
+                Diagnose(IPv6DiagnosticCode.EncryptedEsp, offset, "ESP encrypted content; upper layer unavailable");
+            else
+                Diagnose(IPv6DiagnosticCode.UnsupportedNextHeader, offset, $"unsupported Next Header {next}; upper layer unavailable");
+            return new(IPv6PayloadFailure.Unsupported);
+        }
+
+        private IPv6PayloadUnavailable? CheckLength(uint? declared, int required)
         {
             if (declared is uint length && (ulong)offset + (uint)required > length)
             {
                 Diagnose(IPv6DiagnosticCode.HeaderExceedsPayload, offset,
                     $"header {next} requires {required} bytes, declared remainder {length - (uint)offset}");
-                return new IPv6PayloadUnavailable(IPv6PayloadFailure.Invalid);
+                return new(IPv6PayloadFailure.Invalid);
             }
-            if (Available() - offset < required)
+            if (Available(declared) - offset < required)
             {
                 Diagnose(IPv6DiagnosticCode.HeaderTruncated, offset,
-                    $"header {next} requires {required} bytes, captured {Available() - offset}");
-                return new IPv6PayloadUnavailable(IPv6PayloadFailure.Truncated);
+                    $"header {next} requires {required} bytes, captured {Available(declared) - offset}");
+                return new(IPv6PayloadFailure.Truncated);
             }
             return null;
         }
 
-        while (true)
+        private IPv6PayloadUnavailable? CheckHeaderLength(uint? declared, out int length)
         {
-            if (next == 59)
-                return Finish(new IPv6NoNextHeader());
-            if (next is 6 or 17 or 58 or 4 or 41 or 132)
-            {
-                // Addresses belong only to a located upper layer; protocol and length are stored once.
-                IPv6ChecksumContext context = addressesKnown
-                    ? new IPv6ChecksumContext.KnownAddresses(header.Source, header.Destination)
-                    : new IPv6ChecksumContext.Unavailable();
-                return Finish(new IPv6UpperLayer(next, 40 + offset, declared!.Value - (uint)offset,
-                    captured[offset..Available()], context));
-            }
-            if (next is not (0 or 60 or 43 or 44 or 51))
-            {
-                if (next == 50)
-                    Diagnose(IPv6DiagnosticCode.EncryptedEsp, offset, "ESP encrypted content; upper layer unavailable");
-                else
-                    Diagnose(IPv6DiagnosticCode.UnsupportedNextHeader, offset, $"unsupported Next Header {next}; upper layer unavailable");
-                return Finish(new IPv6PayloadUnavailable(IPv6PayloadFailure.Unsupported));
-            }
-
-            if (CheckLength(next == 44 ? 8 : 2) is { } shortPrefix)
-                return Finish(shortPrefix);
+            length = 0;
+            if (CheckLength(declared, next == 44 ? 8 : 2) is { } shortPrefix)
+                return shortPrefix;
             var bytes = captured.Span[offset..];
-            var length = next switch
+            length = next switch
             {
                 44 => 8,
                 51 => (bytes[1] + 2) * 4,
@@ -82,81 +127,74 @@ internal static class IPv6ExtensionParser
             if (next == 51 && (length < 12 || length % 8 != 0))
             {
                 Diagnose(IPv6DiagnosticCode.InvalidHeaderLength, offset, $"AH length {length} must include 12 fixed bytes and be a multiple of 8");
-                return Finish(new IPv6PayloadUnavailable(IPv6PayloadFailure.Invalid));
+                return new(IPv6PayloadFailure.Invalid);
             }
-            if (CheckLength(length) is { } shortHeader)
-                return Finish(shortHeader);
+            return CheckLength(declared, length);
+        }
 
-            IPv6Fragment? fragment = null;
-            if (next == 44)
-            {
-                var bits = BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]);
-                fragment = new IPv6Fragment(
-                    Offset: (ushort)(bits >> 3),
-                    MoreFragments: (bits & 1) != 0,
-                    Identification: BinaryPrimitives.ReadUInt32BigEndian(bytes[4..]),
-                    NextHeader: bytes[0]);
-            }
-            headers.Add(new(next, bytes[0], 40 + offset, captured.Slice(offset, length), fragment));
+        private readonly IPv6Fragment? ReadFragment(ReadOnlySpan<byte> bytes)
+        {
+            if (next != 44)
+                return null;
+            var bits = BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]);
+            return new IPv6Fragment(
+                Offset: (ushort)(bits >> 3),
+                MoreFragments: (bits & 1) != 0,
+                Identification: BinaryPrimitives.ReadUInt32BigEndian(bytes[4..]),
+                NextHeader: bytes[0]);
+        }
 
-            if (next == 0 && offset != 0)
+        private IPv6PayloadUnavailable? CheckHopByHopPosition(int length)
+        {
+            if (next != 0 || offset == 0)
+                return null;
+            Diagnose(IPv6DiagnosticCode.InvalidHopByHopPosition, offset, "Hop-by-Hop must immediately follow the fixed header");
+            offset += length;
+            return new(IPv6PayloadFailure.Invalid);
+        }
+
+        private IPv6PayloadUnavailable? ProcessOptions(ReadOnlySpan<byte> bytes, ref uint? declared, ref bool addressesKnown)
+        {
+            var options = ReadOptions(bytes, next == 0 && offset == 0, header.PayloadLength);
+            if (options is OptionsResult.Invalid error)
             {
-                Diagnose(IPv6DiagnosticCode.InvalidHopByHopPosition, offset, "Hop-by-Hop must immediately follow the fixed header");
-                offset += length;
-                return Finish(new IPv6PayloadUnavailable(IPv6PayloadFailure.Invalid));
+                Diagnose(error.Code, offset + error.Offset, error.Message);
+                return new(IPv6PayloadFailure.Invalid);
             }
-            if (next is 0 or 60)
-            {
-                var options = ReadOptions(bytes[..length], next == 0 && offset == 0, header.PayloadLength);
-                if (options is OptionsResult.Invalid error)
-                {
-                    Diagnose(error.Code, offset + error.Offset, error.Message);
-                    offset += length;
-                    return Finish(new IPv6PayloadUnavailable(IPv6PayloadFailure.Invalid));
-                }
-                if (options.Value is OptionsResult.Regular { HasHomeAddress: true } or OptionsResult.Jumbo { HasHomeAddress: true })
-                {
-                    addressesKnown = false;
-                    Diagnose(IPv6DiagnosticCode.SourceAddressUnavailable, offset, "Home Address option semantics unsupported; checksum context unavailable");
-                }
-                if (declared is null)
-                {
-                    if (options is not OptionsResult.Jumbo jumbo)
-                    {
-                        Diagnose(IPv6DiagnosticCode.MissingJumboPayload, offset, "zero Payload Length with Hop-by-Hop requires a Jumbo Payload option");
-                        offset += length;
-                        return Finish(new IPv6PayloadUnavailable(IPv6PayloadFailure.Invalid));
-                    }
-                    declared = jumbo.Length;
-                }
-            }
-            if (next == 43 && bytes[3] != 0)
+            if (options.Value is OptionsResult.Regular { HasHomeAddress: true } or OptionsResult.Jumbo { HasHomeAddress: true })
             {
                 addressesKnown = false;
-                Diagnose(IPv6DiagnosticCode.FinalDestinationUnavailable, offset,
-                    $"Routing Type {bytes[2]}, Segments Left {bytes[3]}; final destination and checksum context unavailable");
+                Diagnose(IPv6DiagnosticCode.SourceAddressUnavailable, offset, "Home Address option semantics unsupported; checksum context unavailable");
             }
-            if (fragment is not null)
+            if (declared is null)
             {
-                if (declared > ushort.MaxValue || sawFragment)
+                if (options is not OptionsResult.Jumbo jumbo)
                 {
-                    if (sawFragment)
-                        Diagnose(IPv6DiagnosticCode.DuplicateFragment, offset, "duplicate Fragment header");
-                    else
-                        Diagnose(IPv6DiagnosticCode.JumboFragment, offset, "Jumbo Payload cannot be combined with a Fragment header");
-                    offset += length;
-                    return Finish(new IPv6PayloadUnavailable(IPv6PayloadFailure.Invalid));
+                    Diagnose(IPv6DiagnosticCode.MissingJumboPayload, offset, "zero Payload Length with Hop-by-Hop requires a Jumbo Payload option");
+                    return new(IPv6PayloadFailure.Invalid);
                 }
-                sawFragment = true;
-                if (!fragment.IsAtomic)
-                {
-                    Diagnose(IPv6DiagnosticCode.ReassemblyRequired, offset, "fragment requires reassembly; complete upper layer unavailable");
-                    offset += length;
-                    return Finish(new IPv6FragmentPayload(fragment, declared!.Value - (uint)offset, captured[offset..Available()]));
-                }
+                declared = jumbo.Length;
             }
-            next = bytes[0];
+            return null;
+        }
+
+        private IPv6ExtensionResult? ProcessFragment(IPv6Fragment fragment, int length, uint? declared, ref bool sawFragment)
+        {
+            if (declared > ushort.MaxValue || sawFragment)
+            {
+                if (sawFragment)
+                    Diagnose(IPv6DiagnosticCode.DuplicateFragment, offset, "duplicate Fragment header");
+                else
+                    Diagnose(IPv6DiagnosticCode.JumboFragment, offset, "Jumbo Payload cannot be combined with a Fragment header");
+                offset += length;
+                return new IPv6PayloadUnavailable(IPv6PayloadFailure.Invalid);
+            }
+            sawFragment = true;
+            if (fragment.IsAtomic)
+                return null;
+            Diagnose(IPv6DiagnosticCode.ReassemblyRequired, offset, "fragment requires reassembly; complete upper layer unavailable");
             offset += length;
+            return new IPv6FragmentPayload(fragment, declared!.Value - (uint)offset, captured[offset..Available(declared)]);
         }
     }
 

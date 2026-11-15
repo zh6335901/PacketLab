@@ -26,6 +26,22 @@ public sealed class IpReassemblyAnalyzer : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         var events = ImmutableArray.CreateBuilder<IpReassemblyEvent>();
+        ExpireAssociations(recordNumber, timestampNanoseconds, events);
+        if (decoding is not EthernetDecodeResult ethernet || ethernet is not DecodedEthernet frame ||
+            frame.Frame.EtherType is not (0x0800 or 0x86dd)) return events.ToImmutable();
+        if (!(frame.Payload is IPv4DecodeResult ipv4 && ipv4 is DecodedIPv4) &&
+            !(frame.Payload is IPv6DecodeResult ipv6 && ipv6 is DecodedIPv6)) return events.ToImmutable();
+        var ipBytes = frame.Frame.RemainingBytes;
+        if (DiscardAtRecordLimit(ipBytes, recordNumber, events))
+            return events.ToImmutable();
+        if (reassembler.Process(ipBytes) is { } update)
+            AssociateRecord(update, recordNumber, events);
+        return events.ToImmutable();
+    }
+
+    private void ExpireAssociations(long recordNumber, ulong? timestampNanoseconds,
+        ImmutableArray<IpReassemblyEvent>.Builder events)
+    {
         if (timestampNanoseconds is { } time)
         {
             foreach (var expired in reassembler.AdvanceTime(time))
@@ -37,11 +53,11 @@ public sealed class IpReassemblyAnalyzer : IDisposable
             if (reassembler.Expire(id) is { } expired)
                 EndAssociation(expired, IpReassemblyAnalysisReason.RecordAgeLimit, events);
         }
-        if (decoding is not EthernetDecodeResult ethernet || ethernet is not DecodedEthernet frame ||
-            frame.Frame.EtherType is not (0x0800 or 0x86dd)) return events.ToImmutable();
-        if (!(frame.Payload is IPv4DecodeResult ipv4 && ipv4 is DecodedIPv4) &&
-            !(frame.Payload is IPv6DecodeResult ipv6 && ipv6 is DecodedIPv6)) return events.ToImmutable();
-        var ipBytes = frame.Frame.RemainingBytes;
+    }
+
+    private bool DiscardAtRecordLimit(ReadOnlyMemory<byte> ipBytes, long recordNumber,
+        ImmutableArray<IpReassemblyEvent>.Builder events)
+    {
         if (reassembler.FindDatagram(ipBytes) is { } existing && associations.TryGetValue(existing, out var prior) &&
             prior.Pending && prior.Records.Count >= options.MaxRecordsPerDatagram)
         {
@@ -51,9 +67,14 @@ public sealed class IpReassemblyAnalyzer : IDisposable
             prior.Records.Clear();
             prior.Pending = false;
             prior.Reason = IpReassemblyAnalysisReason.RecordAssociationLimit;
-            return events.ToImmutable();
+            return true;
         }
-        if (reassembler.Process(ipBytes) is not { } update) return events.ToImmutable();
+        return false;
+    }
+
+    private void AssociateRecord(IpReassemblyUpdate update, long recordNumber,
+        ImmutableArray<IpReassemblyEvent>.Builder events)
+    {
         if (!associations.TryGetValue(update.DatagramId, out var state)) state = new(recordNumber);
         var records = state.Pending ? Append(state.Records, recordNumber) : [recordNumber];
         events.Add(new(state.FirstRecord, records, update, state.Reason));
@@ -68,7 +89,6 @@ public sealed class IpReassemblyAnalyzer : IDisposable
             }
             associations[update.DatagramId] = state;
         }
-        return events.ToImmutable();
     }
 
     public ImmutableArray<IpReassemblyEvent> Finish(IpReassemblyAnalysisReason reason)
