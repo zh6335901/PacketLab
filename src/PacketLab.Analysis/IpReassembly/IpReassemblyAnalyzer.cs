@@ -28,9 +28,11 @@ public sealed class IpReassemblyAnalyzer : IDisposable
         var events = ImmutableArray.CreateBuilder<IpReassemblyEvent>();
         ExpireAssociations(recordNumber, timestampNanoseconds, events);
         if (decoding is not EthernetDecodeResult ethernet || ethernet is not DecodedEthernet frame ||
-            frame.Frame.EtherType is not (0x0800 or 0x86dd)) return events.ToImmutable();
+            frame.Frame.EtherType is not (0x0800 or 0x86dd))
+            return events.ToImmutable();
         if (!(frame.Payload is IPv4DecodeResult ipv4 && ipv4 is DecodedIPv4) &&
-            !(frame.Payload is IPv6DecodeResult ipv6 && ipv6 is DecodedIPv6)) return events.ToImmutable();
+            !(frame.Payload is IPv6DecodeResult ipv6 && ipv6 is DecodedIPv6))
+            return events.ToImmutable();
         var ipBytes = frame.Frame.RemainingBytes;
         if (DiscardAtRecordLimit(ipBytes, recordNumber, events))
             return events.ToImmutable();
@@ -49,7 +51,8 @@ public sealed class IpReassemblyAnalyzer : IDisposable
         }
         foreach (var (id, association) in associations.ToArray())
         {
-            if (recordNumber - association.FirstRecord < options.MaxRecordAge) continue;
+            if (recordNumber - association.FirstRecord < options.MaxRecordAge)
+                continue;
             if (reassembler.Expire(id) is { } expired)
                 EndAssociation(expired, IpReassemblyAnalysisReason.RecordAgeLimit, events);
         }
@@ -75,7 +78,8 @@ public sealed class IpReassemblyAnalyzer : IDisposable
     private void AssociateRecord(IpReassemblyUpdate update, long recordNumber,
         ImmutableArray<IpReassemblyEvent>.Builder events)
     {
-        if (!associations.TryGetValue(update.DatagramId, out var state)) state = new(recordNumber);
+        if (!associations.TryGetValue(update.DatagramId, out var state))
+            state = new(recordNumber);
         var records = state.Pending ? Append(state.Records, recordNumber) : [recordNumber];
         events.Add(new(state.FirstRecord, records, update, state.Reason));
         if (!reassembler.IsRetained(update.DatagramId))
@@ -115,8 +119,10 @@ public sealed class IpReassemblyAnalyzer : IDisposable
     private void EndAssociation(IpReassemblyUpdate update, IpReassemblyAnalysisReason reason,
         ImmutableArray<IpReassemblyEvent>.Builder events)
     {
-        if (!associations.Remove(update.DatagramId, out var state)) return;
-        if (state.Pending) events.Add(new(state.FirstRecord, [.. state.Records], update, reason));
+        if (!associations.Remove(update.DatagramId, out var state))
+            return;
+        if (state.Pending)
+            events.Add(new(state.FirstRecord, [.. state.Records], update, reason));
     }
 
     private static ImmutableArray<long> Append(List<long> records, long record)

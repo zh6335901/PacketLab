@@ -35,7 +35,12 @@ internal static class IPv6ExtensionParser
 
                 var bytes = captured.Span.Slice(offset, length);
                 var fragment = ReadFragment(bytes);
-                headers.Add(new(next, bytes[0], 40 + offset, captured.Slice(offset, length), fragment));
+                headers.Add(new(
+                    Type: next,
+                    NextHeader: bytes[0],
+                    Offset: 40 + offset,
+                    Bytes: captured.Slice(offset, length),
+                    Fragment: fragment));
                 if (CheckHopByHopPosition(length) is { } positionFailure)
                     return Finish(declared, positionFailure);
                 if (next is 0 or 60)
@@ -73,8 +78,13 @@ internal static class IPv6ExtensionParser
                 : new IPv6Payload.UndeterminedLength(captured);
             if (declared is uint expected && captured.Length < expected)
                 Diagnose(IPv6DiagnosticCode.PayloadTruncated, end, $"payload declared {expected} bytes, captured {captured.Length}");
-            return new(header, payload, new(headers.ToImmutable(), 40 + offset, captured[offset..end],
-                diagnostics?.ToImmutable() ?? [], result));
+            var chain = new IPv6ExtensionChain(
+                Headers: headers.ToImmutable(),
+                RemainingOffset: 40 + offset,
+                RemainingBytes: captured[offset..end],
+                Diagnostics: diagnostics?.ToImmutable() ?? [],
+                Result: result);
+            return new(header, payload, chain);
         }
 
         private IPv6UpperLayer ReadUpperLayer(uint declared, bool addressesKnown)
@@ -83,7 +93,12 @@ internal static class IPv6ExtensionParser
             IPv6ChecksumContext context = addressesKnown
                 ? new IPv6ChecksumContext.KnownAddresses(header.Source, header.Destination)
                 : new IPv6ChecksumContext.Unavailable();
-            return new(next, 40 + offset, declared - (uint)offset, captured[offset..Available(declared)], context);
+            return new(
+                Protocol: next,
+                Offset: 40 + offset,
+                DeclaredLength: declared - (uint)offset,
+                Bytes: captured[offset..Available(declared)],
+                ChecksumContext: context);
         }
 
         private IPv6PayloadUnavailable UnsupportedHeader()
@@ -155,7 +170,8 @@ internal static class IPv6ExtensionParser
 
         private IPv6PayloadUnavailable? ProcessOptions(ReadOnlySpan<byte> bytes, ref uint? declared, ref bool addressesKnown)
         {
-            var options = ReadOptions(bytes, next == 0 && offset == 0, header.PayloadLength);
+            var firstHopByHop = next == 0 && offset == 0;
+            var options = ReadOptions(bytes, firstHopByHop, header.PayloadLength);
             if (options is OptionsResult.Invalid error)
             {
                 Diagnose(error.Code, offset + error.Offset, error.Message);

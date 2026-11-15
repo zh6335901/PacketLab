@@ -51,7 +51,8 @@ internal static class PacketSamples
         bytes[12] = (byte)(headerLength / 4 << 4);
         bytes[13] = 0x10;
         Write16(bytes, 14, 8192);
-        if (timestamp) Convert.FromHexString("0101080A0000000100000002").CopyTo(bytes, 20);
+        if (timestamp)
+            Convert.FromHexString("0101080A0000000100000002").CopyTo(bytes, 20);
         FillPayload(bytes.AsSpan(headerLength));
         Write16(bytes, 16, Checksum(bytes, IPv4AddressSum + 6 + (uint)bytes.Length));
         return bytes;
@@ -70,7 +71,8 @@ internal static class PacketSamples
         packet[9] = 17;
         IPv4Addresses.CopyTo(packet, 12);
         packet.AsSpan(20, optionBytes).Fill(1); // One-byte NOP options.
-        Write16(packet, 10, Checksum(packet.AsSpan(0, headerLength)));
+        var headerChecksum = Checksum(packet.AsSpan(0, headerLength));
+        Write16(packet, 10, headerChecksum);
         payload.CopyTo(packet.AsSpan(headerLength));
         return packet;
     }
@@ -126,7 +128,8 @@ internal static class PacketSamples
     private static ushort Checksum(ReadOnlySpan<byte> bytes, ulong initial = 0)
     {
         ulong sum = initial + SumWords(bytes);
-        while (sum > ushort.MaxValue) sum = (sum & 0xffff) + (sum >> 16);
+        while (sum > ushort.MaxValue)
+            sum = (sum & 0xffff) + (sum >> 16);
         return (ushort)~sum;
     }
 }

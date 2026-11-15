@@ -258,10 +258,14 @@ internal static class ProtocolFormatter
 
     private static int Bit(bool value) => value ? 1 : 0;
 
-    private static string HardwareAddress(ArpPacket arp, ReadOnlyMemory<byte> address) =>
-        arp.HardwareType == 1 && arp.HardwareAddressLength == 6
-            ? string.Join(":", address.ToArray().Select(value => value.ToString("X2")))
-            : Convert.ToHexString(address.Span);
+    private static string HardwareAddress(ArpPacket arp, ReadOnlyMemory<byte> address)
+    {
+        if (arp.HardwareType != 1 || arp.HardwareAddressLength != 6)
+            return Convert.ToHexString(address.Span);
+
+        var octets = address.ToArray().Select(value => value.ToString("X2"));
+        return string.Join(":", octets);
+    }
 
     private static string ProtocolAddress(ArpPacket arp, ReadOnlyMemory<byte> address) =>
         arp.ProtocolType == 0x0800 && arp.ProtocolAddressLength == 4

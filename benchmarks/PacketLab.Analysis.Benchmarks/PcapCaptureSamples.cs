@@ -27,7 +27,9 @@ internal static class PcapCaptureSamples
 
     private static MemoryStream Create(byte[] frame)
     {
-        using var bytes = new MemoryStream(24 + PacketCount * (16 + frame.Length));
+        var recordSize = 16 + frame.Length;
+        var captureSize = 24 + PacketCount * recordSize;
+        using var bytes = new MemoryStream(captureSize);
         using var writer = new BinaryWriter(bytes);
         writer.Write(0xa1b2c3d4u);
         writer.Write((ushort)2);

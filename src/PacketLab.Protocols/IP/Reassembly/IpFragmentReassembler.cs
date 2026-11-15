@@ -153,8 +153,8 @@ public sealed class IpFragmentReassembler : IDisposable
             return;
         }
         var packet = BuildPacket(fragment.Prefix, fragment, fragment.Bytes.Span);
-        events.Add(Event(state, IpReassemblyStatus.Atomic, "independent atomic fragment",
-            Decode(packet, fragment.Key.Version)));
+        var decodedPacket = Decode(packet, fragment.Key.Version);
+        events.Add(Event(state, IpReassemblyStatus.Atomic, "independent atomic fragment", decodedPacket));
     }
 
     private void AcceptFragment(Datagram state, Collecting buffer, Fragment fragment,
@@ -211,7 +211,8 @@ public sealed class IpFragmentReassembler : IDisposable
                 foreach (var part in buffer.Parts)
                     part.Bytes.CopyTo(payload, part.Offset);
                 var packet = BuildPacket(first, fragment, payload, (buffer.EcnCodepoints & 0b1000) != 0);
-                events.Add(Event(state, IpReassemblyStatus.Complete, "all fragment bytes captured", Decode(packet, fragment.Key.Version)));
+                var decodedPacket = Decode(packet, fragment.Key.Version);
+                events.Add(Event(state, IpReassemblyStatus.Complete, "all fragment bytes captured", decodedPacket));
                 Remove(fragment.Key, state);
                 return;
             }
@@ -458,7 +459,8 @@ public sealed class IpFragmentReassembler : IDisposable
             if (congestionExperienced)
                 ip[1] |= 3;
             BinaryPrimitives.WriteUInt16BigEndian(ip[2..], (ushort)ip.Length);
-            ip[6] = ip[7] = ip[10] = ip[11] = 0;
+            BinaryPrimitives.WriteUInt16BigEndian(ip[6..], 0);
+            BinaryPrimitives.WriteUInt16BigEndian(ip[10..], 0);
             uint sum = 0;
             for (var i = 0; i < prefix.Length; i += 2)
                 sum += BinaryPrimitives.ReadUInt16BigEndian(ip[i..]);
