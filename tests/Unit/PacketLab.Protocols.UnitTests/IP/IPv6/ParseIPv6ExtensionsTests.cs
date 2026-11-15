@@ -170,6 +170,23 @@ public class ParseIPv6ExtensionsTests
     }
 
     [Test]
+    public async Task Truncated_header_after_routing_preserves_diagnostic_order_and_remaining_bytes()
+    {
+        var packet = Parse(43, "3C00FE01000000001101", 24);
+        var chain = packet.Extensions;
+
+        await Assert.That(chain.Headers.Single().Type).IsEqualTo((byte)43);
+        await Assert.That(chain.RemainingOffset).IsEqualTo(48);
+        await Assert.That(Hex(chain.RemainingBytes)).IsEqualTo("1101");
+        await Assert.That(chain.Result is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Truncated }).IsTrue();
+        await Assert.That(chain.Diagnostics.Select(d => d.Code).SequenceEqual([
+            IPv6DiagnosticCode.FinalDestinationUnavailable,
+            IPv6DiagnosticCode.HeaderTruncated,
+            IPv6DiagnosticCode.PayloadTruncated])).IsTrue();
+        await Assert.That(chain.Diagnostics.Select(d => d.Offset).SequenceEqual([40, 48, 50])).IsTrue();
+    }
+
+    [Test]
     public async Task Incomplete_upper_payload_retains_pseudo_header_context_and_capture_diagnostic()
     {
         // Act
@@ -273,6 +290,8 @@ public class ParseIPv6ExtensionsTests
         await Assert.That(chain.Headers.Length).IsEqualTo(2);
         await Assert.That(chain.Diagnostics[0].Code).IsEqualTo(code);
         await Assert.That(chain.Result is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Invalid }).IsTrue();
+        await Assert.That(chain.RemainingOffset).IsEqualTo(56);
+        await Assert.That(chain.RemainingBytes.IsEmpty).IsTrue();
     }
 
     [Test]

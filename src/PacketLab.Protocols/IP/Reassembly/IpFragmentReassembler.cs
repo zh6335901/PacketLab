@@ -117,16 +117,7 @@ public sealed class IpFragmentReassembler : IDisposable
     {
         if (fragment.Atomic)
         {
-            var atomic = new Datagram(fragment, datagramId, clock);
-            var atomicFailure = Validate(fragment);
-            if (atomicFailure is { } invalid)
-                events.Add(Event(atomic, invalid.Status, invalid.Message));
-            else
-            {
-                var packet = BuildPacket(fragment.Prefix, fragment, fragment.Bytes.Span);
-                var decodedPacket = Decode(packet, fragment.Key.Version);
-                events.Add(Event(atomic, IpReassemblyStatus.Atomic, "independent atomic fragment", decodedPacket));
-            }
+            AcceptAtomic(fragment, datagramId, events);
             return;
         }
 
@@ -150,32 +141,31 @@ public sealed class IpFragmentReassembler : IDisposable
             return;
         }
         var buffer = state.Buffer is Collecting collecting ? collecting : throw new InvalidOperationException();
-        if (Validate(fragment) is { } failure)
+        AcceptFragment(state, buffer, fragment, events);
+    }
+
+    private void AcceptAtomic(Fragment fragment, long datagramId, ImmutableArray<IpReassemblyUpdate>.Builder events)
+    {
+        var state = new Datagram(fragment, datagramId, clock);
+        if (Validate(fragment) is { } invalid)
+        {
+            events.Add(Event(state, invalid.Status, invalid.Message));
+            return;
+        }
+        var packet = BuildPacket(fragment.Prefix, fragment, fragment.Bytes.Span);
+        var decodedPacket = Decode(packet, fragment.Key.Version);
+        events.Add(Event(state, IpReassemblyStatus.Atomic, "independent atomic fragment", decodedPacket));
+    }
+
+    private void AcceptFragment(Datagram state, Collecting buffer, Fragment fragment,
+        ImmutableArray<IpReassemblyUpdate>.Builder events)
+    {
+        if (ValidateForDatagram(state, buffer, fragment) is { } failure)
         {
             Fail(state, failure.Status, failure.Message, events);
             return;
         }
-        if (state.NextHeader != fragment.NextHeader || !Compatible(state, fragment))
-        {
-            Fail(state, IpReassemblyStatus.Conflict, "incompatible IP or extension header context", events);
-            return;
-        }
-        if (state.Version == 4)
-        {
-            // RFC 3168 §5.3: even duplicate fragments may carry a new CE marking.
-            buffer.EcnCodepoints |= 1 << (fragment.Prefix.Span[1] & 3);
-            if ((buffer.EcnCodepoints & 0b1001) == 0b1001)
-            {
-                Fail(state, IpReassemblyStatus.Conflict, "CE and Not-ECT fragments cannot be combined", events);
-                return;
-            }
-        }
         var end = fragment.Offset + fragment.Bytes.Length;
-        if (ConflictsWithFinalLength(buffer, end, fragment.More))
-        {
-            Fail(state, IpReassemblyStatus.Conflict, "inconsistent final fragment length", events);
-            return;
-        }
         foreach (var part in buffer.Parts)
         {
             if (part.Offset >= end || part.Offset + part.Bytes.Length <= fragment.Offset)
@@ -190,30 +180,17 @@ public sealed class IpFragmentReassembler : IDisposable
             return;
         }
 
-        if (buffer.Parts.Count >= options.MaxFragmentsPerDatagram)
+        if (BufferFragment(buffer, fragment, end) is { } limit)
         {
-            Fail(state, IpReassemblyStatus.ResourceLimit, "fragment count limit reached", events);
+            Fail(state, limit.Status, limit.Message, events);
             return;
         }
+        CompleteOrWait(state, buffer, fragment, events);
+    }
 
-        var prefixBytes = buffer.Context is null ? fragment.Prefix.Length : 0;
-        // Preserve the offset-zero header independently; it supplies the reconstructed IP context.
-        var firstBytes = fragment.Offset == 0 ? fragment.Prefix.Length : 0;
-        var needed = fragment.Bytes.Length + prefixBytes + firstBytes;
-        if (needed > options.MaxBufferedBytes - bufferedBytes)
-        {
-            Fail(state, IpReassemblyStatus.ResourceLimit, "buffered byte limit reached", events);
-            return;
-        }
-        buffer.Context ??= fragment.Prefix.ToArray();
-        if (fragment.Offset == 0)
-            buffer.First = new FirstHeader(fragment.Prefix.ToArray());
-        buffer.Parts.Add(new(fragment.Offset, fragment.More, fragment.Bytes.ToArray()));
-        buffer.PayloadBytes += fragment.Bytes.Length;
-        buffer.Bytes += needed;
-        bufferedBytes += needed;
-        if (!fragment.More)
-            buffer.Length = new FinalLength(end);
+    private void CompleteOrWait(Datagram state, Collecting buffer, Fragment fragment,
+        ImmutableArray<IpReassemblyUpdate>.Builder events)
+    {
         if (buffer.First is FirstHeader { Bytes: var first } && buffer.Length is FinalLength { Value: var total })
         {
             var ipLength = first.Length + total;
@@ -241,6 +218,49 @@ public sealed class IpFragmentReassembler : IDisposable
             }
         }
         events.Add(Event(state, IpReassemblyStatus.Pending, "waiting for contiguous fragments and final length"));
+    }
+
+    private (IpReassemblyStatus Status, string Message)? ValidateForDatagram(
+        Datagram state, Collecting buffer, Fragment fragment)
+    {
+        if (Validate(fragment) is { } failure)
+            return failure;
+        if (state.NextHeader != fragment.NextHeader || !Compatible(state, fragment))
+            return (IpReassemblyStatus.Conflict, "incompatible IP or extension header context");
+        if (state.Version == 4)
+        {
+            // RFC 3168 §5.3: even duplicate fragments may carry a new CE marking.
+            buffer.EcnCodepoints |= 1 << (fragment.Prefix.Span[1] & 3);
+            if ((buffer.EcnCodepoints & 0b1001) == 0b1001)
+                return (IpReassemblyStatus.Conflict, "CE and Not-ECT fragments cannot be combined");
+        }
+        var end = fragment.Offset + fragment.Bytes.Length;
+        if (ConflictsWithFinalLength(buffer, end, fragment.More))
+            return (IpReassemblyStatus.Conflict, "inconsistent final fragment length");
+        return null;
+    }
+
+    private (IpReassemblyStatus Status, string Message)? BufferFragment(Collecting buffer, Fragment fragment, int end)
+    {
+        if (buffer.Parts.Count >= options.MaxFragmentsPerDatagram)
+            return (IpReassemblyStatus.ResourceLimit, "fragment count limit reached");
+
+        var prefixBytes = buffer.Context is null ? fragment.Prefix.Length : 0;
+        // Preserve the offset-zero header independently; it supplies the reconstructed IP context.
+        var firstBytes = fragment.Offset == 0 ? fragment.Prefix.Length : 0;
+        var needed = fragment.Bytes.Length + prefixBytes + firstBytes;
+        if (needed > options.MaxBufferedBytes - bufferedBytes)
+            return (IpReassemblyStatus.ResourceLimit, "buffered byte limit reached");
+        buffer.Context ??= fragment.Prefix.ToArray();
+        if (fragment.Offset == 0)
+            buffer.First = new FirstHeader(fragment.Prefix.ToArray());
+        buffer.Parts.Add(new(fragment.Offset, fragment.More, fragment.Bytes.ToArray()));
+        buffer.PayloadBytes += fragment.Bytes.Length;
+        buffer.Bytes += needed;
+        bufferedBytes += needed;
+        if (!fragment.More)
+            buffer.Length = new FinalLength(end);
+        return null;
     }
 
     private static bool ConflictsWithFinalLength(Collecting buffer, int end, bool more)

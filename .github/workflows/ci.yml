@@ -41,6 +41,7 @@ jobs:
                 '^\.github/workflows/'
                 '^[^/]+\.(sln|slnx|slnf|props|targets|rsp)$'
                 '^(global\.json|nuget\.config|packages\.lock\.json)$'
+                '^(\.editorconfig|CodeMetricsConfig\.txt)$'
                 '^\.config/dotnet-tools\.json$'
               )
               $runTests = @($files | Where-Object { $_ -match ($patterns -join '|') }).Count -gt 0
