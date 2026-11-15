@@ -73,6 +73,39 @@ type Measurement = {
     Errors: string list
 }
 
+let timingErrors (raw: JsonNode) =
+    let values = field "Statistics" raw |> field "OriginalValues"
+    match values with
+    | :? JsonArray as samples when samples.Count >= 10 ->
+        let values = samples |> Seq.map (fun value -> value.GetValue<float>()) |> Seq.toArray
+        if values |> Array.exists (fun value -> not (Double.IsFinite(value)) || value <= 0.) then
+            ["Invalid timing samples"]
+        else
+            let mean = Array.average values
+            let variance = values |> Array.sumBy (fun value -> (value - mean) ** 2.)
+            let variation = sqrt (variance / float (values.Length - 1)) / mean
+            let half = values.Length / 2
+            let first = values[..half - 1] |> Array.average
+            let last = values[values.Length - half..] |> Array.average
+            let drift = abs (last / first - 1.)
+            let measurements = field "Measurements" raw
+            let durations =
+                match measurements with
+                | :? JsonArray as iterations ->
+                    iterations |> Seq.filter (fun iteration ->
+                        (field "IterationMode" iteration |> optionalString) = Some "Workload" &&
+                        (field "IterationStage" iteration |> optionalString) = Some "Actual")
+                    |> Seq.map (fun iteration -> (field "Nanoseconds" iteration).GetValue<float>()) |> Seq.toArray
+                | _ -> [||]
+            [ if variation > 0.10 then
+                  sprintf "Unstable timing: relative standard deviation %.1f%% exceeds 10%%" (variation * 100.)
+              if drift > 0.10 then
+                  sprintf "Unstable timing: first/last half means differ by %.1f%% (limit 10%%)" (drift * 100.)
+              if durations.Length = 0 then "Missing actual iteration durations"
+              elif durations |> Array.exists (fun ns -> not (Double.IsFinite(ns)) || ns < 100_000_000.) then
+                  "Unstable timing: actual iteration shorter than 100 ms" ]
+    | _ -> ["Fewer than 10 timing samples"]
+
 let readMeasurement (raw: JsonNode) failure =
     let stats = field "Statistics" raw
     let median =
@@ -87,7 +120,8 @@ let readMeasurement (raw: JsonNode) failure =
         | value -> Some (value.GetValue<int64>()) |> Option.filter ((<=) 0L)
     { Raw = raw; Median = median; Allocation = allocation
       Errors = [ if median.IsNone then defaultArg failure "Execution failed or timing samples missing"
-                 if allocation.IsNone then "Missing allocation measurement" ] }
+                 if allocation.IsNone then "Missing allocation measurement"
+                 yield! timingErrors raw ] }
 
 let executionErrors log =
     let mutable scenario = None
@@ -151,8 +185,10 @@ let runSide temp output project candidate affinity (name, revision) =
                 if not failedChild.HasExited then failedChild.Kill(true)
                 reraise()
         runProcess launch (Path.GetDirectoryName bench) (Some log) env "dotnet"
-            [target; "--filter"; "*"; "--inProcess"; "--iterationCount"; "12"; "--warmupCount"; "3"
-             "--iterationTime"; "250"; "--exporters"; "fulljson"; "--artifacts"; folder] |> ignore
+            // Short warmups can leave tiered JIT transitions inside the measured iterations.
+            [target; "--filter"; "*"; "--inProcess"; "--iterationCount"; "12"; "--warmupCount"; "20"
+             "--iterationTime"; "1000"; "--outliers"; "DontRemove"
+             "--exporters"; "fulljson"; "--artifacts"; folder] |> ignore
     with ex -> errors.Add(ex.Message)
     let failures = executionErrors log
     let mutable rows, environments = Map.empty, Set.empty
@@ -208,6 +244,8 @@ let report output project scenarios affinity baseline candidate compare =
     lines.Add($"- Benchmark source: {candidate.Sha} / {project}")
     lines.Add($"- Benchmark CPU policy: {BenchmarkAffinity.describe affinity}")
     lines.Add($"- ResultsComparer: {comparerRev}, threshold {threshold}, noise filter 0.3 ns")
+    lines.Add("- Measurement: runtime configuration unchanged, 20 warmups, 12 measured iterations, 1 s target per iteration; all samples retained.")
+    lines.Add("- Timing screen: at least 10 samples, relative standard deviation and first/last half drift at most 10%, actual iterations at least 100 ms. Rejected timings are inconclusive; passing this screen does not prove equivalence within 5%.")
     for side in [baseline; candidate] do
         lines.Add($"- {side.Name} product: {side.Sha} ([run log]({side.Name}/run.log))")
         for cpu in side.CpuModels do lines.Add($"  - CPU: {cpu}")
@@ -247,7 +285,7 @@ let report output project scenarios affinity baseline candidate compare =
         let allocation row = row |> Option.bind _.Allocation |> Option.map string |> Option.defaultValue "—"
         let change =
             match median left, median right with
-            | Some a, Some b -> sprintf "%+.2f%%" ((b / a - 1.) * 100.)
+            | Some a, Some b when diagnostics.Count = 0 -> sprintf "%+.2f%%" ((b / a - 1.) * 100.)
             | _ -> "—"
         let verdict =
             match left, right with
