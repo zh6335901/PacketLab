@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using PacketLab.Protocols.IP;
 
 namespace PacketLab.Protocols.Udp;
 
@@ -69,12 +70,6 @@ public static class UdpParser
         return new UdpDatagram(header, length, data[8..end], declaredLength - length, data[end..], checksum);
     }
 
-    private static UdpChecksumStatus Validate(ReadOnlySpan<byte> bytes, ulong sum)
-    {
-        for (var i = 0; i < bytes.Length; i += 2)
-            sum += i + 1 < bytes.Length ? BinaryPrimitives.ReadUInt16BigEndian(bytes[i..]) : (uint)bytes[i] << 8;
-        while (sum > ushort.MaxValue)
-            sum = (sum & 0xffff) + (sum >> 16);
-        return sum == ushort.MaxValue ? UdpChecksumStatus.Match : UdpChecksumStatus.Mismatch;
-    }
+    private static UdpChecksumStatus Validate(ReadOnlySpan<byte> bytes, ulong sum) =>
+        InternetChecksum.IsValid(bytes, sum) ? UdpChecksumStatus.Match : UdpChecksumStatus.Mismatch;
 }

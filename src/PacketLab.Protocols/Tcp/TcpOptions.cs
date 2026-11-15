@@ -39,6 +39,7 @@ internal static class TcpOptionParser
 {
     internal static TcpOptions Parse(ReadOnlyMemory<byte> data, int declaredLength)
     {
+        if (data.IsEmpty) return new(data, [], ReadOnlyMemory<byte>.Empty);
         var items = ImmutableArray.CreateBuilder<TcpOption>();
         for (var i = 0; i < data.Length;)
         {

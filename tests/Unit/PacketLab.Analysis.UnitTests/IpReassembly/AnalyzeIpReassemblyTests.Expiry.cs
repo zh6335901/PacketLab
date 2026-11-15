@@ -10,11 +10,20 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Time_expiry_uses_first_arrival_and_does_not_refresh_on_duplicates()
     {
+        // Arrange
         var first = Fragment(4, 0, true, Payload[..16]);
         using var stream = Capture(first, first, Fragment(4, 16, false, Payload[16..]));
-        SetSeconds(stream, 1, 100); SetSeconds(stream, 2, 159); SetSeconds(stream, 3, 160);
+        SetSeconds(stream, 1, 100);
+        SetSeconds(stream, 2, 159);
+        SetSeconds(stream, 3, 160);
         using var reader = Open(stream);
-        Read(reader); Read(reader); Read(reader);
+        Read(reader);
+        Read(reader);
+
+        // Act
+        Read(reader);
+
+        // Assert
         await Assert.That(reader.ReassemblyEvents.Select(x => x.Status).ToArray()).IsEquivalentTo(
             new[] { IpReassemblyStatus.Expired, IpReassemblyStatus.Pending });
         await Assert.That(reader.ReassemblyEvents[0].DatagramNumber).IsEqualTo(1L);
@@ -24,6 +33,7 @@ public partial class AnalyzeIpReassemblyTests
     public void Duplicate_arrivals_never_extend_the_original_deadline() =>
         Prop.ForAll((byte[] delays, ushort start) =>
         {
+            // Arrange
             var times = delays.Take(24).Select(t => t % 60).Append(59).Order().ToArray();
             var first = Fragment(4, 0, true, Payload[..16]);
             using var stream = Capture([first, .. Enumerable.Repeat(first, times.Length), Fragment(4, 16, false, Payload[16..])]);
@@ -32,12 +42,12 @@ public partial class AnalyzeIpReassemblyTests
             SetSeconds(stream, times.Length + 2, (uint)(start + 60));
             using var reader = Open(stream);
             Read(reader);
-            foreach (var _ in times)
-            {
-                Read(reader);
-                if (reader.ReassemblyEvents.Single().Status != IpReassemblyStatus.Duplicate) return false;
-            }
+            foreach (var _ in times) Read(reader);
+
+            // Act
             Read(reader);
+
+            // Assert
             return reader.ReassemblyEvents.Select(e => e.Status).SequenceEqual(new[] { IpReassemblyStatus.Expired, IpReassemblyStatus.Pending })
                 && reader.ReassemblyEvents[0].DatagramNumber == 1;
         }).Check(Config.QuickThrowOnFailure);
@@ -45,100 +55,162 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Record_age_expires_state_when_capture_time_is_not_advancing()
     {
+        // Arrange
         using var stream = Capture(Fragment(4, 0, true, Payload[..16]), new byte[14], Fragment(4, 16, false, Payload[16..]));
         using var reader = Open(stream, new(maxRecordAge: 2));
-        Read(reader); Read(reader); Read(reader);
+        Read(reader);
+        Read(reader);
+
+        // Act
+        Read(reader);
+
+        // Assert
         await Assert.That(reader.ReassemblyEvents[0].Status).IsEqualTo(IpReassemblyStatus.Expired);
         await Assert.That(reader.ReassemblyEvents[1].Status).IsEqualTo(IpReassemblyStatus.Pending);
     }
 
     [Test]
-    public async Task Nanosecond_capture_timeout_uses_the_fractional_boundary()
+    [Arguments(0u, IpReassemblyStatus.Duplicate)]
+    [Arguments(1u, IpReassemblyStatus.Expired)]
+    public async Task Nanosecond_capture_timeout_uses_the_fractional_boundary(uint fraction, IpReassemblyStatus expected)
     {
+        // Arrange
         var first = Fragment(6, 0, true, Payload[..16]);
-        using var stream = Capture(first, first, Fragment(6, 16, false, Payload[16..]));
+        using var stream = Capture(first, first);
         var bytes = stream.GetBuffer();
         BinaryPrimitives.WriteUInt32LittleEndian(bytes, 0xa1b23c4d);
-        SetSeconds(stream, 1, 1); SetSeconds(stream, 2, 61); SetSeconds(stream, 3, 61);
+        SetSeconds(stream, 1, 1);
+        SetSeconds(stream, 2, 61);
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(28), 1);
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(24 + (16 + first.Length) * 2 + 4), 1);
-        using var reader = Open(stream); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Duplicate);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(24 + 16 + first.Length + 4), fraction);
+        using var reader = Open(stream);
         Read(reader);
-        await Assert.That(reader.ReassemblyEvents[0].Status).IsEqualTo(IpReassemblyStatus.Expired);
+
+        // Act
+        Read(reader);
+
+        // Assert
+        await Assert.That(reader.ReassemblyEvents[0].Status).IsEqualTo(expected);
     }
 
     [Test]
     public async Task Microsecond_capture_fraction_is_used_for_expiry()
     {
+        // Arrange
         var first = Fragment(4, 0, true, Payload[..16]);
         using var stream = Capture(first, Fragment(4, 16, false, Payload[16..]));
-        SetSeconds(stream, 1, 1); SetSeconds(stream, 2, 61);
+        SetSeconds(stream, 1, 1);
+        SetSeconds(stream, 2, 61);
         BinaryPrimitives.WriteUInt32LittleEndian(stream.GetBuffer().AsSpan(28), 1);
-        using var reader = Open(stream); Read(reader); Read(reader);
+        using var reader = Open(stream);
+        Read(reader);
+
+        // Act
+        Read(reader);
+
+        // Assert
         await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Complete);
     }
 
     [Test]
     public async Task Nanosecond_fractions_are_not_scaled_as_microseconds()
     {
+        // Arrange
         var first = Fragment(6, 0, true, Payload[..16]);
         using var stream = Capture(first, Fragment(6, 16, false, Payload[16..]));
-        var bytes = stream.GetBuffer(); BinaryPrimitives.WriteUInt32LittleEndian(bytes, 0xa1b23c4d);
-        SetSeconds(stream, 1, 1); SetSeconds(stream, 2, 61);
+        var bytes = stream.GetBuffer();
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes, 0xa1b23c4d);
+        SetSeconds(stream, 1, 1);
+        SetSeconds(stream, 2, 61);
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(28), 500_000_000);
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(24 + 16 + first.Length + 4), 500_000_000);
-        using var reader = Open(stream); Read(reader); Read(reader);
+        using var reader = Open(stream);
+        Read(reader);
+
+        // Act
+        Read(reader);
+
+        // Assert
         await Assert.That(reader.ReassemblyEvents[0].Status).IsEqualTo(IpReassemblyStatus.Expired);
     }
 
     [Test]
     public async Task Clock_moving_from_100_seconds_back_to_1_keeps_fragments_alive()
     {
-        await Assert.That(StatusAfterClockMovesBack(100, 1)).IsEqualTo(IpReassemblyStatus.Complete);
+        // Act
+        var result = StatusAfterClockMovesBack(100, 1);
+
+        // Assert
+        await Assert.That(result).IsEqualTo(IpReassemblyStatus.Complete);
     }
 
     [Test]
     public void Reordered_timestamps_never_underflow_the_expiry_clock() =>
         Prop.ForAll((DoNotSize<uint> first, DoNotSize<uint> decrease) =>
         {
+            // Arrange
             uint high = Math.Max(1u, first.Item);
             uint low = high - 1 - decrease.Item % high;
-            return StatusAfterClockMovesBack(high, low) == IpReassemblyStatus.Complete;
+
+            // Act
+            var result = StatusAfterClockMovesBack(high, low);
+
+            // Assert
+            return result == IpReassemblyStatus.Complete;
         }).Check(Config.QuickThrowOnFailure);
 
     private static IpReassemblyStatus StatusAfterClockMovesBack(uint first, uint second)
     {
+        // Arrange
         using var stream = Capture(Fragment(4, 0, true, Payload[..16]), Fragment(4, 16, false, Payload[16..]));
         SetSeconds(stream, 1, first);
         SetSeconds(stream, 2, second);
         using var reader = Open(stream);
         Read(reader);
+
+        // Act
         Read(reader);
+
+        // Assert
         return reader.ReassemblyEvents.Single().Status;
     }
 
     [Test]
     public async Task Invalid_timestamp_fraction_does_not_expire_other_datagrams()
     {
+        // Arrange
         using var stream = Capture(Fragment(4, 0, true, Payload[..16]), Fragment(4, 16, false, Payload[16..]));
         SetSeconds(stream, 2, 100);
         BinaryPrimitives.WriteUInt32LittleEndian(stream.GetBuffer().AsSpan(24 + 16 + 50 + 4), 1_000_000);
-        using var reader = Open(stream); Read(reader); Read(reader);
+        using var reader = Open(stream);
+        Read(reader);
+
+        // Act
+        Read(reader);
+
+        // Assert
         await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Complete);
     }
 
     [Test]
-    public async Task Tombstones_bound_the_table_and_expire_before_accepting_a_new_identity()
+    [Arguments(2, IpReassemblyStatus.ResourceLimit)]
+    [Arguments(4, IpReassemblyStatus.Complete)]
+    public async Task Tombstones_bound_the_table_until_their_deadline(int preceding, IpReassemblyStatus expected)
     {
+        // Arrange
         var first = Fragment(4, 0, true, Payload[..16]);
         using var stream = Capture(first, Fragment(4, 8, true, Payload[8..]), Fragment(4, 16, false, Payload[16..], 2),
             Fragment(4, 0, true, Payload[..16], 2), Fragment(4, 16, false, Payload[16..], 2));
-        SetSeconds(stream, 4, 61); SetSeconds(stream, 5, 61);
-        using var reader = Open(stream, new(reassembly: new(maxDatagrams: 1))); Read(reader); Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.ResourceLimit);
-        Read(reader); Read(reader);
-        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Complete);
+        SetSeconds(stream, 4, 61);
+        SetSeconds(stream, 5, 61);
+        using var reader = Open(stream, new(reassembly: new(maxDatagrams: 1)));
+        for (int i = 0; i < preceding; i++) Read(reader);
+
+        // Act
+        Read(reader);
+
+        // Assert
+        await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(expected);
     }
 
     private static void SetSeconds(MemoryStream stream, int record, uint seconds)

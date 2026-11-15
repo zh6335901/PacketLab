@@ -12,16 +12,18 @@ namespace PacketLab.Analysis.IntegrationTests;
 
 public class AnalyzeIPv6CaptureTests
 {
-#pragma warning disable PL0003 // Verify the ordered results of one complete reference capture.
     [Test]
     [Arguments("ipv6-little", PcapByteOrder.LittleEndian)]
     [Arguments("ipv6-big", PcapByteOrder.BigEndian)]
     public async Task Analysis_matches_expected_ipv6_file_records(string sample, PcapByteOrder byteOrder)
     {
+        // Arrange
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
         var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened
             : throw new InvalidOperationException($"Expected an analysis reader for {sample}.");
-        await Assert.That(reader.Header.ByteOrder).IsEqualTo(byteOrder);
+        var snapshots = new List<RecordSnapshot>();
+
+        // Act
         foreach (var expected in ExpectedRecords)
         {
             var context = $"{sample}, record {expected.RecordNumber}";
@@ -32,28 +34,34 @@ public class AnalyzeIPv6CaptureTests
             var actual = new RecordSnapshot(analyzed.RecordNumber, analyzed.Packet.CapturedLength, analyzed.Packet.OriginalLength,
                 decoding.Frame.Source.ToString(), decoding.Frame.Destination.ToString(), decoding.Frame.EtherType,
                 Snapshot(decoding.Payload is IPv6DecodeResult ip ? ip : throw new InvalidOperationException()));
-            await Assert.That(actual).IsEqualTo(expected).Because($"the output must match {context}");
+            snapshots.Add(actual);
         }
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
-    }
-#pragma warning restore PL0003
+        var terminal = reader.ReadNext();
 
-#pragma warning disable PL0003 // Verify extension-chain results and continued reading within one capture.
+        // Assert
+        await Assert.That(reader.Header.ByteOrder).IsEqualTo(byteOrder);
+        await Assert.That(snapshots.SequenceEqual(ExpectedRecords)).IsTrue();
+        await Assert.That(terminal is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
+    }
+
     [Test]
     [Arguments("little", PcapByteOrder.LittleEndian)]
     [Arguments("big", PcapByteOrder.BigEndian)]
     public async Task Extension_chains_and_failures_survive_pcap_analysis_and_continue_to_last_record(string order, PcapByteOrder expectedOrder)
     {
+        // Arrange
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", $"ipv6-extensions-{order}.pcap"));
         var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened
             : throw new InvalidOperationException("Expected PCAP reader.");
-        await Assert.That(reader.Header.ByteOrder).IsEqualTo(expectedOrder);
+        var snapshots = new List<ExtensionSnapshot>();
+        var packets = new List<AnalyzedPacket>();
+
+        // Act
         for (var i = 0; i < ExpectedExtensionRecords.Length; i++)
         {
             var record = reader.ReadNext() is AnalyzedPacket analyzed ? analyzed
                 : throw new InvalidOperationException($"Expected record {i + 1}.");
-            await Assert.That(record.RecordNumber).IsEqualTo(i + 1L);
-            await Assert.That(record.Packet.OriginalLength).IsEqualTo(70000u);
+            packets.Add(record);
             var frame = record.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet decoded
                 ? decoded : throw new InvalidOperationException("Expected Ethernet frame.");
             var ip = frame.Payload is IPv6DecodeResult result && result is DecodedIPv6 parsed
@@ -72,11 +80,17 @@ public class AnalyzeIPv6CaptureTests
                 string.Join(",", ip.Extensions.Select(h => $"{h.Type}@{h.Offset}+{h.Length}>{h.NextHeader}:{Convert.ToHexString(h.Bytes.Span)}")),
                 ip.RemainingOffset, Convert.ToHexString(ip.RemainingBytes.Span), ip.CanBuildChecksumContext,
                 string.Join(",", ip.Diagnostics.Select(d => $"{d.Code}@{d.Offset}")));
-            await Assert.That(actual).IsEqualTo(ExpectedExtensionRecords[i]).Because($"record {i + 1} must match independently specified wire fields");
+            snapshots.Add(actual);
         }
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
+        var terminal = reader.ReadNext();
+
+        // Assert
+        await Assert.That(reader.Header.ByteOrder).IsEqualTo(expectedOrder);
+        await Assert.That(packets.Select(p => p.RecordNumber).SequenceEqual(Enumerable.Range(1, packets.Count).Select(i => (long)i))).IsTrue();
+        await Assert.That(packets.All(p => p.Packet.OriginalLength == 70000u)).IsTrue();
+        await Assert.That(snapshots.SequenceEqual(ExpectedExtensionRecords)).IsTrue();
+        await Assert.That(terminal is PcapEndOfFile).IsTrue();
     }
-#pragma warning restore PL0003
 
     private sealed record RecordSnapshot(long RecordNumber, uint CapturedLength, uint OriginalLength,
         string Source, string Destination, ushort EtherType, IPv6Snapshot IPv6);

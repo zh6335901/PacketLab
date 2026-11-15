@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Runtime.Intrinsics;
 
 namespace PacketLab.Protocols.IP.IPv4;
 
@@ -77,6 +78,21 @@ public static class IPv4Parser
     private static IPv4ChecksumStatus Checksum(ReadOnlySpan<byte> header)
     {
         uint sum = 0;
+        if (Vector128.IsHardwareAccelerated)
+        {
+            var lanes = Vector128<uint>.Zero;
+            while (header.Length >= 16)
+            {
+                var words = Vector128.Create(header).AsUInt32();
+                lanes += (words & Vector128.Create(0xffffu)) + (words >> 16);
+                header = header[16..];
+            }
+            // IPv4 headers are at most 60 bytes, so the lane and horizontal sums fit in uint.
+            sum = Vector128.Sum(lanes);
+            sum = (sum & 0xffff) + (sum >> 16);
+            sum = (sum & 0xffff) + (sum >> 16);
+            if (BitConverter.IsLittleEndian) sum = BinaryPrimitives.ReverseEndianness((ushort)sum);
+        }
         for (var offset = 0; offset < header.Length; offset += 2)
             sum += BinaryPrimitives.ReadUInt16BigEndian(header[offset..]);
         while (sum > ushort.MaxValue)

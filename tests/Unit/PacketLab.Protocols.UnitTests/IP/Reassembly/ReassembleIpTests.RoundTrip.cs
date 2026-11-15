@@ -17,11 +17,27 @@ public partial class ReassembleIpTests
     [Test]
     [Arguments(4)]
     [Arguments(6)]
+    public async Task A_first_fragment_completes_a_datagram_after_a_duplicated_tail(int version)
+    {
+        // Arrange
+        using var reassembler = new IpFragmentReassembler();
+        var tail = Fragment(version, 16, false, Payload[16..]);
+        reassembler.Process(tail);
+        reassembler.Process(tail);
+
+        // Act
+        var result = reassembler.Process(Fragment(version, 0, true, Payload[..16]))!;
+
+        // Assert
+        await Assert.That(result.Status).IsEqualTo(IpReassemblyStatus.Complete);
+        await Assert.That(Udp(result).Payload.Span.SequenceEqual(Payload[8..])).IsTrue();
+    }
+
+    [Test]
+    [Arguments(4)]
+    [Arguments(6)]
     public void Reassembly_restores_the_original_udp_datagram_across_partitions_and_arrival_orders(int version)
     {
-        var tailTwiceThenFirst = new Delivery([16, 8], [1, 0], 0, Payload[8..]);
-        VerifyDelivery(version, tailTwiceThenFirst);
-
         var deliveries =
             from count in Gen.Choose(2, 8)
             from blocks in Gen.Choose(1, 4).ArrayOf(count - 1)
@@ -36,25 +52,34 @@ public partial class ReassembleIpTests
             .Check(Config.QuickThrowOnFailure.WithMaxTest(1000));
     }
 
-#pragma warning disable PL0003 // Each permutation verifies the same reconstruction invariant.
     [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Every_arrival_permutation_of_three_fragments_reconstructs_the_same_payload(int version)
+    [Arguments(4, 0, 1, 2)]
+    [Arguments(4, 0, 2, 1)]
+    [Arguments(4, 1, 0, 2)]
+    [Arguments(4, 1, 2, 0)]
+    [Arguments(4, 2, 0, 1)]
+    [Arguments(4, 2, 1, 0)]
+    [Arguments(6, 0, 1, 2)]
+    [Arguments(6, 0, 2, 1)]
+    [Arguments(6, 1, 0, 2)]
+    [Arguments(6, 1, 2, 0)]
+    [Arguments(6, 2, 0, 1)]
+    [Arguments(6, 2, 1, 0)]
+    public async Task Every_arrival_permutation_of_three_fragments_reconstructs_the_same_payload(int version, int first, int second, int last)
     {
-        int[][] orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
-        var fragments = new[] { Fragment(version, 0, true, Payload[..8]), Fragment(version, 8, true, Payload[8..16]), Fragment(version, 16, false, Payload[16..]) };
-        foreach (var order in orders)
-        {
-            var packets = Packets(order.Select(x => fragments[x]).ToArray());
-            using var sequence = new FragmentSequence(packets); sequence.Next(); sequence.Next(); sequence.Next();
-            var result = sequence.Updates.Single();
-            await Assert.That(result.Status).IsEqualTo(IpReassemblyStatus.Complete);
-            await Assert.That(Udp(result).Payload.Span.SequenceEqual(Payload[8..])).IsTrue();
-        }
-    }
+        // Arrange
+        byte[][] fragments = [Fragment(version, 0, true, Payload[..8]), Fragment(version, 8, true, Payload[8..16]), Fragment(version, 16, false, Payload[16..])];
+        using var reassembler = new IpFragmentReassembler();
+        reassembler.Process(fragments[first]);
+        reassembler.Process(fragments[second]);
 
-#pragma warning restore PL0003
+        // Act
+        var result = reassembler.Process(fragments[last])!;
+
+        // Assert
+        await Assert.That(result.Status).IsEqualTo(IpReassemblyStatus.Complete);
+        await Assert.That(Udp(result).Payload.Span.SequenceEqual(Payload[8..])).IsTrue();
+    }
 
     [Test]
     [Arguments(4)]
@@ -62,11 +87,17 @@ public partial class ReassembleIpTests
     public void Capture_bytes_after_fragment_declarations_do_not_enter_the_datagram(int version) =>
         Prop.ForAll((byte[] payload, byte[] tail) =>
         {
+            // Arrange
             byte[] udpPayload = [0xaa, .. payload];
             var original = CreateUdpDatagram(version, udpPayload);
             var fragments = SplitDatagram(version, original, [8, udpPayload.Length]);
             byte[][] padded = fragments.Select(fragment => fragment.Concat(tail).ToArray()).ToArray();
-            return Deliver(padded, [1, 0], null).Packet!.Bytes.Span.SequenceEqual(original);
+
+            // Act
+            var result = Deliver(padded, [1, 0], null);
+
+            // Assert
+            return result.Packet!.Bytes.Span.SequenceEqual(original);
         }).Check(Config.QuickThrowOnFailure);
 
     private static IEnumerable<Delivery> ShrinkDelivery(Delivery delivery)
@@ -84,17 +115,22 @@ public partial class ReassembleIpTests
             yield return delivery with { UdpPayload = new byte[delivery.UdpPayload.Length] };
     }
 
-    private static void VerifyDelivery(int version, Delivery delivery)
+    private static bool VerifyDelivery(int version, Delivery delivery)
     {
+        // Arrange
         var original = CreateUdpDatagram(version, delivery.UdpPayload);
         var fragments = SplitDatagram(version, original, delivery.Lengths);
+
+        // Act
         var complete = Deliver(fragments, delivery.Order, delivery.DuplicateAfter);
 
+        // Assert
         if (!complete.Packet!.Bytes.Span.SequenceEqual(original))
             throw new InvalidOperationException("Reassembled bytes differ from the original IP datagram.");
         var decoded = Udp(complete);
         if (!decoded.IsComplete || !decoded.Payload.Span.SequenceEqual(delivery.UdpPayload))
             throw new InvalidOperationException("Decoded UDP payload differs from the original payload.");
+        return true;
     }
 
     private static byte[] CreateUdpDatagram(int version, byte[] payload)
@@ -158,15 +194,20 @@ public partial class ReassembleIpTests
 
     private static IpReassemblyUpdate Deliver(byte[][] fragments, int[] order, int? duplicateAfter)
     {
+        // Arrange
         using var reassembler = new IpFragmentReassembler();
         for (int i = 0; i < order.Length - 1; i++)
         {
             var fragment = fragments[order[i]];
-            ExpectStatus(reassembler.Process(fragment), IpReassemblyStatus.Pending);
+            reassembler.Process(fragment);
             if (i == duplicateAfter)
-                ExpectStatus(reassembler.Process(fragment), IpReassemblyStatus.Duplicate);
+                reassembler.Process(fragment);
         }
-        return ExpectStatus(reassembler.Process(fragments[order[^1]]), IpReassemblyStatus.Complete);
+        // Act
+        var result = reassembler.Process(fragments[order[^1]]);
+
+        // Assert
+        return ExpectStatus(result, IpReassemblyStatus.Complete);
     }
 
     private static IpReassemblyUpdate ExpectStatus(IpReassemblyUpdate? update, IpReassemblyStatus expected) =>

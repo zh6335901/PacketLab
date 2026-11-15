@@ -9,14 +9,15 @@ internal static class IPv6ExtensionParser
     {
         uint? declared = header.PayloadLength == 0 && header.NextHeader == 0 ? null : header.PayloadLength;
         var headers = ImmutableArray.CreateBuilder<IPv6ExtensionHeader>();
-        var diagnostics = ImmutableArray.CreateBuilder<IPv6Diagnostic>();
+        ImmutableArray<IPv6Diagnostic>.Builder? diagnostics = null;
         var offset = 0;
         var next = header.NextHeader;
         var addressesKnown = true;
         var sawFragment = false;
 
         int Available() => (int)Math.Min((ulong)captured.Length, declared ?? (ulong)captured.Length);
-        void Diagnose(IPv6DiagnosticCode code, int at, string message) => diagnostics.Add(new(code, 40 + at, message));
+        void Diagnose(IPv6DiagnosticCode code, int at, string message) =>
+            (diagnostics ??= ImmutableArray.CreateBuilder<IPv6Diagnostic>()).Add(new(code, 40 + at, message));
 
         IPv6Packet Finish(IPv6ExtensionResult result)
         {
@@ -27,7 +28,7 @@ internal static class IPv6ExtensionParser
             if (declared is uint expected && captured.Length < expected)
                 Diagnose(IPv6DiagnosticCode.PayloadTruncated, end, $"payload declared {expected} bytes, captured {captured.Length}");
             return new(header, payload, new(headers.ToImmutable(), 40 + offset, captured[offset..end],
-                diagnostics.ToImmutable(), result));
+                diagnostics?.ToImmutable() ?? [], result));
         }
 
         IPv6PayloadUnavailable? CheckLength(int required)

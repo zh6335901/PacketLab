@@ -9,16 +9,18 @@ namespace PacketLab.Analysis.IntegrationTests;
 
 public class AnalyzeEthernetCaptureTests
 {
-#pragma warning disable PL0003 // Verify the ordered results of one complete reference capture.
     [Test]
     [Arguments("ethernet-little", PcapByteOrder.LittleEndian)]
     [Arguments("ethernet-big", PcapByteOrder.BigEndian)]
     public async Task Analysis_matches_expected_ethernet_file_records(string sample, PcapByteOrder byteOrder)
     {
+        // Arrange
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
         var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened
             : throw new InvalidOperationException($"Expected an analysis reader for {sample}.");
-        await Assert.That(reader.Header.ByteOrder).IsEqualTo(byteOrder);
+        var snapshots = new List<RecordSnapshot>();
+
+        // Act
         foreach (var expected in ExpectedRecords)
         {
             var context = $"{sample}, record {expected.RecordNumber}";
@@ -26,11 +28,15 @@ public class AnalyzeEthernetCaptureTests
                 : throw new InvalidOperationException($"Expected {context}.");
             var actual = new RecordSnapshot(packet.RecordNumber, packet.Packet.Timestamp, packet.Packet.CapturedLength,
                 packet.Packet.OriginalLength, Hex(packet.Packet.Data), Snapshot(packet.Decoding));
-            await Assert.That(actual).IsEqualTo(expected).Because($"the output must match {context}");
+            snapshots.Add(actual);
         }
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
+        var terminal = reader.ReadNext();
+
+        // Assert
+        await Assert.That(reader.Header.ByteOrder).IsEqualTo(byteOrder);
+        await Assert.That(snapshots.SequenceEqual(ExpectedRecords)).IsTrue();
+        await Assert.That(terminal is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
     }
-#pragma warning restore PL0003
 
     private sealed record RecordSnapshot(long RecordNumber, PcapTimestamp Timestamp, uint CapturedLength, uint OriginalLength,
         string Bytes, EthernetSnapshot Ethernet);

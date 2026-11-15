@@ -9,15 +9,17 @@ namespace PacketLab.Analysis.IntegrationTests;
 
 public class AnalyzeIPv4CaptureTests
 {
-#pragma warning disable PL0003 // Verify the ordered results of one complete reference capture.
     [Test]
     public async Task Analysis_matches_expected_ipv4_file_records()
     {
+        // Arrange
         const string sample = "ipv4-mixed";
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
         var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened
             : throw new InvalidOperationException($"Expected an analysis reader for {sample}.");
-        await Assert.That(reader.Header.ByteOrder).IsEqualTo(PcapByteOrder.LittleEndian);
+        var snapshots = new List<RecordSnapshot>();
+
+        // Act
         foreach (var expected in ExpectedRecords)
         {
             var context = $"{sample}, record {expected.RecordNumber}";
@@ -28,11 +30,15 @@ public class AnalyzeIPv4CaptureTests
             var actual = new RecordSnapshot(packet.RecordNumber, packet.Packet.CapturedLength, packet.Packet.OriginalLength,
                 decoding.Frame.Source.ToString(), decoding.Frame.Destination.ToString(), decoding.Frame.EtherType,
                 Snapshot(decoding.Payload is IPv4DecodeResult ip ? ip : throw new InvalidOperationException()));
-            await Assert.That(actual).IsEqualTo(expected).Because($"the output must match {context}");
+            snapshots.Add(actual);
         }
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
+        var terminal = reader.ReadNext();
+
+        // Assert
+        await Assert.That(reader.Header.ByteOrder).IsEqualTo(PcapByteOrder.LittleEndian);
+        await Assert.That(snapshots.SequenceEqual(ExpectedRecords)).IsTrue();
+        await Assert.That(terminal is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
     }
-#pragma warning restore PL0003
 
     private sealed record RecordSnapshot(long RecordNumber, uint CapturedLength, uint OriginalLength,
         string Source, string Destination, ushort EtherType, IPv4Snapshot IPv4);

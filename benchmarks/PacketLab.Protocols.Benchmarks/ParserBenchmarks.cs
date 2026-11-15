@@ -36,14 +36,14 @@ public class IPv4ParserBenchmarks
 {
     private ReadOnlyMemory<byte> packet;
 
-    [Params(20, 32)]
+    [Params(20, 32, 60)]
     public int HeaderLength { get; set; }
 
     [GlobalSetup]
     public void Prepare()
     {
         var udp = PacketSamples.Udp(32, true, PacketSamples.IPv4AddressSum);
-        packet = PacketSamples.IPv4(udp, options: HeaderLength == 32);
+        packet = PacketSamples.IPv4(udp, optionBytes: HeaderLength - 20);
         if (Parse() is not IPv4Packet { ChecksumStatus: IPv4ChecksumStatus.Match } parsed ||
             parsed.Header.HeaderLength != HeaderLength || !parsed.Payload.Span.SequenceEqual(udp))
             throw new InvalidDataException("Unexpected IPv4 header or payload.");
@@ -81,8 +81,10 @@ public class IPv6ParserBenchmarks
 public class UdpParserBenchmarks
 {
     private ReadOnlyMemory<byte> datagram;
+    private bool ipv6;
+    private ulong addressSum;
 
-    [Params(32, 1400)]
+    [Params(0, 32, 64, 256, 1400, 9000, 200008)]
     public int PayloadLength { get; set; }
 
     [Params(false, true)]
@@ -91,8 +93,11 @@ public class UdpParserBenchmarks
     [GlobalSetup]
     public void Prepare()
     {
-        datagram = PacketSamples.Udp(PayloadLength, WithChecksum, PacketSamples.IPv4AddressSum);
-        var expected = WithChecksum ? UdpChecksumStatus.Match : UdpChecksumStatus.NotPresent;
+        ipv6 = PayloadLength + 8 > ushort.MaxValue;
+        addressSum = ipv6 ? PacketSamples.IPv6AddressSum : PacketSamples.IPv4AddressSum;
+        datagram = PacketSamples.Udp(PayloadLength, WithChecksum, addressSum, ipv6);
+        var expected = WithChecksum ? UdpChecksumStatus.Match
+            : ipv6 ? UdpChecksumStatus.ZeroNotAllowed : UdpChecksumStatus.NotPresent;
         if (Parse() is not UdpDatagram { IsComplete: true } udp || udp.Payload.Length != PayloadLength ||
             udp.Checksum is not UdpChecksumStatus status || status != expected)
             throw new InvalidDataException("Unexpected UDP payload or checksum.");
@@ -100,30 +105,31 @@ public class UdpParserBenchmarks
 
     [Benchmark]
     public UdpParseResult Parse() =>
-        UdpParser.Parse(datagram, (uint)datagram.Length, false, PacketSamples.IPv4AddressSum);
+        UdpParser.Parse(datagram, (uint)datagram.Length, ipv6, addressSum);
 }
-
-public enum TcpSample { Short, ShortWithTimestamp, Long }
 
 [MemoryDiagnoser]
 public class TcpParserBenchmarks
 {
     private ReadOnlyMemory<byte> segment;
 
-    [ParamsAllValues]
-    public TcpSample Sample { get; set; }
+    [Params(0, 64, 96, 108, 256, 1420, 9000, 200008)]
+    public int PayloadLength { get; set; }
+
+    [Params(false, true)]
+    public bool WithTimestamp { get; set; }
 
     [GlobalSetup]
     public void Prepare()
     {
-        bool timestamp = Sample == TcpSample.ShortWithTimestamp;
-        segment = PacketSamples.Tcp(Sample == TcpSample.Long ? 1440 : 128, timestamp);
+        int headerLength = WithTimestamp ? 32 : 20;
+        segment = PacketSamples.Tcp(PayloadLength + headerLength, WithTimestamp);
         if (Parse() is not TcpSegment { IsComplete: true } tcp || tcp.Checksum is not TcpChecksumStatus.Match ||
-            tcp.Header.HeaderLength != (timestamp ? 32 : 20))
+            tcp.Header.HeaderLength != headerLength || tcp.Payload.Length != PayloadLength)
             throw new InvalidDataException("Unexpected TCP header or checksum.");
-        if (timestamp && tcp.Options.Items is not [{ Kind: 1 }, { Kind: 1 }, { Value: TcpOptionValue.Timestamp }])
+        if (WithTimestamp && tcp.Options.Items is not [{ Kind: 1 }, { Kind: 1 }, { Value: TcpOptionValue.Timestamp }])
             throw new InvalidDataException("Expected two NOP options followed by a timestamp.");
-        if (!timestamp && !tcp.Options.Items.IsEmpty)
+        if (!WithTimestamp && !tcp.Options.Items.IsEmpty)
             throw new InvalidDataException("Expected a TCP segment without options.");
     }
 
