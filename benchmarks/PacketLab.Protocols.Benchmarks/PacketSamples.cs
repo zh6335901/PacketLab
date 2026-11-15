@@ -70,7 +70,8 @@ internal static class PacketSamples
         packet[9] = 17;
         IPv4Addresses.CopyTo(packet, 12);
         packet.AsSpan(20, optionBytes).Fill(1); // One-byte NOP options.
-        Write16(packet, 10, Checksum(packet.AsSpan(0, headerLength)));
+        var headerChecksum = Checksum(packet.AsSpan(0, headerLength));
+        Write16(packet, 10, headerChecksum);
         payload.CopyTo(packet.AsSpan(headerLength));
         return packet;
     }

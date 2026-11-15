@@ -82,9 +82,10 @@ public class AnalyzeReadabilityTests
     }
 
     [Test]
+    [Arguments("Read(Read(Read(0)))")]
     [Arguments("Read(Read(Read(Read(0))))")]
     [Arguments("Read(Read((int)(Read(Read(Read(0))))))")]
-    public async Task Four_or_more_directly_nested_calls_report_once(string expression)
+    public async Task Three_or_more_directly_nested_calls_report_once(string expression)
     {
         var diagnostics = await Analyze(expression);
 
@@ -93,9 +94,12 @@ public class AnalyzeReadabilityTests
 
     [Test]
     [Arguments("Total(values.Where(v => v > 0).Select(v => v + 1))")]
+    [Arguments("Total(values.Distinct().Reverse())")]
+    [Arguments("Total(values.Where(v => v > 0 && v < 10))")]
     [Arguments("Total(values.Distinct().Reverse().ToArray())")]
     [Arguments("Total(from v in values where v > 0 select v)")]
     [Arguments("Read(1 + 2 * (3 + 4) - 5)")]
+    [Arguments("Read(1 + 2 * (3 + 4))")]
     public async Task Computations_inside_one_argument_report_even_without_sibling_arguments(string expression)
     {
         var diagnostics = await Analyze(expression);
@@ -104,11 +108,13 @@ public class AnalyzeReadabilityTests
     }
 
     [Test]
-    [Arguments("Read(Read(Read(0)))")]
+    [Arguments("Read(Read(0))")]
+    [Arguments("Total(values.Distinct())")]
     [Arguments("Total(values.Where(v => v > 0))")]
+    [Arguments("Total(values.Where(v => v + 1 > 0))")]
     [Arguments("values.Where(v => v > 0).Select(v => v + 1).Sum()")]
     [Arguments("Total(from v in values select v)")]
-    [Arguments("Read(1 + 2 * (3 + 4))")]
+    [Arguments("Read(1 + 2 * 3)")]
     public async Task Short_arguments_and_standalone_pipelines_pass(string expression)
     {
         var diagnostics = await Analyze(expression);

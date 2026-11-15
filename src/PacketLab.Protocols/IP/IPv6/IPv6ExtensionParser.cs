@@ -122,7 +122,8 @@ internal static class IPv6ExtensionParser
             }
             if (next is 0 or 60)
             {
-                var options = ReadOptions(bytes[..length], next == 0 && offset == 0, header.PayloadLength);
+                var firstHopByHop = next == 0 && offset == 0;
+                var options = ReadOptions(bytes[..length], firstHopByHop, header.PayloadLength);
                 if (options is OptionsResult.Invalid error)
                 {
                     Diagnose(error.Code, offset + error.Offset, error.Message);

@@ -124,8 +124,8 @@ public sealed class IpFragmentReassembler : IDisposable
             else
             {
                 var packet = BuildPacket(fragment.Prefix, fragment, fragment.Bytes.Span);
-                events.Add(Event(atomic, IpReassemblyStatus.Atomic, "independent atomic fragment",
-                    Decode(packet, fragment.Key.Version)));
+                var decodedPacket = Decode(packet, fragment.Key.Version);
+                events.Add(Event(atomic, IpReassemblyStatus.Atomic, "independent atomic fragment", decodedPacket));
             }
             return;
         }
@@ -234,7 +234,8 @@ public sealed class IpFragmentReassembler : IDisposable
                 foreach (var part in buffer.Parts)
                     part.Bytes.CopyTo(payload, part.Offset);
                 var packet = BuildPacket(first, fragment, payload, (buffer.EcnCodepoints & 0b1000) != 0);
-                events.Add(Event(state, IpReassemblyStatus.Complete, "all fragment bytes captured", Decode(packet, fragment.Key.Version)));
+                var decodedPacket = Decode(packet, fragment.Key.Version);
+                events.Add(Event(state, IpReassemblyStatus.Complete, "all fragment bytes captured", decodedPacket));
                 Remove(fragment.Key, state);
                 return;
             }

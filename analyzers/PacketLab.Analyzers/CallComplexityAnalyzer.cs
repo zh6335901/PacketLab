@@ -13,13 +13,13 @@ public sealed class CallComplexityAnalyzer : DiagnosticAnalyzer
         "PL0007", "Deeply nested method calls",
         "Split the nested calls into steps with descriptive names",
         "Readability", DiagnosticSeverity.Warning, isEnabledByDefault: true,
-        description: "Four or more calls nested directly inside one another's arguments can hide the order of evaluation.");
+        description: "Three or more calls nested directly inside one another's arguments can hide the order of evaluation.");
 
     private static readonly DiagnosticDescriptor ComplexArgument = new(
         "PL0008", "Complex argument expression",
         "Give this argument's calculation a descriptive name",
         "Readability", DiagnosticSeverity.Warning, isEnabledByDefault: true,
-        description: "Extract multi-stage queries, long method chains, or arguments with four or more binary operations.");
+        description: "Extract multi-stage queries, chains of two or more calls, or expressions with three or more binary operations in an argument or its expression-bodied lambda.");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [NestedCalls, ComplexArgument];
 
@@ -40,7 +40,7 @@ public sealed class CallComplexityAnalyzer : DiagnosticAnalyzer
         if (parent is ArgumentSyntax { Parent.Parent: InvocationExpressionSyntax })
             return;
 
-        if (HasNestedCalls(call, remainingDepth: 4))
+        if (HasNestedCalls(call, remainingDepth: 3))
             context.ReportDiagnostic(Diagnostic.Create(NestedCalls, call.ArgumentList.OpenParenToken.GetLocation()));
     }
 
@@ -61,6 +61,8 @@ public sealed class CallComplexityAnalyzer : DiagnosticAnalyzer
     {
         var argument = (ArgumentSyntax)context.Node;
         var expression = Unwrap(argument.Expression);
+        if (expression is LambdaExpressionSyntax { Body: ExpressionSyntax body })
+            expression = Unwrap(body);
         if (IsComplexArgument(expression))
             context.ReportDiagnostic(Diagnostic.Create(ComplexArgument, expression.GetLocation()));
     }
@@ -71,20 +73,14 @@ public sealed class CallComplexityAnalyzer : DiagnosticAnalyzer
         {
             var operations = expression.DescendantNodesAndSelf(node =>
                 node is BinaryExpressionSyntax or ParenthesizedExpressionSyntax or CastExpressionSyntax);
-            return operations.OfType<BinaryExpressionSyntax>().Skip(3).Any();
+            return operations.OfType<BinaryExpressionSyntax>().Skip(2).Any();
         }
 
-        var calls = 0;
-        var hasLambda = false;
-        while (expression is InvocationExpressionSyntax call)
+        if (expression is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax member })
         {
-            calls++;
-            hasLambda |= call.ArgumentList.Arguments.Any(a => a.Expression is LambdaExpressionSyntax);
-            if (calls >= 3 || (calls == 2 && hasLambda))
-                return true;
-            if (call.Expression is not MemberAccessExpressionSyntax member)
-                break;
             expression = Unwrap(member.Expression);
+            if (expression is InvocationExpressionSyntax)
+                return true;
         }
         return expression is QueryExpressionSyntax query && (query.Body.Clauses.Count > 0 || query.Body.Continuation is not null);
     }
