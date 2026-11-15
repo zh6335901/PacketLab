@@ -30,7 +30,7 @@ permissions:
 jobs:
   compare:
     runs-on: windows-2025
-    timeout-minutes: ${{ inputs.suite == 'Protocols' && 55 || 30 }}
+    timeout-minutes: ${{ inputs.suite == 'Protocols' && 100 || 30 }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -42,9 +42,9 @@ jobs:
           global-json-file: global.json
 
       - name: Compare benchmarks
-        # Protocols: 47 cases x 2 revisions x up to 23 iterations x 250 ms is about 9 minutes,
-        # plus JIT preparation, pilot stages, process launches and builds. Reserve upload time.
-        timeout-minutes: ${{ inputs.suite == 'Protocols' && 45 || 25 }}
+        # Protocols: All 47 Protocols cases x 2 revisions x up to 40 iterations x 1 s is about 63 minutes,
+        # plus JIT/pilot/build overhead. Filters reduce cases; reserve time for artifact upload.
+        timeout-minutes: ${{ inputs.suite == 'Protocols' && 90 || 25 }}
         shell: pwsh
         env:
           BENCHMARK_FILTER: ${{ inputs.filter || '*' }}
