@@ -96,8 +96,12 @@ public class UdpParserBenchmarks
         ipv6 = PayloadLength + 8 > ushort.MaxValue;
         addressSum = ipv6 ? PacketSamples.IPv6AddressSum : PacketSamples.IPv4AddressSum;
         datagram = PacketSamples.Udp(PayloadLength, WithChecksum, addressSum, ipv6);
-        var expected = WithChecksum ? UdpChecksumStatus.Match
-            : ipv6 ? UdpChecksumStatus.ZeroNotAllowed : UdpChecksumStatus.NotPresent;
+        var expected = (WithChecksum, ipv6) switch
+        {
+            (true, _) => UdpChecksumStatus.Match,
+            (false, true) => UdpChecksumStatus.ZeroNotAllowed,
+            (false, false) => UdpChecksumStatus.NotPresent
+        };
         if (Parse() is not UdpDatagram { IsComplete: true } udp || udp.Payload.Length != PayloadLength ||
             udp.Checksum is not UdpChecksumStatus status || status != expected)
             throw new InvalidDataException("Unexpected UDP payload or checksum.");

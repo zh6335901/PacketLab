@@ -22,12 +22,19 @@ public sealed record DecodedIPv4
         Packet = packet;
         var header = packet.Header;
         var length = (uint)(header.TotalLength - header.HeaderLength);
-        Payload = header.MoreFragments || header.FragmentOffset != 0
-            ? new IPv4FragmentPayload(header.FragmentOffset, header.MoreFragments, header.Identification,
-                header.Protocol, length, packet.Payload)
-            : header.Protocol == 6 ? TcpDecoder.Decode(packet)
-            : header.Protocol == 17 ? UdpDecoder.Decode(packet)
-            : new UnsupportedIpProtocol(header.Protocol, length, packet.Payload);
+        if (header.MoreFragments || header.FragmentOffset != 0)
+        {
+            Payload = new IPv4FragmentPayload(header.FragmentOffset, header.MoreFragments, header.Identification,
+                header.Protocol, length, packet.Payload);
+            return;
+        }
+
+        Payload = header.Protocol switch
+        {
+            6 => TcpDecoder.Decode(packet),
+            17 => UdpDecoder.Decode(packet),
+            _ => new UnsupportedIpProtocol(header.Protocol, length, packet.Payload)
+        };
     }
 
     public static IPv4DecodeResult Decode(ReadOnlyMemory<byte> data) => IPv4Parser.Parse(data) switch

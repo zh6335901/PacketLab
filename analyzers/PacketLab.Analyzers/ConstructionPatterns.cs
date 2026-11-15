@@ -206,9 +206,15 @@ internal static class ConstructionPatterns
     private static string ConditionalValue(IConditionalOperation conditional, Dictionary<ISymbol, string>? arguments)
     {
         var condition = Value(conditional.Condition, arguments);
-        var first = Value(conditional.WhenTrue, arguments);
-        var second = Value(conditional.WhenFalse, arguments);
-        return condition == "True" ? first : condition == "False" ? second : first == second ? first : Unknown;
+        var whenTrue = Value(conditional.WhenTrue, arguments);
+        var whenFalse = Value(conditional.WhenFalse, arguments);
+        return condition switch
+        {
+            "True" => whenTrue,
+            "False" => whenFalse,
+            _ when whenTrue == whenFalse => whenTrue,
+            _ => Unknown
+        };
     }
 
     private static string ParameterValue(IParameterSymbol parameter, Dictionary<ISymbol, string>? arguments)

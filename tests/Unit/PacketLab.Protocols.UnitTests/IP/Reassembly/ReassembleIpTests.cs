@@ -775,7 +775,8 @@ public partial class ReassembleIpTests
 
     private static IpReassemblyUpdate MaximumDatagram(int version, int payloadLength)
     {
-        var payload = new byte[payloadLength]; Payload.CopyTo(payload, 0);
+        var payload = new byte[payloadLength];
+        Payload.CopyTo(payload, 0);
         using var sequence = new FragmentSequence(Packets(Fragment(version, 0, true, payload[..16]), Fragment(version, 16, false, payload[16..])));
         sequence.Next(); sequence.Next();
         return sequence.Updates.Single();
@@ -960,30 +961,54 @@ public partial class ReassembleIpTests
         private readonly IpFragmentReassembler reassembler = new(options);
         private int index;
         internal System.Collections.Immutable.ImmutableArray<IpReassemblyUpdate> Updates { get; private set; } = [];
-        internal void Next() => Updates = index == packets.Length ? reassembler.Finish()
-            : reassembler.Process(packets[index++]) is { } update ? [update] : [];
+        internal void Next()
+        {
+            if (index == packets.Length)
+            {
+                Updates = reassembler.Finish();
+                return;
+            }
+
+            Updates = reassembler.Process(packets[index++]) is { } update ? [update] : [];
+        }
+
         public void Dispose() => reassembler.Dispose();
     }
 
     private static byte[] Fragment(int version, int offset, bool more, byte[] payload, ushort id = 1,
         byte nextHeader = 17, bool hopByHop = false)
     {
-        var header = version == 4 ? 20 : hopByHop ? 56 : 48;
+        var header = version switch
+        {
+            4 => 20,
+            _ when hopByHop => 56,
+            _ => 48
+        };
         var frame = new byte[header + payload.Length];
         var ip = frame.AsSpan();
         if (version == 4)
         {
-            ip[0] = 0x45; ip[8] = 64; ip[9] = nextHeader; ip[12] = 10; ip[16] = 11;
+            ip[0] = 0x45;
+            ip[8] = 64;
+            ip[9] = nextHeader;
+            ip[12] = 10;
+            ip[16] = 11;
             BinaryPrimitives.WriteUInt16BigEndian(ip[2..], (ushort)(20 + payload.Length));
             BinaryPrimitives.WriteUInt16BigEndian(ip[4..], id);
             BinaryPrimitives.WriteUInt16BigEndian(ip[6..], (ushort)(offset / 8 | (more ? 0x2000 : 0)));
         }
         else
         {
-            ip[0] = 0x60; ip[6] = hopByHop ? (byte)0 : (byte)44; ip[7] = 64; ip[23] = 1; ip[39] = 2;
+            ip[0] = 0x60;
+            ip[6] = hopByHop ? (byte)0 : (byte)44;
+            ip[7] = 64;
+            ip[23] = 1;
+            ip[39] = 2;
             BinaryPrimitives.WriteUInt16BigEndian(ip[4..], (ushort)(header - 40 + payload.Length));
-            if (hopByHop) ip[40] = 44;
-            var fragment = ip[(header - 8)..]; fragment[0] = nextHeader;
+            if (hopByHop)
+                ip[40] = 44;
+            var fragment = ip[(header - 8)..];
+            fragment[0] = nextHeader;
             BinaryPrimitives.WriteUInt16BigEndian(fragment[2..], (ushort)(offset | (more ? 1 : 0)));
             BinaryPrimitives.WriteUInt32BigEndian(fragment[4..], id);
         }

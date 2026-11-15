@@ -63,15 +63,22 @@ internal static class IPv6ExtensionParser
             }
             if (next is not (0 or 60 or 43 or 44 or 51))
             {
-                Diagnose(next == 50 ? IPv6DiagnosticCode.EncryptedEsp : IPv6DiagnosticCode.UnsupportedNextHeader,
-                    offset, next == 50 ? "ESP encrypted content; upper layer unavailable" : $"unsupported Next Header {next}; upper layer unavailable");
+                if (next == 50)
+                    Diagnose(IPv6DiagnosticCode.EncryptedEsp, offset, "ESP encrypted content; upper layer unavailable");
+                else
+                    Diagnose(IPv6DiagnosticCode.UnsupportedNextHeader, offset, $"unsupported Next Header {next}; upper layer unavailable");
                 return Finish(new IPv6PayloadUnavailable(IPv6PayloadFailure.Unsupported));
             }
 
             if (CheckLength(next == 44 ? 8 : 2) is { } shortPrefix)
                 return Finish(shortPrefix);
             var bytes = captured.Span[offset..];
-            var length = next == 44 ? 8 : next == 51 ? (bytes[1] + 2) * 4 : (bytes[1] + 1) * 8;
+            var length = next switch
+            {
+                44 => 8,
+                51 => (bytes[1] + 2) * 4,
+                _ => (bytes[1] + 1) * 8
+            };
             if (next == 51 && (length < 12 || length % 8 != 0))
             {
                 Diagnose(IPv6DiagnosticCode.InvalidHeaderLength, offset, $"AH length {length} must include 12 fixed bytes and be a multiple of 8");
@@ -84,7 +91,11 @@ internal static class IPv6ExtensionParser
             if (next == 44)
             {
                 var bits = BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]);
-                fragment = new((ushort)(bits >> 3), (bits & 1) != 0, BinaryPrimitives.ReadUInt32BigEndian(bytes[4..]), bytes[0]);
+                fragment = new IPv6Fragment(
+                    Offset: (ushort)(bits >> 3),
+                    MoreFragments: (bits & 1) != 0,
+                    Identification: BinaryPrimitives.ReadUInt32BigEndian(bytes[4..]),
+                    NextHeader: bytes[0]);
             }
             headers.Add(new(next, bytes[0], 40 + offset, captured.Slice(offset, length), fragment));
 
@@ -129,8 +140,10 @@ internal static class IPv6ExtensionParser
             {
                 if (declared > ushort.MaxValue || sawFragment)
                 {
-                    Diagnose(sawFragment ? IPv6DiagnosticCode.DuplicateFragment : IPv6DiagnosticCode.JumboFragment,
-                        offset, sawFragment ? "duplicate Fragment header" : "Jumbo Payload cannot be combined with a Fragment header");
+                    if (sawFragment)
+                        Diagnose(IPv6DiagnosticCode.DuplicateFragment, offset, "duplicate Fragment header");
+                    else
+                        Diagnose(IPv6DiagnosticCode.JumboFragment, offset, "Jumbo Payload cannot be combined with a Fragment header");
                     offset += length;
                     return Finish(new IPv6PayloadUnavailable(IPv6PayloadFailure.Invalid));
                 }
@@ -161,7 +174,11 @@ internal static class IPv6ExtensionParser
         for (var i = 2; i < header.Length;)
         {
             var type = header[i];
-            if (type == 0) { i++; continue; }
+            if (type == 0)
+            {
+                i++;
+                continue;
+            }
             if (i + 2 > header.Length || i + 2 + header[i + 1] > header.Length)
                 return new OptionsResult.Invalid(IPv6DiagnosticCode.InvalidOptions, i, "option extends beyond its header");
             var length = header[i + 1];

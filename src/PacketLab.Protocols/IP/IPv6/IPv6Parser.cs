@@ -56,9 +56,15 @@ public static class IPv6Parser
         if (version != 6)
             return new IPv6ParseResult.InvalidVersion(version, data);
 
-        var header = new IPv6Header(version, (byte)((fields >> 20) & 0xff), fields & 0xfffff,
-            BinaryPrimitives.ReadUInt16BigEndian(bytes[4..]), bytes[6], bytes[7],
-            IPv6Address.Read(bytes[8..]), IPv6Address.Read(bytes[24..]));
+        var header = new IPv6Header(
+            Version: version,
+            TrafficClass: (byte)((fields >> 20) & 0xff),
+            FlowLabel: fields & 0xfffff,
+            PayloadLength: BinaryPrimitives.ReadUInt16BigEndian(bytes[4..]),
+            NextHeader: bytes[6],
+            HopLimit: bytes[7],
+            Source: IPv6Address.Read(bytes[8..]),
+            Destination: IPv6Address.Read(bytes[24..]));
         return IPv6ExtensionParser.Parse(header, data[40..]);
     }
 }

@@ -22,7 +22,8 @@ public sealed class IpFragmentReassembler : IDisposable
     public IpReassemblyUpdate? Process(ReadOnlyMemory<byte> ipPacket)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        if (Extract(ipPacket) is not { } fragment) return null;
+        if (Extract(ipPacket) is not { } fragment)
+            return null;
         var events = ImmutableArray.CreateBuilder<IpReassemblyUpdate>();
         Accept(fragment, ++nextId, events);
         return events.Single();
@@ -33,7 +34,8 @@ public sealed class IpFragmentReassembler : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         clock = Math.Max(clock, nanoseconds);
-        if (datagrams.Count == 0) return [];
+        if (datagrams.Count == 0)
+            return [];
         var timeout = (ulong)options.TimeoutSeconds * 1_000_000_000UL;
         return clock - oldestStartTime < timeout ? [] : ExpireDatagrams(timeout);
     }
@@ -64,7 +66,8 @@ public sealed class IpFragmentReassembler : IDisposable
         ObjectDisposedException.ThrowIf(disposed, this);
         foreach (var (key, state) in datagrams)
         {
-            if (state.Id != datagramId) continue;
+            if (state.Id != datagramId)
+                continue;
             var result = Event(state, IpReassemblyStatus.Expired, "datagram expired by caller");
             Remove(key, state);
             return result;
@@ -76,7 +79,8 @@ public sealed class IpFragmentReassembler : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         var state = datagrams.Values.FirstOrDefault(x => x.Id == datagramId);
-        if (state is null) return null;
+        if (state is null)
+            return null;
         var events = ImmutableArray.CreateBuilder<IpReassemblyUpdate>();
         Fail(state, IpReassemblyStatus.Discarded, "datagram discarded by caller", events);
         return events.Single();
@@ -135,7 +139,8 @@ public sealed class IpFragmentReassembler : IDisposable
                 return;
             }
             // Starts are monotonic. Removing the oldest entry can only cause an extra early scan.
-            if (datagrams.Count == 0) oldestStartTime = clock;
+            if (datagrams.Count == 0)
+                oldestStartTime = clock;
             datagrams.Add(fragment.Key, state);
         }
         if (state.Buffer is Discarded discarded)
@@ -166,15 +171,15 @@ public sealed class IpFragmentReassembler : IDisposable
             }
         }
         var end = fragment.Offset + fragment.Bytes.Length;
-        if ((buffer.Length is FinalLength { Value: var length } && (end > length || (fragment.More && end >= length) || (!fragment.More && end != length))) ||
-            (!fragment.More && buffer.Parts.Any(x => x.Offset + x.Bytes.Length > end || (x.More && x.Offset + x.Bytes.Length >= end))))
+        if (ConflictsWithFinalLength(buffer, end, fragment.More))
         {
             Fail(state, IpReassemblyStatus.Conflict, "inconsistent final fragment length", events);
             return;
         }
         foreach (var part in buffer.Parts)
         {
-            if (part.Offset >= end || part.Offset + part.Bytes.Length <= fragment.Offset) continue;
+            if (part.Offset >= end || part.Offset + part.Bytes.Length <= fragment.Offset)
+                continue;
             if (part.Offset == fragment.Offset && part.More == fragment.More &&
                 part.Bytes.AsSpan().SequenceEqual(fragment.Bytes.Span))
             {
@@ -201,12 +206,14 @@ public sealed class IpFragmentReassembler : IDisposable
             return;
         }
         buffer.Context ??= fragment.Prefix.ToArray();
-        if (fragment.Offset == 0) buffer.First = new FirstHeader(fragment.Prefix.ToArray());
+        if (fragment.Offset == 0)
+            buffer.First = new FirstHeader(fragment.Prefix.ToArray());
         buffer.Parts.Add(new(fragment.Offset, fragment.More, fragment.Bytes.ToArray()));
         buffer.PayloadBytes += fragment.Bytes.Length;
         buffer.Bytes += needed;
         bufferedBytes += needed;
-        if (!fragment.More) buffer.Length = new FinalLength(end);
+        if (!fragment.More)
+            buffer.Length = new FinalLength(end);
         if (buffer.First is FirstHeader { Bytes: var first } && buffer.Length is FinalLength { Value: var total })
         {
             var ipLength = first.Length + total;
@@ -224,7 +231,8 @@ public sealed class IpFragmentReassembler : IDisposable
             if (buffer.PayloadBytes == total)
             {
                 var payload = new byte[total];
-                foreach (var part in buffer.Parts) part.Bytes.CopyTo(payload, part.Offset);
+                foreach (var part in buffer.Parts)
+                    part.Bytes.CopyTo(payload, part.Offset);
                 var packet = BuildPacket(first, fragment, payload, (buffer.EcnCodepoints & 0b1000) != 0);
                 events.Add(Event(state, IpReassemblyStatus.Complete, "all fragment bytes captured", Decode(packet, fragment.Key.Version)));
                 Remove(fragment.Key, state);
@@ -234,9 +242,27 @@ public sealed class IpFragmentReassembler : IDisposable
         events.Add(Event(state, IpReassemblyStatus.Pending, "waiting for contiguous fragments and final length"));
     }
 
+    private static bool ConflictsWithFinalLength(Collecting buffer, int end, bool more)
+    {
+        if (buffer.Length is FinalLength final && (more ? end >= final.Value : end != final.Value))
+            return true;
+
+        if (!more)
+        {
+            foreach (var part in buffer.Parts)
+            {
+                var partEnd = part.Offset + part.Bytes.Length;
+                if (partEnd > end || (partEnd == end && part.More))
+                    return true;
+            }
+        }
+        return false;
+    }
+
     private (IpReassemblyStatus Status, string Message)? Validate(Fragment fragment)
     {
-        if (fragment.Validity is InvalidFragment { Message: var invalid }) return (IpReassemblyStatus.Invalid, invalid);
+        if (fragment.Validity is InvalidFragment { Message: var invalid })
+            return (IpReassemblyStatus.Invalid, invalid);
         if (fragment.Bytes.Length != fragment.DeclaredLength)
             return (IpReassemblyStatus.Truncated, "fragment payload was not fully captured");
         if ((!fragment.Atomic && fragment.Bytes.Length == 0) || (fragment.More && fragment.Bytes.Length % 8 != 0))
@@ -251,7 +277,8 @@ public sealed class IpFragmentReassembler : IDisposable
 
     private static bool Compatible(Datagram state, Fragment fragment)
     {
-        if (state.Buffer is not Collecting buffer || buffer.Context is not { } context) return true;
+        if (state.Buffer is not Collecting buffer || buffer.Context is not { } context)
+            return true;
         if (fragment.Key.Version == 6)
         {
             // Payload length and hop limit may differ, but extension layout and context must agree.
@@ -269,69 +296,123 @@ public sealed class IpFragmentReassembler : IDisposable
         ImmutableArray<IpReassemblyUpdate>.Builder events)
     {
         events.Add(Event(state, status, message));
-        if (state.Buffer is Collecting buffer) bufferedBytes -= buffer.Bytes;
+        if (state.Buffer is Collecting buffer)
+            bufferedBytes -= buffer.Bytes;
         // A bounded tombstone prevents later fragments from reviving an ambiguous datagram.
         state.Buffer = new Discarded(status);
     }
 
     private void Remove(Key key, Datagram state)
     {
-        if (state.Buffer is Collecting buffer) bufferedBytes -= buffer.Bytes;
+        if (state.Buffer is Collecting buffer)
+            bufferedBytes -= buffer.Bytes;
         datagrams.Remove(key);
     }
 
     private static IpReassemblyUpdate Event(Datagram state, IpReassemblyStatus status, string message,
-        ReassembledIpPacket? packet = null) =>
-        new(state.Id, state.Version, state.Identification,
-            message,
-            packet is null ? new IpReassemblyDiagnostic(status) : status == IpReassemblyStatus.Atomic
-                ? new IpReassemblyAtomic(packet) : new IpReassemblyComplete(packet));
+        ReassembledIpPacket? packet = null)
+    {
+        IpReassemblyOutcome outcome = packet switch
+        {
+            null => new IpReassemblyDiagnostic(status),
+            _ when status == IpReassemblyStatus.Atomic => new IpReassemblyAtomic(packet),
+            _ => new IpReassemblyComplete(packet)
+        };
+        return new(state.Id, state.Version, state.Identification, message, outcome);
+    }
 
     private static Fragment? Extract(ReadOnlyMemory<byte> bytes)
     {
-        if (bytes.IsEmpty) return null;
-        var version = bytes.Span[0] >> 4;
-        // Unfragmented IPv4 packets cannot enter reassembly; avoid decoding their transport payload again.
-        if (version == 4 && bytes.Length >= 8 &&
-            (BinaryPrimitives.ReadUInt16BigEndian(bytes.Span[6..]) & 0x3fff) == 0) return null;
-        if (version == 4 && DecodedIPv4.Decode(bytes) is DecodedIPv4 v4 && v4.Payload is IPv4FragmentPayload f4)
+        if (bytes.IsEmpty)
+            return null;
+
+        return (bytes.Span[0] >> 4) switch
         {
-            var header = v4.Packet.Header;
-            return new(new(4, new(0, BinaryPrimitives.ReadUInt32BigEndian(bytes.Span[12..])),
-                    new(0, BinaryPrimitives.ReadUInt32BigEndian(bytes.Span[16..])), f4.Identification, f4.Protocol),
-                f4.Offset * 8, f4.MoreFragments, false, f4.Protocol, f4.DeclaredLength, f4.Bytes,
-                bytes[..header.HeaderLength], 0,
-                header.DontFragment || header.ReservedFlag ? new InvalidFragment("invalid IPv4 fragmentation flags") : new ValidFragment());
-        }
-        if (version != 6 || DecodedIPv6.Decode(bytes) is not DecodedIPv6 v6) return null;
-        var extension = v6.Extensions.FirstOrDefault(x => x.Fragment is not null);
-        if (extension?.Fragment is not { } f6 || v6.Capture is not IPv6Payload.KnownLength capture) return null;
+            4 => ExtractIPv4(bytes),
+            6 => ExtractIPv6(bytes),
+            _ => null
+        };
+    }
+
+    private static Fragment? ExtractIPv4(ReadOnlyMemory<byte> bytes)
+    {
+        // Unfragmented IPv4 packets cannot enter reassembly; avoid decoding their transport payload again.
+        if (bytes.Length >= 8 && (BinaryPrimitives.ReadUInt16BigEndian(bytes.Span[6..]) & 0x3fff) == 0)
+            return null;
+        if (DecodedIPv4.Decode(bytes) is not DecodedIPv4 packet || packet.Payload is not IPv4FragmentPayload payload)
+            return null;
+
+        var header = packet.Packet.Header;
+        var source = new IPv6Address(0, BinaryPrimitives.ReadUInt32BigEndian(bytes.Span[12..]));
+        var destination = new IPv6Address(0, BinaryPrimitives.ReadUInt32BigEndian(bytes.Span[16..]));
+        var key = new Key(4, source, destination, payload.Identification, payload.Protocol);
+        FragmentValidity validity = header.DontFragment || header.ReservedFlag
+            ? new InvalidFragment("invalid IPv4 fragmentation flags")
+            : new ValidFragment();
+
+        return new Fragment(
+            Key: key,
+            Offset: payload.Offset * 8,
+            More: payload.MoreFragments,
+            Atomic: false,
+            NextHeader: payload.Protocol,
+            DeclaredLength: payload.DeclaredLength,
+            Bytes: payload.Bytes,
+            Prefix: bytes[..header.HeaderLength],
+            PreviousNextHeader: 0,
+            Validity: validity);
+    }
+
+    private static Fragment? ExtractIPv6(ReadOnlyMemory<byte> bytes)
+    {
+        if (DecodedIPv6.Decode(bytes) is not DecodedIPv6 packet)
+            return null;
+        var extension = packet.Extensions.FirstOrDefault(x => x.Fragment is not null);
+        if (extension?.Fragment is not { } header || packet.Capture is not IPv6Payload.KnownLength capture)
+            return null;
+
         var offset = extension.Offset + 8;
         var declared = (long)capture.DeclaredLength - (offset - 40);
-        if (declared < 0) return null;
+        if (declared < 0)
+            return null;
         var available = Math.Min((int)declared, Math.Max(0, bytes.Length - offset));
-        var previous = v6.Extensions.LastOrDefault(x => x.Offset < extension.Offset);
-        var fragment = new Fragment(new(6, v6.Header.Source, v6.Header.Destination, f6.Identification, 0),
-            f6.OffsetBytes, f6.MoreFragments, f6.IsAtomic, f6.NextHeader, (uint)declared,
-            bytes.Slice(offset, available), bytes[..extension.Offset],
-            previous is null ? 6 : previous.Offset, new ValidFragment());
-        if (v6.Diagnostics.Any(x => x.Code is not (IPv6DiagnosticCode.ReassemblyRequired or
+        var previous = packet.Extensions.LastOrDefault(x => x.Offset < extension.Offset);
+        var key = new Key(6, packet.Header.Source, packet.Header.Destination, header.Identification, 0);
+        var fragment = new Fragment(
+            Key: key,
+            Offset: header.OffsetBytes,
+            More: header.MoreFragments,
+            Atomic: header.IsAtomic,
+            NextHeader: header.NextHeader,
+            DeclaredLength: (uint)declared,
+            Bytes: bytes.Slice(offset, available),
+            Prefix: bytes[..extension.Offset],
+            PreviousNextHeader: previous?.Offset ?? 6,
+            Validity: new ValidFragment());
+
+        if (packet.Diagnostics.Any(x => x.Code is not (IPv6DiagnosticCode.ReassemblyRequired or
                 IPv6DiagnosticCode.PayloadTruncated or IPv6DiagnosticCode.FinalDestinationUnavailable or
                 IPv6DiagnosticCode.SourceAddressUnavailable)))
             return fragment with { Validity = new InvalidFragment("invalid or incomplete IPv6 extension chain") };
-        if (f6.Offset == 0 && fragment.Bytes.Length == declared && !FirstHeadersComplete(fragment))
+        if (header.Offset == 0 && fragment.Bytes.Length == declared && !FirstHeadersComplete(fragment))
             return fragment with { Validity = new InvalidFragment("IPv6 first fragment lacks a complete upper-layer header chain") };
         return fragment;
     }
 
     private static bool FirstHeadersComplete(Fragment fragment)
     {
-        if (fragment.NextHeader == 0) return false; // Hop-by-Hop cannot follow the Fragment header.
+        // Hop-by-Hop cannot follow the Fragment header.
+        if (fragment.NextHeader == 0)
+            return false;
         var packet = BuildPacket(fragment.Prefix, fragment, fragment.Bytes.Span);
-        if (IPv6Parser.Parse(packet) is not IPv6Packet parsed) return false;
-        if (parsed.Extensions.Headers.Any(x => x.Type == 44)) return false;
-        if (parsed.Extensions.Result is IPv6NoNextHeader) return true;
-        if (parsed.Extensions.Result is not IPv6UpperLayer upper) return false;
+        if (IPv6Parser.Parse(packet) is not IPv6Packet parsed)
+            return false;
+        if (parsed.Extensions.Headers.Any(x => x.Type == 44))
+            return false;
+        if (parsed.Extensions.Result is IPv6NoNextHeader)
+            return true;
+        if (parsed.Extensions.Result is not IPv6UpperLayer upper)
+            return false;
         var bytes = upper.Bytes.Span;
         return upper.Protocol switch
         {
@@ -354,12 +435,15 @@ public sealed class IpFragmentReassembler : IDisposable
         var ip = bytes.AsSpan();
         if (fragment.Key.Version == 4)
         {
-            if (congestionExperienced) ip[1] |= 3;
+            if (congestionExperienced)
+                ip[1] |= 3;
             BinaryPrimitives.WriteUInt16BigEndian(ip[2..], (ushort)ip.Length);
             ip[6] = ip[7] = ip[10] = ip[11] = 0;
             uint sum = 0;
-            for (var i = 0; i < prefix.Length; i += 2) sum += BinaryPrimitives.ReadUInt16BigEndian(ip[i..]);
-            while (sum > 65535) sum = (sum & 65535) + (sum >> 16);
+            for (var i = 0; i < prefix.Length; i += 2)
+                sum += BinaryPrimitives.ReadUInt16BigEndian(ip[i..]);
+            while (sum > 65535)
+                sum = (sum & 65535) + (sum >> 16);
             BinaryPrimitives.WriteUInt16BigEndian(ip[10..], (ushort)~sum);
         }
         else
