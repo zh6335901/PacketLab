@@ -17,6 +17,7 @@ PacketLab is a lightweight, local-first network protocol analysis and experiment
 - Use Result types for expected domain failures; let environmental exceptions propagate to application boundaries.
 - Favor type-driven design; make invalid states unrepresentable where practical.
 - Prioritize correctness and maintainability.
+- Keep code easy to follow by giving intermediate values meaningful names and splitting dense expressions or nested conditionals into clear steps.
 - Be mindful of performance, memory allocations, and resource efficiency.
 - Measure before optimizing.
 - Sequence work into verifiable units; verify each before proceeding.
