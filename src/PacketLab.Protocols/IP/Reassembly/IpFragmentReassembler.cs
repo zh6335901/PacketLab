@@ -438,7 +438,8 @@ public sealed class IpFragmentReassembler : IDisposable
             if (congestionExperienced)
                 ip[1] |= 3;
             BinaryPrimitives.WriteUInt16BigEndian(ip[2..], (ushort)ip.Length);
-            ip[6] = ip[7] = ip[10] = ip[11] = 0;
+            BinaryPrimitives.WriteUInt16BigEndian(ip[6..], 0);
+            BinaryPrimitives.WriteUInt16BigEndian(ip[10..], 0);
             uint sum = 0;
             for (var i = 0; i < prefix.Length; i += 2)
                 sum += BinaryPrimitives.ReadUInt16BigEndian(ip[i..]);
