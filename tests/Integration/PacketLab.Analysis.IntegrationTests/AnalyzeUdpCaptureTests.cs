@@ -9,24 +9,41 @@ namespace PacketLab.Analysis.IntegrationTests;
 
 public class AnalyzeUdpCaptureTests
 {
-#pragma warning disable PL0003 // One reader must continue through all diagnostics to the final valid record.
     [Test]
     [Arguments("udp-little", PcapByteOrder.LittleEndian)]
     [Arguments("udp-big", PcapByteOrder.BigEndian)]
-    public async Task Analysis_reads_all_records_after_packet_diagnostics_and_reaches_eof(string sample, PcapByteOrder byteOrder)
+    public async Task Analysis_preserves_record_order_after_packet_diagnostics(string sample, PcapByteOrder order)
     {
+        // Arrange
         using var stream = OpenSample(sample);
-        var reader = OpenReader(stream);
-        await Assert.That(reader.Header.ByteOrder).IsEqualTo(byteOrder);
-        for (var number = 1; number < 14; number++)
-            await Assert.That(ReadPacket(reader).RecordNumber).IsEqualTo((long)number);
-        var last = ReadPacket(reader);
-        await Assert.That(last.RecordNumber).IsEqualTo(14L);
-        var udp = Datagram(Udp(IPv6(Ethernet(last)).Payload));
-        await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
+        using var reader = OpenReader(stream);
+
+        // Act
+        var packets = Enumerable.Range(0, 14).Select(_ => ReadPacket(reader)).ToArray();
+
+        // Assert
+        await Assert.That(reader.Header.ByteOrder).IsEqualTo(order);
+        await Assert.That(packets.Select(p => p.RecordNumber).SequenceEqual(Enumerable.Range(1, 14).Select(i => (long)i))).IsTrue();
+        var last = Datagram(Udp(IPv6(Ethernet(packets[^1])).Payload));
+        await Assert.That(last.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
     }
-#pragma warning restore PL0003
+
+    [Test]
+    [Arguments("udp-little")]
+    [Arguments("udp-big")]
+    public async Task Analysis_reaches_eof_after_all_records_with_diagnostics(string sample)
+    {
+        // Arrange
+        using var stream = OpenSample(sample);
+        using var reader = OpenReader(stream);
+
+        // Act
+        for (int i = 0; i < 14; i++) ReadPacket(reader);
+        var result = reader.ReadNext();
+
+        // Assert
+        await Assert.That(result is PcapEndOfFile).IsTrue();
+    }
 
     [Test]
     [Arguments("udp-little", SampleRecord.PayloadWithSurplus, 11, 0x356e, 11u, "CAFE01", 2u, "AABB", UdpChecksumStatus.Match)]
@@ -38,7 +55,10 @@ public class AnalyzeUdpCaptureTests
     public async Task Complete_ipv4_datagrams_preserve_fields_boundaries_and_checksum(string sample, SampleRecord record,
         ushort length, ushort checksum, uint effectiveLength, string payload, uint surplusLength, string surplus, UdpChecksumStatus status)
     {
+        // Act
         var udp = Datagram(Udp(IPv4(ReadRecord(sample, record)).Payload));
+
+        // Assert
         await Assert.That(udp.Header).IsEqualTo(new UdpHeader(0, 4660, length, checksum));
         await Assert.That(udp.EffectiveLength).IsEqualTo(effectiveLength);
         await Assert.That(udp.Payload.Length).IsEqualTo(payload.Length / 2);
@@ -64,7 +84,10 @@ public class AnalyzeUdpCaptureTests
     public async Task Complete_ipv6_datagrams_preserve_fields_boundaries_and_checksum(string sample, SampleRecord record,
         ushort length, ushort checksum, uint effectiveLength, string payload, uint surplusLength, string surplus, UdpChecksumStatus status)
     {
+        // Act
         var udp = Datagram(Udp(IPv6(ReadRecord(sample, record)).Payload));
+
+        // Assert
         await Assert.That(udp.Header).IsEqualTo(new UdpHeader(0, 4660, length, checksum));
         await Assert.That(udp.EffectiveLength).IsEqualTo(effectiveLength);
         await Assert.That(udp.Payload.Length).IsEqualTo(payload.Length / 2);
@@ -81,7 +104,10 @@ public class AnalyzeUdpCaptureTests
     [Arguments("udp-big")]
     public async Task Invalid_udp_length_retains_header_and_available_bytes(string sample)
     {
+        // Act
         var result = Udp(IPv4(ReadRecord(sample, SampleRecord.InvalidLength)).Payload);
+
+        // Assert
         var error = result is UdpParseResult.InvalidLength invalid ? invalid
             : throw new InvalidOperationException("Expected an invalid UDP length.");
         await Assert.That(error.Header).IsEqualTo(new UdpHeader(0, 4660, 7, 1));
@@ -94,7 +120,10 @@ public class AnalyzeUdpCaptureTests
     [Arguments("udp-big")]
     public async Task Incomplete_ip_surplus_does_not_disable_complete_udp_checksum(string sample)
     {
+        // Act
         var udp = Datagram(Udp(IPv6(ReadRecord(sample, SampleRecord.TruncatedSurplus)).Payload));
+
+        // Assert
         await Assert.That(udp.Header).IsEqualTo(new UdpHeader(0, 4660, 8, 0x9235));
         await Assert.That(udp.EffectiveLength).IsEqualTo(8u);
         await Assert.That(udp.Payload.Length).IsEqualTo(0);
@@ -111,7 +140,10 @@ public class AnalyzeUdpCaptureTests
     [Arguments("udp-big")]
     public async Task Truncated_payload_retains_header_and_declared_length(string sample)
     {
+        // Act
         var udp = Datagram(Udp(IPv4(ReadRecord(sample, SampleRecord.TruncatedPayload)).Payload));
+
+        // Assert
         await Assert.That(udp.Header).IsEqualTo(new UdpHeader(0, 4660, 11, 0x356e));
         await Assert.That(udp.EffectiveLength).IsEqualTo(11u);
         await Assert.That(udp.Payload.Length).IsEqualTo(2);
@@ -128,7 +160,10 @@ public class AnalyzeUdpCaptureTests
     [Arguments("udp-big")]
     public async Task Unknown_pseudo_header_preserves_udp_without_claiming_a_checksum_result(string sample)
     {
+        // Act
         var udp = Datagram(Udp(IPv6(ReadRecord(sample, SampleRecord.UnknownRoutingDestination)).Payload));
+
+        // Assert
         await Assert.That(udp.Header).IsEqualTo(new UdpHeader(0, 4660, 8, 0x9235));
         await Assert.That(udp.EffectiveLength).IsEqualTo(8u);
         await Assert.That(udp.Payload.Length).IsEqualTo(0);
@@ -145,7 +180,10 @@ public class AnalyzeUdpCaptureTests
     [Arguments("udp-big")]
     public async Task Ipv6_fragment_preserves_fragment_metadata_and_bytes_without_decoding_udp(string sample)
     {
+        // Act
         var ip = IPv6(ReadRecord(sample, SampleRecord.Fragment));
+
+        // Assert
         var fragment = ip.Payload is IPv6FragmentPayload payload ? payload
             : throw new InvalidOperationException("Expected an IPv6 fragment.");
         await Assert.That(fragment.Fragment).IsEqualTo(new IPv6Fragment(0, true, 0x01234567, 17));
@@ -158,7 +196,10 @@ public class AnalyzeUdpCaptureTests
     [Arguments("udp-big")]
     public async Task Jumbogram_preserves_the_entire_payload_and_effective_udp_length(string sample)
     {
+        // Act
         var udp = Datagram(Udp(IPv6(ReadRecord(sample, SampleRecord.Jumbogram)).Payload));
+
+        // Assert
         await Assert.That(udp.Header).IsEqualTo(new UdpHeader(0, 4660, 0, 0x9244));
         await Assert.That(udp.EffectiveLength).IsEqualTo(65536u);
         await Assert.That(udp.Payload.Length).IsEqualTo(65528);

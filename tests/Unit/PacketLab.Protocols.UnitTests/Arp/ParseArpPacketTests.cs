@@ -13,7 +13,10 @@ public class ParseArpPacketTests
     [Arguments("ABCD", "102030405060", "C0000201")]
     public async Task Ethernet_ipv4_packets_preserve_all_fields(string operation, string targetHardware, string senderProtocol)
     {
+        // Act
         var packet = Parse("000108000604" + operation + "020000000001" + senderProtocol + targetHardware + "C0000202");
+
+        // Assert
         await Assert.That(packet.HardwareType).IsEqualTo((ushort)1);
         await Assert.That(packet.ProtocolType).IsEqualTo((ushort)0x0800);
         await Assert.That(packet.HardwareAddressLength).IsEqualTo((byte)6);
@@ -27,22 +30,45 @@ public class ParseArpPacketTests
     }
 
     [Test]
-    public void Declared_lengths_split_addresses_and_preserve_padding()
-    {
-        var empty = new Addresses([], [], [], []);
-        var hardwareOnly = new Addresses([1], [], [2], []);
-        var protocolOnly = new Addresses([], [3], [], [4]);
-        if (!FieldsMatch(empty, [], 0) || !FieldsMatch(hardwareOnly, [0], 1) || !FieldsMatch(protocolOnly, [], 2))
-            throw new InvalidOperationException("Failed to preserve a zero-length address field.");
+    public void Declared_lengths_split_addresses_and_preserve_padding() =>
         Prop.ForAll(((byte[] Sender, byte[] Target) hardware, (byte[] Sender, byte[] Target) protocol,
             (byte[] Padding, ushort Operation) fields) =>
-            FieldsMatch(Addresses.Create(hardware, protocol), fields.Padding, fields.Operation)).Check(Config.QuickThrowOnFailure);
+            {
+                // Act
+                var matches = FieldsMatch(Addresses.Create(hardware, protocol), fields.Padding, fields.Operation);
+
+                // Assert
+                return matches;
+            }).Check(Config.QuickThrowOnFailure);
+
+    [Test]
+    [Arguments("", "", "", "", "", 0)]
+    [Arguments("01", "", "02", "", "00", 1)]
+    [Arguments("", "03", "", "04", "", 2)]
+    public async Task Zero_length_arp_addresses_preserve_the_other_fields(
+        string senderHardware, string senderProtocol, string targetHardware, string targetProtocol, string padding, ushort operation)
+    {
+        // Arrange
+        var addresses = new Addresses(Convert.FromHexString(senderHardware), Convert.FromHexString(senderProtocol),
+            Convert.FromHexString(targetHardware), Convert.FromHexString(targetProtocol));
+
+        // Act
+        var matches = FieldsMatch(addresses, Convert.FromHexString(padding), operation);
+
+        // Assert
+        await Assert.That(matches).IsTrue();
     }
 
     private static bool FieldsMatch(Addresses addresses, byte[] padding, ushort operation)
     {
+        // Arrange
         byte[] wire = [.. addresses.Encode(operation), .. padding];
-        return ArpParser.Parse(wire) is ArpPacket packet
+
+        // Act
+        var result = ArpParser.Parse(wire);
+
+        // Assert
+        return result is ArpPacket packet
             && packet.HardwareType == 0x1234 && packet.ProtocolType == 0x5678 && packet.Operation == operation
             && packet.HardwareAddressLength == addresses.SenderHardware.Length
             && packet.ProtocolAddressLength == addresses.SenderProtocol.Length
@@ -68,12 +94,22 @@ public class ParseArpPacketTests
     }
 
     [Test]
-    public void Truncation_reports_required_and_captured_lengths() =>
+    [Arguments(0)]
+    [Arguments(1)]
+    [Arguments(2)]
+    [Arguments(3)]
+    public void Truncation_reports_required_and_captured_lengths(int scenario) =>
         Prop.ForAll(((byte[] Sender, byte[] Target) hardware, (byte[] Sender, byte[] Target) protocol, DoNotSize<ushort> cut) =>
         {
+            // Arrange
             var wire = Addresses.Create(hardware, protocol).Encode(1);
-            return Truncated(wire, 0) && Truncated(wire, 7) && Truncated(wire, wire.Length - 1)
-                && Truncated(wire, cut.Item % wire.Length);
+            int length = scenario switch { 0 => 0, 1 => 7, 2 => wire.Length - 1, _ => cut.Item % wire.Length };
+
+            // Act
+            var matches = Truncated(wire, length);
+
+            // Assert
+            return matches;
         }).Check(Config.QuickThrowOnFailure);
 
     private static bool Truncated(byte[] wire, int length) =>

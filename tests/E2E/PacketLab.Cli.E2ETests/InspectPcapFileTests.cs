@@ -26,8 +26,13 @@ public class InspectPcapFileTests
     [Arguments("unsupported-link", "unsupported-link", 1)]
     public async Task Inspect_matches_expected_file_output(string sample, string expectation, int exitCode)
     {
-        var result = await Run("pcap", "inspect", Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
+        // Arrange
         var expected = Path.Combine(AppContext.BaseDirectory, "Expected", expectation);
+
+        // Act
+        var result = await Run("pcap", "inspect", Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
+
+        // Assert
         await Assert.That(result.ExitCode).IsEqualTo(exitCode);
         await Assert.That(result.Output.ReplaceLineEndings("\n")).IsEqualTo(File.ReadAllText(expected + ".stdout.txt").ReplaceLineEndings("\n"));
         await Assert.That(result.Error.ReplaceLineEndings("\n")).IsEqualTo(File.ReadAllText(expected + ".stderr.txt").ReplaceLineEndings("\n"));

@@ -13,7 +13,10 @@ public class ParseIPv6ExtensionsTests
     [Arguments(58)]
     public async Task Direct_upper_layer_has_exact_range_and_pseudo_header(byte protocol)
     {
+        // Act
         var packet = Parse(protocol, "CAFE0102DEAD", 4);
+
+        // Assert
         var upper = Upper(packet.Extensions);
         await Assert.That(upper.Protocol).IsEqualTo(protocol);
         await Assert.That(upper.Offset).IsEqualTo(40);
@@ -33,7 +36,10 @@ public class ParseIPv6ExtensionsTests
     [Arguments(44, "11FF000001020304", 8)]
     public async Task Header_specific_length_encoding_locates_transport(byte type, string extension, int length)
     {
+        // Act
         var packet = Parse(type, extension + "CAFE");
+
+        // Assert
         var item = packet.Extensions.Headers.Single();
         await Assert.That(item.Type).IsEqualTo(type);
         await Assert.That(item.NextHeader).IsEqualTo((byte)17);
@@ -49,9 +55,12 @@ public class ParseIPv6ExtensionsTests
     [Test]
     public async Task Mixed_chain_retains_order_raw_slices_and_true_upper_length()
     {
+        // Act
         var packet = Parse(0, "3C00000000000000" + "2B010000000000000000000000000000"
             + "3300FE0000000000" + "2C0400000102030405060708000000000000000000000000"
             + "0600000001234567" + "CAFE0102");
+
+        // Assert
         var chain = packet.Extensions;
         await Assert.That(string.Join(",", chain.Headers.Select(h => h.Type))).IsEqualTo("0,60,43,51,44");
         await Assert.That(string.Join(",", chain.Headers.Select(h => h.Offset))).IsEqualTo("40,48,64,72,96");
@@ -70,12 +79,18 @@ public class ParseIPv6ExtensionsTests
     [Arguments(8191, true)]
     public async Task Fragment_fields_distinguish_atomic_first_and_later_fragments(ushort offset, bool more)
     {
+        // Arrange
         var fragment = new byte[10];
         fragment[0] = 60;
         BinaryPrimitives.WriteUInt16BigEndian(fragment.AsSpan(2), (ushort)((offset << 3) | (more ? 1 : 0)));
         BinaryPrimitives.WriteUInt32BigEndian(fragment.AsSpan(4), 0x89abcdef);
-        fragment[8] = 0xde; fragment[9] = 0xad;
+        fragment[8] = 0xde;
+        fragment[9] = 0xad;
+
+        // Act
         var packet = Parse(44, Convert.ToHexString(fragment));
+
+        // Assert
         var actual = packet.Extensions.Headers[0].Fragment!;
         await Assert.That(actual).IsEqualTo(new IPv6Fragment(offset, more, 0x89abcdef, 60));
         await Assert.That(actual.OffsetBytes).IsEqualTo(offset * 8);
@@ -92,7 +107,10 @@ public class ParseIPv6ExtensionsTests
     [Arguments(1, false)]
     public async Task Routing_segments_control_final_destination_reliability(byte segments, bool available)
     {
+        // Act
         var chain = Parse(43, "1100FE" + segments.ToString("X2") + "00000000CAFE").Extensions;
+
+        // Assert
         await Assert.That(Upper(chain).Protocol).IsEqualTo((byte)17);
         await Assert.That(available
             ? Upper(chain).ChecksumContext is IPv6ChecksumContext.KnownAddresses
@@ -106,7 +124,10 @@ public class ParseIPv6ExtensionsTests
     [Arguments(135, IPv6DiagnosticCode.UnsupportedNextHeader)]
     public async Task Unsupported_chain_preserves_prefix_and_remainder(byte type, IPv6DiagnosticCode code)
     {
+        // Act
         var chain = Parse(60, type.ToString("X2") + "00000000000000CAFE").Extensions;
+
+        // Assert
         await Assert.That(chain.Result is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Unsupported }).IsTrue();
         await Assert.That(chain.Headers.Length).IsEqualTo(1);
         await Assert.That(chain.Diagnostics.Single().Code).IsEqualTo(code);
@@ -118,7 +139,10 @@ public class ParseIPv6ExtensionsTests
     [Test]
     public async Task No_next_header_ignores_but_preserves_remaining_payload()
     {
+        // Act
         var chain = Parse(60, "3B00000000000000CAFE").Extensions;
+
+        // Assert
         await Assert.That(chain.Result is IPv6NoNextHeader).IsTrue();
         await Assert.That(Hex(chain.RemainingBytes)).IsEqualTo("CAFE");
     }
@@ -134,7 +158,10 @@ public class ParseIPv6ExtensionsTests
     [Arguments(60, "1100010500000000", 8, IPv6DiagnosticCode.InvalidOptions)]
     public async Task Invalid_and_short_headers_report_precise_failure_without_transport(byte type, string bytes, ushort declared, IPv6DiagnosticCode code)
     {
+        // Act
         var packet = Parse(type, bytes, declared);
+
+        // Assert
         await Assert.That(packet.Extensions.Diagnostics[0].Code).IsEqualTo(code);
         await Assert.That(packet.Extensions.Diagnostics[0].Offset).IsEqualTo(code == IPv6DiagnosticCode.InvalidOptions ? 42 : 40);
         await Assert.That(packet.Extensions.Result is IPv6PayloadUnavailable failure && failure.Reason ==
@@ -145,7 +172,10 @@ public class ParseIPv6ExtensionsTests
     [Test]
     public async Task Incomplete_upper_payload_retains_pseudo_header_context_and_capture_diagnostic()
     {
+        // Act
         var packet = Parse(60, "1100000000000000CAFE", 12);
+
+        // Assert
         await Assert.That(Upper(packet.Extensions).DeclaredLength).IsEqualTo(4u);
         await Assert.That(Upper(packet.Extensions).IsComplete).IsFalse();
         await Assert.That(Hex(Upper(packet.Extensions).Bytes)).IsEqualTo("CAFE");
@@ -158,7 +188,10 @@ public class ParseIPv6ExtensionsTests
     [Arguments("1100C204FFFFFFFF", uint.MaxValue)]
     public async Task Jumbo_length_uses_unsigned_wire_value_even_when_capture_is_short(string bytes, uint expected)
     {
+        // Act
         var packet = Parse(0, bytes, 0);
+
+        // Assert
         await Assert.That(Known(packet).DeclaredLength).IsEqualTo(expected);
         await Assert.That(Known(packet).DeclaredDatagramLength).IsEqualTo(40UL + expected);
         await Assert.That(Known(packet).IsDatagramComplete).IsFalse();
@@ -171,10 +204,16 @@ public class ParseIPv6ExtensionsTests
     [Test]
     public async Task Complete_jumbo_excludes_trailing_capture_and_supplies_upper_length()
     {
+        // Arrange
         var bytes = new byte[65539];
         Convert.FromHexString("1100C20400010000").CopyTo(bytes, 0);
-        bytes[65535] = 0xab; bytes[65536] = 0xcd;
+        bytes[65535] = 0xab;
+        bytes[65536] = 0xcd;
+
+        // Act
         var packet = Parse(0, Convert.ToHexString(bytes), 0);
+
+        // Assert
         await Assert.That(Known(packet).IsDatagramComplete).IsTrue();
         await Assert.That(Known(packet).TrailingBytes.Length).IsEqualTo(3);
         await Assert.That(Known(packet).TrailingBytes.Span[0]).IsEqualTo((byte)0xcd);
@@ -195,7 +234,10 @@ public class ParseIPv6ExtensionsTests
     [Arguments("", IPv6DiagnosticCode.HeaderTruncated)]
     public async Task Invalid_jumbo_never_infers_length_from_capture(string bytes, IPv6DiagnosticCode code)
     {
+        // Act
         var packet = Parse(0, bytes, 0);
+
+        // Assert
         var payload = packet.Payload is IPv6Payload.UndeterminedLength unknown ? unknown
             : throw new InvalidOperationException("Expected unknown length.");
         await Assert.That(Hex(payload.CapturedBytes)).IsEqualTo(bytes);
@@ -209,7 +251,10 @@ public class ParseIPv6ExtensionsTests
     [Arguments(60)]
     public async Task Jumbo_option_with_nonzero_fixed_length_is_invalid(byte type)
     {
+        // Act
         var packet = Parse(type, "1100C20400010000");
+
+        // Assert
         await Assert.That(Known(packet).DeclaredLength).IsEqualTo(8u);
         await Assert.That(packet.Extensions.Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.InvalidJumboPayload);
         await Assert.That(packet.Extensions.Result is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Invalid }).IsTrue();
@@ -221,7 +266,10 @@ public class ParseIPv6ExtensionsTests
     [Arguments(60, "00000000000000001100000000000000", 16, IPv6DiagnosticCode.InvalidHopByHopPosition)]
     public async Task Illegal_header_combinations_retain_headers_but_disable_upper_layer(byte type, string bytes, ushort length, IPv6DiagnosticCode code)
     {
+        // Act
         var chain = Parse(type, bytes, length).Extensions;
+
+        // Assert
         await Assert.That(chain.Headers.Length).IsEqualTo(2);
         await Assert.That(chain.Diagnostics[0].Code).IsEqualTo(code);
         await Assert.That(chain.Result is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Invalid }).IsTrue();
@@ -230,34 +278,47 @@ public class ParseIPv6ExtensionsTests
     [Test]
     public async Task Home_address_option_does_not_supply_potentially_wrong_source_to_checksum()
     {
+        // Act
         var chain = Parse(60, "1102C91020010DB800000000000000000000000900000000CAFE").Extensions;
+
+        // Assert
         await Assert.That(Upper(chain).Offset).IsEqualTo(64);
         await Assert.That(Upper(chain).ChecksumContext is IPv6ChecksumContext.Unavailable).IsTrue();
         await Assert.That(chain.Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.SourceAddressUnavailable);
     }
 
-#pragma warning disable PL0003 // Every capture prefix checks the same extension-chain bounds contract.
+    private const string ExtensionCapture = "3C000000000000002B000000000000003300FE00000000002C04000001020304050607080000000000000000000000000600000001234567CAFE0102";
+
+    public static IEnumerable<int> CapturePrefixes() => Enumerable.Range(0, ExtensionCapture.Length / 2 + 1);
+
     [Test]
-    public async Task Every_capture_prefix_is_bounded_and_never_throws()
+    [MethodDataSource(nameof(CapturePrefixes))]
+    public async Task Every_capture_prefix_is_bounded_and_never_throws(int captured)
     {
-        var source = Convert.FromHexString("3C000000000000002B000000000000003300FE00000000002C04000001020304050607080000000000000000000000000600000001234567CAFE0102");
-        for (var captured = 0; captured <= source.Length; captured++)
-        {
-            var packet = Parse(0, Convert.ToHexString(source.AsSpan(0, captured)), (ushort)source.Length);
-            await Assert.That(packet.Extensions.RemainingOffset + packet.Extensions.RemainingBytes.Length).IsEqualTo(40 + captured);
-            await Assert.That(packet.Extensions.Headers.All(h => h.Offset + h.Length <= 40 + captured)).IsTrue();
-        }
+        // Arrange
+        var source = Convert.FromHexString(ExtensionCapture);
+
+        // Act
+        var packet = Parse(0, Convert.ToHexString(source.AsSpan(0, captured)), (ushort)source.Length);
+
+        // Assert
+        await Assert.That(packet.Extensions.RemainingOffset + packet.Extensions.RemainingBytes.Length).IsEqualTo(40 + captured);
+        await Assert.That(packet.Extensions.Headers.All(h => h.Offset + h.Length <= 40 + captured)).IsTrue();
     }
-#pragma warning restore PL0003
 
     [Test]
     public void Extension_slices_and_upper_payload_match_the_original_chain() =>
         Prop.ForAll((byte mask, byte[] lengths, byte[] payload) =>
         {
+            // Arrange
             var input = ExtensionHeaders.Create(mask, lengths, 17);
             var wire = input.Bytes.Concat(payload).ToArray();
             if (wire.Length == 0) wire = payload = [0];
+
+            // Act
             var chain = Parse(input.First, Convert.ToHexString(wire)).Extensions;
+
+            // Assert
             var upper = Upper(chain);
             return chain.Headers.Select(h => Hex(h.Bytes)).SequenceEqual(input.Headers.Select(h => Convert.ToHexString(h)))
                 && upper.Offset == 40 + input.Bytes.Length && upper.Protocol == 17 && upper.DeclaredLength == payload.Length
@@ -268,10 +329,15 @@ public class ParseIPv6ExtensionsTests
     public void Truncated_extension_chains_only_reference_captured_bytes() =>
         Prop.ForAll((byte mask, byte[] lengths, DoNotSize<ushort> selector) =>
         {
+            // Arrange
             var input = ExtensionHeaders.Create(mask, lengths, 17);
             byte[] wire = [.. input.Bytes, 0xaa, 0xbb];
             int cut = selector.Item % wire.Length;
+
+            // Act
             var chain = Parse(input.First, Convert.ToHexString(wire.AsSpan(0, cut)), (ushort)wire.Length).Extensions;
+
+            // Assert
             return chain.Headers.All(h => h.Offset >= 40 && h.Offset + h.Length <= 40 + cut
                     && h.Bytes.Span.SequenceEqual(wire.AsSpan(h.Offset - 40, h.Length)))
                 && chain.RemainingOffset >= 40 && chain.RemainingOffset + chain.RemainingBytes.Length == 40 + cut;

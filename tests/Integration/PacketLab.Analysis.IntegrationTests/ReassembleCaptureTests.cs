@@ -17,15 +17,20 @@ public class ReassembleCaptureTests
     [Arguments("big")]
     public async Task Reference_capture_reassembles_udp_and_tcp_with_valid_checksums(string order)
     {
+        // Arrange
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", $"ip-reassembly-{order}.pcap"));
         using var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened : throw new InvalidOperationException();
         var events = new List<IpReassemblyEvent>();
         var records = new List<AnalyzedPacket>();
+
+        // Act
         while (reader.ReadNext() is AnalyzedPacket packet)
         {
             records.Add(packet);
             events.AddRange(reader.ReassemblyEvents);
         }
+
+        // Assert
         events.AddRange(reader.ReassemblyEvents);
         var v4 = Decoding(events.Single(x => x.DatagramNumber == 1 && x.Status == IpReassemblyStatus.Complete));
         var udp = v4 is IPv4DecodeResult ip4 && ip4 is DecodedIPv4 d4 && d4.Payload is UdpParseResult p4 && p4 is UdpDatagram u4

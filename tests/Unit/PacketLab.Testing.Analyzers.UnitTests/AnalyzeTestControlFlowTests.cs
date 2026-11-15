@@ -23,8 +23,13 @@ public class AnalyzeTestControlFlowTests
     [Arguments("var result = flag switch { true => Assert.That(1), false => Assert.That(2) };", "switch expression")]
     public async Task Assertions_inside_control_flow_report_a_warning_at_the_test_name(string body, string construct)
     {
+        // Arrange
         var source = TestSource(body);
+
+        // Act
         var diagnostic = (await Analyze(source)).Single();
+
+        // Assert
         await Assert.That(diagnostic.Id).IsEqualTo("PL0003");
         await Assert.That(diagnostic.Severity).IsEqualTo(DiagnosticSeverity.Warning);
         await Assert.That(source.Substring(diagnostic.Location.SourceSpan.Start, diagnostic.Location.SourceSpan.Length)).IsEqualTo("Case");
@@ -36,6 +41,7 @@ public class AnalyzeTestControlFlowTests
     [Test]
     public async Task Nested_and_repeated_constructs_report_once_per_test()
     {
+        // Act
         var diagnostic = (await Analyze(TestSource("""
             for (var i = 0; i < 2; i++)
             {
@@ -44,6 +50,8 @@ public class AnalyzeTestControlFlowTests
             }
             foreach (var item in new[] { 3 }) Assert.That(item);
             """))).Single();
+
+        // Assert
         await Assert.That(diagnostic.GetMessage()).Contains("inside if, for, foreach");
     }
 
@@ -57,7 +65,11 @@ public class AnalyzeTestControlFlowTests
     [Arguments("for (var i = 0; i < 2; i++) { using var scope = Assert.Multiple(); }")]
     public async Task Control_flow_without_assertions_does_not_report(string body)
     {
-        await Assert.That((await Analyze(TestSource(body))).Length).IsEqualTo(0);
+        // Act
+        var diagnostics = await Analyze(TestSource(body));
+
+        // Assert
+        await Assert.That(diagnostics.Length).IsEqualTo(0);
     }
 
     [Test]
@@ -66,22 +78,30 @@ public class AnalyzeTestControlFlowTests
     [Arguments("void Check() { if (flag) Assert.That(flag); } Check();")]
     public async Task Nested_function_bodies_are_not_treated_as_the_test_body(string body)
     {
-        await Assert.That((await Analyze(TestSource(body))).Length).IsEqualTo(0);
+        // Act
+        var diagnostics = await Analyze(TestSource(body));
+
+        // Assert
+        await Assert.That(diagnostics.Length).IsEqualTo(0);
     }
 
     [Test]
     public async Task Loop_calling_a_local_assertion_function_reports()
     {
+        // Act
         var diagnostic = (await Analyze(TestSource("""
             void Check(bool value) => Assert.That(value);
             foreach (var value in new[] { flag }) Check(value);
             """))).Single();
+
+        // Assert
         await Assert.That(diagnostic.GetMessage()).Contains("inside foreach");
     }
 
     [Test]
     public async Task Branch_calling_a_chain_of_helpers_reports()
     {
+        // Act
         var diagnostic = (await Analyze(TestSource("if (flag) Checks.Check(flag);"), helperSource: """
             using TUnit.Assertions;
             static class Checks
@@ -90,12 +110,15 @@ public class AnalyzeTestControlFlowTests
                 static void Verify<T>(T value) { Assert.That(value); }
             }
             """)).Single();
+
+        // Assert
         await Assert.That(diagnostic.GetMessage()).Contains("Test 'Case' contains assertions inside if");
     }
 
     [Test]
     public async Task Recursive_calls_without_a_reachable_assertion_do_not_report()
     {
+        // Act
         var diagnostics = await Analyze(TestSource("""
             void First() => Second();
             void Second()
@@ -106,12 +129,15 @@ public class AnalyzeTestControlFlowTests
             }
             if (flag) First();
             """));
+
+        // Assert
         await Assert.That(diagnostics.Length).IsEqualTo(0);
     }
 
     [Test]
     public async Task Helpers_are_not_analyzed_as_test_methods()
     {
+        // Arrange
         var source = """
             using TUnit.Assertions;
             public class Cases
@@ -120,39 +146,62 @@ public class AnalyzeTestControlFlowTests
                 private void Check() { if (true) Assert.That(true); }
             }
             """;
-        await Assert.That((await Analyze(source)).Length).IsEqualTo(0);
+
+        // Act
+        var diagnostics = await Analyze(source);
+
+        // Assert
+        await Assert.That(diagnostics.Length).IsEqualTo(0);
     }
 
     [Test]
     public async Task Unrelated_test_attributes_do_not_mark_methods_as_tests()
     {
+        // Arrange
         var source = """
             using TUnit.Assertions;
             public class TestAttribute : System.Attribute { }
             public class Cases { [Test] public void Case() { if (true) Assert.That(true); } }
             """;
-        await Assert.That((await Analyze(source)).Length).IsEqualTo(0);
+
+        // Act
+        var diagnostics = await Analyze(source);
+
+        // Assert
+        await Assert.That(diagnostics.Length).IsEqualTo(0);
     }
 
     [Test]
     public async Task Unrelated_assertion_names_do_not_trigger_the_rule()
     {
+        // Arrange
         var source = """
             public static class Assert { public static void That(bool value) { } }
             public class Cases { [TUnit.Core.Test] public void Case() { if (true) Assert.That(true); } }
             """;
-        await Assert.That((await Analyze(source)).Length).IsEqualTo(0);
+
+        // Act
+        var diagnostics = await Analyze(source);
+
+        // Assert
+        await Assert.That(diagnostics.Length).IsEqualTo(0);
     }
 
     [Test]
     public async Task Aliases_and_static_imports_still_identify_framework_symbols()
     {
+        // Arrange
         var source = """
             using Test = TUnit.Core.TestAttribute;
             using static TUnit.Assertions.Assert;
             public class Cases { [Test] public void Case() { if (true) That(true); } }
             """;
-        await Assert.That((await Analyze(source)).Single().Id).IsEqualTo("PL0003");
+
+        // Act
+        var diagnostics = await Analyze(source);
+
+        // Assert
+        await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0003");
     }
 
     [Test]
@@ -160,12 +209,17 @@ public class AnalyzeTestControlFlowTests
     [Arguments("Assert.Throws<System.Exception>(() => throw new System.Exception());")]
     public async Task Explicit_failure_and_exception_assertions_are_recognized(string assertion)
     {
-        await Assert.That((await Analyze(TestSource($"if (flag) {{ {assertion} }}"))).Single().Id).IsEqualTo("PL0003");
+        // Act
+        var diagnostics = await Analyze(TestSource($"if (flag) {{ {assertion} }}"));
+
+        // Assert
+        await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0003");
     }
 
     [Test]
     public async Task A_documented_local_suppression_only_affects_its_test()
     {
+        // Arrange
         var source = """
             using TUnit.Assertions;
             public class Cases
@@ -178,7 +232,11 @@ public class AnalyzeTestControlFlowTests
             """;
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
             generalDiagnosticOption: ReportDiagnostic.Error);
+
+        // Act
         var diagnostic = (await Analyze(source, options)).Single();
+
+        // Assert
         await Assert.That(diagnostic.GetMessage()).Contains("Test 'Other'");
         await Assert.That(diagnostic.Severity).IsEqualTo(DiagnosticSeverity.Error);
     }
@@ -186,9 +244,14 @@ public class AnalyzeTestControlFlowTests
     [Test]
     public async Task Warnings_as_errors_makes_unsuppressed_test_control_flow_blocking()
     {
+        // Arrange
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
             generalDiagnosticOption: ReportDiagnostic.Error);
+
+        // Act
         var diagnostic = (await Analyze(TestSource("if (flag) Assert.That(flag);"), options)).Single();
+
+        // Assert
         await Assert.That(diagnostic.Severity).IsEqualTo(DiagnosticSeverity.Error);
         await Assert.That(diagnostic.IsWarningAsError).IsTrue();
     }
@@ -196,13 +259,20 @@ public class AnalyzeTestControlFlowTests
     [Test]
     public async Task Generated_tests_are_skipped()
     {
-        await Assert.That((await Analyze("// <auto-generated/>\n" + TestSource("if (flag) Assert.That(flag);"))).Length).IsEqualTo(0);
+        // Act
+        var diagnostics = await Analyze("// <auto-generated/>\n" + TestSource("if (flag) Assert.That(flag);"));
+
+        // Assert
+        await Assert.That(diagnostics.Length).IsEqualTo(0);
     }
 
     [Test]
     public async Task Incomplete_test_code_does_not_crash_analysis()
     {
+        // Act
         var diagnostics = await Analyze("using TUnit.Assertions; public class Cases { [TUnit.Core.Test] public void Case() { if (", allowErrors: true);
+
+        // Assert
         await Assert.That(diagnostics.Any(d => d.Id == "AD0001")).IsFalse();
     }
 

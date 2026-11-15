@@ -7,9 +7,14 @@ public class ReadPcapFileTests
     [Test]
     public async Task Cli_reads_entire_file_and_prints_accurate_summary()
     {
+        // Arrange
         var bytes = PcapSamples.Replace(PcapSamples.Multiple(), 16, "03000000FFFF0000");
         using var input = new InputFile(bytes);
+
+        // Act
         var result = await Run("pcap", "read", input.Path);
+
+        // Assert
         await Assert.That(result.ExitCode).IsEqualTo(0);
         await Assert.That(result.Error).IsEqualTo("");
         await Assert.That(result.Output.Replace("\r\n", "\n")).IsEqualTo(
@@ -19,9 +24,14 @@ public class ReadPcapFileTests
     [Test]
     public async Task Missing_file_reports_the_path_and_exits_with_failure()
     {
+        // Arrange
         using var input = new InputFile([]);
         var path = input.Path + ".missing";
+
+        // Act
         var result = await Run("pcap", "read", path);
+
+        // Assert
         await Assert.That(result.ExitCode).IsEqualTo(1);
         await Assert.That(result.Output).IsEqualTo("");
         await Assert.That(result.Error).Contains("Unable to read");
@@ -31,8 +41,13 @@ public class ReadPcapFileTests
     [Test]
     public async Task Invalid_file_header_reports_open_failure_without_a_success_summary()
     {
+        // Arrange
         using var input = new InputFile([]);
+
+        // Act
         var result = await Run("pcap", "read", input.Path);
+
+        // Assert
         await Assert.That(result.ExitCode).IsEqualTo(1);
         await Assert.That(result.Output).IsEqualTo("");
         await Assert.That(result.Error).Contains("Error at byte 0");
@@ -42,8 +57,13 @@ public class ReadPcapFileTests
     [Test]
     public async Task Failure_after_a_packet_reports_location_without_a_success_summary()
     {
+        // Arrange
         using var input = new InputFile(PcapSamples.Multiple()[..60]);
+
+        // Act
         var result = await Run("pcap", "read", input.Path);
+
+        // Assert
         await Assert.That(result.ExitCode).IsEqualTo(1);
         await Assert.That(result.Output).IsEqualTo("");
         await Assert.That(result.Error).Contains("Error at byte 60");

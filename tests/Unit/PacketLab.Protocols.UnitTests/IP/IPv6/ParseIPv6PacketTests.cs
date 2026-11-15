@@ -13,7 +13,10 @@ public class ParseIPv6PacketTests
     [Test]
     public async Task Fixed_header_preserves_distinct_bit_fields_network_order_addresses_and_unknown_next_header()
     {
+        // Act
         var packet = Parse("6ABCDEF00102FD00" + Addresses);
+
+        // Assert
         await Assert.That(packet.Header).IsEqualTo(new IPv6Header(6, 0xab, 0xcdef0, 258, 253, 0,
             new IPv6Address(0x20010db800000000, 1), new IPv6Address(0xff02000000000000, 2)));
         await Assert.That(packet.Header.Source.ToString()).IsEqualTo("2001:db8::1");
@@ -22,17 +25,35 @@ public class ParseIPv6PacketTests
     }
 
     [Test]
-    public void Bit_fields_do_not_bleed_into_adjacent_fields()
-    {
-        if (!(FieldsMatch(0, 0, 255) && FieldsMatch(255, 0xfffff, 1) && FieldsMatch(1, 0x80000, 128)))
-            throw new InvalidOperationException("IPv6 bit field boundary mismatch.");
+    public void Bit_fields_do_not_bleed_into_adjacent_fields() =>
         Prop.ForAll((byte traffic, DoNotSize<uint> flow, byte hop) =>
-            FieldsMatch(traffic, flow.Item & 0xfffff, hop)).Check(Config.QuickThrowOnFailure);
+            {
+                // Act
+                var matches = FieldsMatch(traffic, flow.Item & 0xfffff, hop);
+
+                // Assert
+                return matches;
+            }).Check(Config.QuickThrowOnFailure);
+
+    [Test]
+    [Arguments(0, 0u, 255)]
+    [Arguments(255, 0xfffffu, 1)]
+    [Arguments(1, 0x80000u, 128)]
+    public async Task IPv6_bit_field_boundaries_preserve_adjacent_fields(byte traffic, uint flow, byte hop)
+    {
+        // Act
+        var matches = FieldsMatch(traffic, flow, hop);
+
+        // Assert
+        await Assert.That(matches).IsTrue();
     }
 
     private static bool FieldsMatch(byte traffic, uint flow, byte hop)
     {
+        // Act
         var header = Parse($"6{traffic:X2}{flow:X5}00003B{hop:X2}" + Addresses).Header;
+
+        // Assert
         return header.Version == 6 && header.TrafficClass == traffic && header.FlowLabel == flow && header.HopLimit == hop;
     }
 
@@ -42,8 +63,13 @@ public class ParseIPv6PacketTests
     [MethodDataSource(nameof(ShortLengths))]
     public async Task Short_headers_report_actual_bytes_and_required_length(int length)
     {
+        // Arrange
         var bytes = Convert.FromHexString(Header)[..length];
+
+        // Act
         var result = IPv6Parser.Parse(bytes);
+
+        // Assert
         var incomplete = result is IPv6ParseResult.IncompleteHeader parsed ? parsed
             : throw new InvalidOperationException("Expected an incomplete header.");
         await Assert.That(incomplete.RequiredLength).IsEqualTo(40);
@@ -54,35 +80,71 @@ public class ParseIPv6PacketTests
     [Test]
     [Arguments(4)]
     [Arguments(7)]
-    public async Task Complete_header_with_wrong_version_is_distinct_from_truncation(byte version)
+    public async Task Complete_header_with_wrong_version_reports_invalid_version(byte version)
     {
+        // Arrange
         var bytes = Convert.FromHexString(Header + "CAFE");
         bytes[0] = (byte)((version << 4) | 0xa);
+
+        // Act
         var result = IPv6Parser.Parse(bytes);
+
+        // Assert
         var invalid = result is IPv6ParseResult.InvalidVersion parsed ? parsed
             : throw new InvalidOperationException("Expected an invalid version.");
         await Assert.That(invalid.Version).IsEqualTo(version);
         await Assert.That(invalid.RemainingBytes.Span.SequenceEqual(bytes)).IsTrue();
-        await Assert.That(IPv6Parser.Parse(bytes.AsMemory(0, 39)) is IPv6ParseResult.IncompleteHeader).IsTrue();
     }
 
     [Test]
-    public void Declared_length_bounds_payload_and_preserves_trailing_bytes() =>
+    [Arguments(4)]
+    [Arguments(7)]
+    public async Task Truncated_header_takes_precedence_over_wrong_version(byte version)
+    {
+        // Arrange
+        var bytes = Convert.FromHexString(Header)[..39];
+        bytes[0] = (byte)((version << 4) | 0xa);
+
+        // Act
+        var result = IPv6Parser.Parse(bytes);
+
+        // Assert
+        await Assert.That(result is IPv6ParseResult.IncompleteHeader { CapturedLength: 39 }).IsTrue();
+    }
+
+    [Test]
+    [Arguments(0)]
+    [Arguments(1)]
+    [Arguments(2)]
+    public void Declared_length_bounds_payload_and_preserves_trailing_bytes(int scenario) =>
         Prop.ForAll((byte[] data, byte[] tail, ushort selector) =>
         {
+            // Arrange
             byte[] payload = [0xca, .. data];
             byte[] header = Convert.FromHexString("6ABCDEF0" + payload.Length.ToString("X4") + "FD00" + Addresses);
-            int cut = selector % payload.Length;
-            return HasSlices(header, payload.Length, payload[..cut], [])
-                && HasSlices(header, payload.Length, payload, []) && HasSlices(header, payload.Length, payload, tail);
+            int cut = scenario == 0 ? selector % payload.Length : payload.Length;
+            byte[] trailing = scenario == 2 ? tail : [];
+
+            // Act
+            var matches = HasSlices(header, payload.Length, payload[..cut], trailing);
+
+            // Assert
+            return matches;
         }).Check(Config.QuickThrowOnFailure);
 
     private static bool HasSlices(byte[] header, int declared, byte[] data, byte[] tail)
     {
+        // Arrange
         byte[] bytes = [.. header, .. data, .. tail];
-        if (IPv6Parser.Parse(bytes) is not IPv6Packet packet) return false;
+        var expectedHeader = Parse(Convert.ToHexString(header)).Header;
+
+        // Act
+        var result = IPv6Parser.Parse(bytes);
+
+        // Assert
+        if (result is not IPv6Packet packet) return false;
         var payload = Known(packet);
-        return packet.Header == Parse(Convert.ToHexString(header)).Header
+        return packet.Header == expectedHeader
             && payload.DeclaredLength == declared && payload.DeclaredDatagramLength == 40UL + (uint)declared
             && payload.IsDatagramComplete == (declared == data.Length)
             && payload.Bytes.Equals(bytes.AsMemory(40, data.Length))
@@ -92,7 +154,10 @@ public class ParseIPv6PacketTests
     [Test]
     public async Task Maximum_payload_length_does_not_overflow_datagram_length_or_require_captured_payload()
     {
+        // Act
         var payload = Known(Parse("60000000FFFF1101" + Addresses));
+
+        // Assert
         await Assert.That(payload.DeclaredDatagramLength).IsEqualTo(65575);
         await Assert.That(payload.DeclaredLength).IsEqualTo(ushort.MaxValue);
         await Assert.That(payload.Bytes.IsEmpty).IsTrue();
@@ -108,7 +173,10 @@ public class ParseIPv6PacketTests
     [Arguments(60)]
     public async Task Invalid_extension_headers_preserve_fixed_header_and_payload(byte nextHeader)
     {
+        // Act
         var packet = Parse("600000000004" + nextHeader.ToString("X2") + "40" + Addresses + "FFFFFFFF");
+
+        // Assert
         await Assert.That(packet.Header.NextHeader).IsEqualTo(nextHeader);
         var payload = Known(packet);
         await Assert.That(payload.IsDatagramComplete).IsTrue();
@@ -120,7 +188,10 @@ public class ParseIPv6PacketTests
     [Arguments(253)]
     public async Task Zero_length_without_hop_by_hop_keeps_remaining_capture_as_trailing_bytes(byte nextHeader)
     {
+        // Act
         var packet = Parse("600000000000" + nextHeader.ToString("X2") + "40" + Addresses + "DEADBEEF");
+
+        // Assert
         var payload = Known(packet);
         await Assert.That(payload.DeclaredLength).IsEqualTo((ushort)0);
         await Assert.That(payload.DeclaredDatagramLength).IsEqualTo(40);
@@ -134,9 +205,14 @@ public class ParseIPv6PacketTests
     [Arguments("FFFFFFFF")]
     public async Task Zero_length_with_hop_by_hop_preserves_capture_without_asserting_length_or_completeness(string remaining)
     {
+        // Arrange
         var bytes = Convert.FromHexString("6ABCDEF00000007F" + Addresses + remaining);
+
+        // Act
         var packet = IPv6Parser.Parse(bytes) is IPv6Packet parsed ? parsed
             : throw new InvalidOperationException("Expected a complete header.");
+
+        // Assert
         await Assert.That(packet.Header).IsEqualTo(new IPv6Header(6, 0xab, 0xcdef0, 0, 0, 127,
             new IPv6Address(0x20010db800000000, 1), new IPv6Address(0xff02000000000000, 2)));
         var payload = packet.Payload is IPv6Payload.UndeterminedLength unknown ? unknown
@@ -156,7 +232,10 @@ public class ParseIPv6PacketTests
     [Arguments("00000000000000000000FFFFC0000201", "::ffff:192.0.2.1")]
     public async Task Addresses_use_canonical_rfc5952_text(string source, string expected)
     {
+        // Act
         var packet = Parse("6000000000003B40" + source + Addresses[32..]);
+
+        // Assert
         await Assert.That(packet.Header.Source.ToString()).IsEqualTo(expected);
     }
 

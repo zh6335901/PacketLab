@@ -9,31 +9,45 @@ namespace PacketLab.Analysis.IntegrationTests;
 
 public class AnalyzeTcpCaptureTests
 {
-#pragma warning disable PL0003 // One reader must continue through all diagnostics to the final valid record.
     [Test]
     [Arguments("tcp-little", PcapByteOrder.LittleEndian)]
     [Arguments("tcp-big", PcapByteOrder.BigEndian)]
-    public async Task Analysis_reads_all_records_after_packet_diagnostics_and_reaches_eof(string sample, PcapByteOrder order)
+    public async Task Analysis_preserves_record_order_after_packet_diagnostics(string sample, PcapByteOrder order)
     {
+        // Arrange
         using var stream = OpenSample(sample);
-        var reader = OpenReader(stream);
+        using var reader = OpenReader(stream);
+
+        // Act
+        var packets = Enumerable.Range(0, 16).Select(_ => ReadPacket(reader)).ToArray();
+
+        // Assert
         await Assert.That(reader.Header.ByteOrder).IsEqualTo(order);
-        var packets = new AnalyzedPacket[16];
-        for (var i = 0; i < packets.Length; i++)
-        {
-            var packet = ReadPacket(reader);
-            packets[i] = packet;
-            await Assert.That(packet.RecordNumber).IsEqualTo(i + 1L);
-            await Assert.That(packet.Packet.OriginalLength).IsEqualTo(70000u);
-            await Assert.That(Ethernet(packet).Frame.Source.ToString()).IsEqualTo("02:00:00:00:00:01");
-        }
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
+        await Assert.That(packets.Select(p => p.RecordNumber).SequenceEqual(Enumerable.Range(1, 16).Select(i => (long)i))).IsTrue();
+        await Assert.That(packets.All(p => p.Packet.OriginalLength == 70000u)).IsTrue();
+        await Assert.That(packets.All(p => Ethernet(p).Frame.Source.ToString() == "02:00:00:00:00:01")).IsTrue();
         var last = Segment(Tcp(IPv6(Ethernet(packets[^1])).Payload));
         await Assert.That(last.IsComplete).IsTrue();
         await Assert.That(last.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
         await Assert.That(Hex(last.Payload)).IsEqualTo("CAFE01");
     }
-#pragma warning restore PL0003
+
+    [Test]
+    [Arguments("tcp-little")]
+    [Arguments("tcp-big")]
+    public async Task Analysis_reaches_eof_after_all_records_with_diagnostics(string sample)
+    {
+        // Arrange
+        using var stream = OpenSample(sample);
+        using var reader = OpenReader(stream);
+
+        // Act
+        for (int i = 0; i < 16; i++) ReadPacket(reader);
+        var result = reader.ReadNext();
+
+        // Assert
+        await Assert.That(result is PcapEndOfFile).IsTrue();
+    }
 
     [Test]
     [Arguments("tcp-little", SampleRecord.MaximumHeader, 60, 63u, "CAFE01", TcpChecksumStatus.Match)]
@@ -49,7 +63,10 @@ public class AnalyzeTcpCaptureTests
     public async Task Ipv4_tcp_preserves_fields_boundaries_and_checksum(string sample, SampleRecord record,
         int headerLength, uint declaredLength, string payload, TcpChecksumStatus checksum)
     {
+        // Act
         var tcp = Segment(Tcp(IPv4(ReadRecord(sample, record)).Payload));
+
+        // Assert
         await Assert.That(tcp.Header.SourcePort).IsEqualTo((ushort)43981);
         await Assert.That(tcp.Header.DestinationPort).IsEqualTo((ushort)65244);
         await Assert.That(tcp.Header.HeaderLength).IsEqualTo(headerLength);
@@ -67,7 +84,10 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big", SampleRecord.FinalValidSegment)]
     public async Task Ipv6_located_tcp_preserves_fields_boundaries_and_checksum(string sample, SampleRecord record)
     {
+        // Act
         var tcp = Segment(Tcp(IPv6(ReadRecord(sample, record)).Payload));
+
+        // Assert
         await Assert.That(tcp.Header.SourcePort).IsEqualTo((ushort)43981);
         await Assert.That(tcp.Header.DestinationPort).IsEqualTo((ushort)65244);
         await Assert.That(tcp.Header.HeaderLength).IsEqualTo(20);
@@ -81,7 +101,10 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big")]
     public async Task Maximum_tcp_header_retains_options_and_excludes_ip_trailing_bytes(string sample)
     {
+        // Act
         var ip = IPv4(ReadRecord(sample, SampleRecord.MaximumHeader));
+
+        // Assert
         var tcp = Segment(Tcp(ip.Payload));
         await Assert.That(ip.Packet.ChecksumStatus).IsEqualTo(IPv4ChecksumStatus.Match);
         await Assert.That(Hex(ip.Packet.TrailingBytes)).IsEqualTo("DEADBEEF");
@@ -97,7 +120,10 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big")]
     public async Task Ipv6_extensions_locate_tcp_and_keep_trailing_bytes_separate(string sample)
     {
+        // Act
         var ip = IPv6(ReadRecord(sample, SampleRecord.ExtensionChain));
+
+        // Assert
         await Assert.That(ip.RemainingOffset).IsEqualTo(56);
         await Assert.That(ip.Extensions.Length).IsEqualTo(2);
         await Assert.That(ip.Capture is IPv6Payload.KnownLength known && Hex(known.TrailingBytes) == "DEAD").IsTrue();
@@ -108,7 +134,10 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big")]
     public async Task Invalid_data_offset_is_retained_inside_ipv4(string sample)
     {
+        // Act
         var tcp = Tcp(IPv4(ReadRecord(sample, SampleRecord.InvalidDataOffset)).Payload);
+
+        // Assert
         await Assert.That(tcp is TcpParseResult.InvalidDataOffset { Header.DataOffset: 4, DeclaredLength: 23 }).IsTrue();
     }
 
@@ -117,7 +146,10 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big")]
     public async Task Fixed_header_truncation_is_retained_inside_ipv6(string sample)
     {
+        // Act
         var tcp = Tcp(IPv6(ReadRecord(sample, SampleRecord.TruncatedHeader)).Payload);
+
+        // Assert
         await Assert.That(tcp is TcpParseResult.HeaderTruncated { DeclaredLength: 23, RemainingBytes.Length: 18 }).IsTrue();
     }
 
@@ -126,9 +158,12 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big")]
     public async Task Options_truncation_retains_the_declared_header_length(string sample)
     {
+        // Act
         var tcp = Tcp(IPv4(ReadRecord(sample, SampleRecord.TruncatedOptions)).Payload);
+
+        // Assert
         await Assert.That(tcp is TcpParseResult.OptionsTruncated
-            { Header.HeaderLength: 60, DeclaredLength: 63, RemainingBytes.Length: 22 }).IsTrue();
+        { Header.HeaderLength: 60, DeclaredLength: 63, RemainingBytes.Length: 22 }).IsTrue();
     }
 
     [Test]
@@ -136,7 +171,10 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big")]
     public async Task Payload_truncation_preserves_tcp_fields_without_claiming_a_checksum_result(string sample)
     {
+        // Act
         var tcp = Segment(Tcp(IPv6(ReadRecord(sample, SampleRecord.TruncatedPayload)).Payload));
+
+        // Assert
         await Assert.That(tcp.Header.SourcePort).IsEqualTo((ushort)43981);
         await Assert.That(tcp.Header.DestinationPort).IsEqualTo((ushort)65244);
         await Assert.That(tcp.Header.HeaderLength).IsEqualTo(20);
@@ -150,7 +188,10 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big")]
     public async Task Malformed_option_has_a_structured_boundary_diagnostic(string sample)
     {
+        // Act
         var tcp = Segment(Tcp(IPv4(ReadRecord(sample, SampleRecord.InvalidOption)).Payload));
+
+        // Assert
         await Assert.That(tcp.Options.Items.Single().Value.Value)
             .IsEqualTo(new TcpOptionValue.Invalid(TcpOptionFailure.ExceedsHeader, 5, 4));
     }
@@ -160,7 +201,10 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big")]
     public async Task Unknown_routing_destination_preserves_tcp_without_claiming_a_checksum_result(string sample)
     {
+        // Act
         var tcp = Segment(Tcp(IPv6(ReadRecord(sample, SampleRecord.UnknownRoutingDestination)).Payload));
+
+        // Assert
         await Assert.That(tcp.Header.SourcePort).IsEqualTo((ushort)43981);
         await Assert.That(tcp.Header.DestinationPort).IsEqualTo((ushort)65244);
         await Assert.That(tcp.Header.HeaderLength).IsEqualTo(20);
@@ -174,7 +218,10 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big")]
     public async Task Ipv4_fragment_stops_before_tcp_decoding(string sample)
     {
+        // Act
         var ip = IPv4(ReadRecord(sample, SampleRecord.Ipv4Fragment));
+
+        // Assert
         await Assert.That(ip.Payload is IPv4FragmentPayload { Protocol: 6, MoreFragments: true }).IsTrue();
     }
 
@@ -183,7 +230,10 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big")]
     public async Task Ipv6_fragment_stops_before_tcp_decoding(string sample)
     {
+        // Act
         var ip = IPv6(ReadRecord(sample, SampleRecord.Ipv6Fragment));
+
+        // Assert
         await Assert.That(ip.Payload is IPv6FragmentPayload { Fragment: { NextHeader: 6, MoreFragments: true } }).IsTrue();
     }
 
@@ -192,7 +242,10 @@ public class AnalyzeTcpCaptureTests
     [Arguments("tcp-big")]
     public async Task Invalid_extension_chain_stops_before_tcp_decoding(string sample)
     {
+        // Act
         var ip = IPv6(ReadRecord(sample, SampleRecord.InvalidExtensionChain));
+
+        // Assert
         await Assert.That(ip.Payload is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Invalid }).IsTrue();
     }
 

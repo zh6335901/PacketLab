@@ -14,14 +14,17 @@ public class TransportChecksumTests
     public void Valid_tcp_checksums_match_for_varied_payloads_and_memory_offsets() =>
         Prop.ForAll(ChecksumInputs(), input =>
         {
+            // Arrange
             var packet = PayloadSlice(20, input.Length, input.Offset, input.Seed);
             packet.Span[12] = 0x50;
             var length = (uint)packet.Length;
             BinaryPrimitives.WriteUInt16BigEndian(packet.Span[16..],
                 Checksum(packet.Span, Addresses + 6 + (length >> 16) + (length & 0xffff)));
 
+            // Act
             var parsed = TcpParser.Parse(packet, length, Addresses);
 
+            // Assert
             return parsed.Checksum.Value is TcpChecksumStatus.Match;
         }).Check(Config.QuickThrowOnFailure.WithMaxTest(300));
 
@@ -29,6 +32,7 @@ public class TransportChecksumTests
     public void Valid_udp_checksums_match_for_varied_payloads_and_memory_offsets() =>
         Prop.ForAll(ChecksumInputs(), input =>
         {
+            // Arrange
             var packet = PayloadSlice(8, input.Length, input.Offset, input.Seed);
             var length = (uint)packet.Length;
             bool jumbo = length > ushort.MaxValue;
@@ -36,8 +40,10 @@ public class TransportChecksumTests
             var checksum = Checksum(packet.Span, Addresses + 17 + (length >> 16) + (length & 0xffff));
             BinaryPrimitives.WriteUInt16BigEndian(packet.Span[6..], checksum == 0 ? ushort.MaxValue : checksum);
 
+            // Act
             var parsed = UdpParser.Parse(packet, length, jumbo, Addresses);
 
+            // Assert
             return parsed.Checksum.Value is UdpChecksumStatus.Match;
         }).Check(Config.QuickThrowOnFailure.WithMaxTest(300));
 
