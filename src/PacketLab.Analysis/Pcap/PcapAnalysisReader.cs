@@ -66,7 +66,8 @@ public sealed class PcapAnalysisReader : IDisposable
     // The stream remains owned by the caller; disposal only releases reassembly state.
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+            return;
         ReassemblyEvents = reassemblyAnalyzer.Finish(IpReassemblyAnalysisReason.Aborted);
         reassemblyAnalyzer.Dispose();
         disposed = true;

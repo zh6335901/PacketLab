@@ -27,8 +27,13 @@ internal static class IPv6ExtensionParser
                 : new IPv6Payload.UndeterminedLength(captured);
             if (declared is uint expected && captured.Length < expected)
                 Diagnose(IPv6DiagnosticCode.PayloadTruncated, end, $"payload declared {expected} bytes, captured {captured.Length}");
-            return new(header, payload, new(headers.ToImmutable(), 40 + offset, captured[offset..end],
-                diagnostics?.ToImmutable() ?? [], result));
+            var chain = new IPv6ExtensionChain(
+                Headers: headers.ToImmutable(),
+                RemainingOffset: 40 + offset,
+                RemainingBytes: captured[offset..end],
+                Diagnostics: diagnostics?.ToImmutable() ?? [],
+                Result: result);
+            return new(header, payload, chain);
         }
 
         IPv6PayloadUnavailable? CheckLength(int required)
@@ -58,8 +63,13 @@ internal static class IPv6ExtensionParser
                 IPv6ChecksumContext context = addressesKnown
                     ? new IPv6ChecksumContext.KnownAddresses(header.Source, header.Destination)
                     : new IPv6ChecksumContext.Unavailable();
-                return Finish(new IPv6UpperLayer(next, 40 + offset, declared!.Value - (uint)offset,
-                    captured[offset..Available()], context));
+                var upper = new IPv6UpperLayer(
+                    Protocol: next,
+                    Offset: 40 + offset,
+                    DeclaredLength: declared!.Value - (uint)offset,
+                    Bytes: captured[offset..Available()],
+                    ChecksumContext: context);
+                return Finish(upper);
             }
             if (next is not (0 or 60 or 43 or 44 or 51))
             {
@@ -97,7 +107,12 @@ internal static class IPv6ExtensionParser
                     Identification: BinaryPrimitives.ReadUInt32BigEndian(bytes[4..]),
                     NextHeader: bytes[0]);
             }
-            headers.Add(new(next, bytes[0], 40 + offset, captured.Slice(offset, length), fragment));
+            headers.Add(new(
+                Type: next,
+                NextHeader: bytes[0],
+                Offset: 40 + offset,
+                Bytes: captured.Slice(offset, length),
+                Fragment: fragment));
 
             if (next == 0 && offset != 0)
             {
@@ -107,7 +122,8 @@ internal static class IPv6ExtensionParser
             }
             if (next is 0 or 60)
             {
-                var options = ReadOptions(bytes[..length], next == 0 && offset == 0, header.PayloadLength);
+                var firstHopByHop = next == 0 && offset == 0;
+                var options = ReadOptions(bytes[..length], firstHopByHop, header.PayloadLength);
                 if (options is OptionsResult.Invalid error)
                 {
                     Diagnose(error.Code, offset + error.Offset, error.Message);
