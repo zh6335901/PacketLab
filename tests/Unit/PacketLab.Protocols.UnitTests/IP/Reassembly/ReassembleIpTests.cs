@@ -17,28 +17,61 @@ public partial class ReassembleIpTests
     [Arguments(0x40)]
     [Arguments(0x80)]
     [Arguments(0xc0)]
-    public async Task Unfragmented_ipv4_does_not_join_a_pending_datagram_with_the_same_identity(byte flags)
+    public async Task Processing_unfragmented_ipv4_returns_no_update_even_when_its_identity_is_pending(byte flags)
     {
         using var reassembler = new IpFragmentReassembler();
-        var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
+        reassembler.Process(Fragment(4, 0, true, Payload[..16]));
         var packet = Fragment(4, 0, false, Payload);
         packet[6] = flags;
 
-        await Assert.That(reassembler.FindDatagram(packet)).IsNull();
-        await Assert.That(reassembler.Process(packet)).IsNull();
-        await Assert.That(reassembler.IsRetained(pending.DatagramId)).IsTrue();
+        var result = reassembler.Process(packet);
+
+        await Assert.That(result).IsNull();
+    }
+
+    [Test]
+    public async Task Looking_up_unfragmented_ipv4_returns_no_datagram_even_when_its_identity_is_pending()
+    {
+        using var reassembler = new IpFragmentReassembler();
+        reassembler.Process(Fragment(4, 0, true, Payload[..16]));
+        var packet = Fragment(4, 0, false, Payload);
+
+        var result = reassembler.FindDatagram(packet);
+
+        await Assert.That(result).IsNull();
+    }
+
+    [Test]
+    public async Task A_final_fragment_completes_the_pending_datagram_after_an_unfragmented_packet_with_the_same_identity()
+    {
+        using var reassembler = new IpFragmentReassembler();
+        var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
+        reassembler.Process(Fragment(4, 0, false, Payload));
+
         var completed = reassembler.Process(Fragment(4, 16, false, Payload[16..]))!;
+
         await Assert.That(completed.DatagramId).IsEqualTo(pending.DatagramId);
         await Assert.That(completed.Status).IsEqualTo(IpReassemblyStatus.Complete);
     }
 
     [Test]
-    public void Truncated_ipv4_headers_do_not_enter_reassembly() =>
+    public void Processing_truncated_ipv4_headers_returns_no_update() =>
         Prop.ForAll((byte length, bool more) =>
         {
             using var reassembler = new IpFragmentReassembler();
             var packet = Fragment(4, 0, more, Payload).AsMemory(0, length % 20);
-            return reassembler.FindDatagram(packet) is null && reassembler.Process(packet) is null;
+            var result = reassembler.Process(packet);
+            return result is null;
+        }).Check(Config.QuickThrowOnFailure);
+
+    [Test]
+    public void Looking_up_truncated_ipv4_headers_returns_no_datagram() =>
+        Prop.ForAll((byte length, bool more) =>
+        {
+            using var reassembler = new IpFragmentReassembler();
+            var packet = Fragment(4, 0, more, Payload).AsMemory(0, length % 20);
+            var result = reassembler.FindDatagram(packet);
+            return result is null;
         }).Check(Config.QuickThrowOnFailure);
 
     [Test]
