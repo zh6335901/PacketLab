@@ -25,10 +25,7 @@ public sealed class IpFragmentReassembler : IDisposable
         if (Extract(ipPacket) is not { } fragment)
             return null;
 
-        var events = ImmutableArray.CreateBuilder<IpReassemblyUpdate>();
-        Accept(fragment, ++nextId, events);
-
-        return events.Single();
+        return Accept(fragment, ++nextId);
     }
 
     // A monotonic high-water mark makes reordered input timestamps safe.
@@ -91,10 +88,7 @@ public sealed class IpFragmentReassembler : IDisposable
         if (state is null)
             return null;
 
-        var events = ImmutableArray.CreateBuilder<IpReassemblyUpdate>();
-        Fail(state, IpReassemblyStatus.Discarded, "datagram discarded by caller", events);
-
-        return events.Single();
+        return Fail(state, IpReassemblyStatus.Discarded, "datagram discarded by caller");
     }
 
     // Allows a host to enforce bounded input associations before accepting another fragment.
@@ -126,24 +120,16 @@ public sealed class IpFragmentReassembler : IDisposable
         disposed = true;
     }
 
-    private void Accept(Fragment fragment, long datagramId, ImmutableArray<IpReassemblyUpdate>.Builder events)
+    private IpReassemblyUpdate Accept(Fragment fragment, long datagramId)
     {
         if (fragment.Atomic)
-        {
-            AcceptAtomic(fragment, datagramId, events);
-
-            return;
-        }
+            return AcceptAtomic(fragment, datagramId);
 
         if (!datagrams.TryGetValue(fragment.Key, out var state))
         {
             state = new Datagram(fragment, datagramId, clock);
             if (datagrams.Count >= options.MaxDatagrams)
-            {
-                events.Add(Event(state, IpReassemblyStatus.ResourceLimit, "datagram table limit reached (including discarded identities)"));
-
-                return;
-            }
+                return Event(state, IpReassemblyStatus.ResourceLimit, "datagram table limit reached (including discarded identities)");
 
             // Starts are monotonic. Removing the oldest entry can only cause an extra early scan.
             if (datagrams.Count == 0)
@@ -152,40 +138,31 @@ public sealed class IpFragmentReassembler : IDisposable
         }
         if (state.Buffer is Discarded discarded)
         {
-            events.Add(new(state.Id, state.Version, state.Identification,
-                "datagram already discarded; identity retained until expiry", new IpReassemblyDiagnostic(discarded.Status)));
-
-            return;
+            return new(state.Id, state.Version, state.Identification,
+                "datagram already discarded; identity retained until expiry", new IpReassemblyDiagnostic(discarded.Status));
         }
 
         var buffer = state.Buffer is Collecting collecting ? collecting : throw new InvalidOperationException();
-        AcceptFragment(state, buffer, fragment, events);
+
+        return AcceptFragment(state, buffer, fragment);
     }
 
-    private void AcceptAtomic(Fragment fragment, long datagramId, ImmutableArray<IpReassemblyUpdate>.Builder events)
+    private IpReassemblyUpdate AcceptAtomic(Fragment fragment, long datagramId)
     {
         var state = new Datagram(fragment, datagramId, clock);
         if (Validate(fragment) is { } invalid)
-        {
-            events.Add(Event(state, invalid.Status, invalid.Message));
-
-            return;
-        }
+            return Event(state, invalid.Status, invalid.Message);
 
         var packet = BuildPacket(fragment.Prefix, fragment, fragment.Bytes.Span);
         var decodedPacket = Decode(packet, fragment.Key.Version);
-        events.Add(Event(state, IpReassemblyStatus.Atomic, "independent atomic fragment", decodedPacket));
+
+        return Event(state, IpReassemblyStatus.Atomic, "independent atomic fragment", decodedPacket);
     }
 
-    private void AcceptFragment(Datagram state, Collecting buffer, Fragment fragment,
-        ImmutableArray<IpReassemblyUpdate>.Builder events)
+    private IpReassemblyUpdate AcceptFragment(Datagram state, Collecting buffer, Fragment fragment)
     {
         if (ValidateForDatagram(state, buffer, fragment) is { } failure)
-        {
-            Fail(state, failure.Status, failure.Message, events);
-
-            return;
-        }
+            return Fail(state, failure.Status, failure.Message);
 
         var end = fragment.Offset + fragment.Bytes.Length;
         foreach (var part in buffer.Parts)
@@ -195,44 +172,27 @@ public sealed class IpFragmentReassembler : IDisposable
             if (part.Offset == fragment.Offset && part.More == fragment.More &&
                 part.Bytes.AsSpan().SequenceEqual(fragment.Bytes.Span))
             {
-                events.Add(Event(state, IpReassemblyStatus.Duplicate, "exact duplicate ignored"));
-
-                return;
+                return Event(state, IpReassemblyStatus.Duplicate, "exact duplicate ignored");
             }
 
-            Fail(state, IpReassemblyStatus.Conflict, "overlap: entire datagram discarded", events);
-
-            return;
+            return Fail(state, IpReassemblyStatus.Conflict, "overlap: entire datagram discarded");
         }
 
         if (BufferFragment(buffer, fragment, end) is { } limit)
-        {
-            Fail(state, limit.Status, limit.Message, events);
+            return Fail(state, limit.Status, limit.Message);
 
-            return;
-        }
-
-        CompleteOrWait(state, buffer, fragment, events);
+        return CompleteOrWait(state, buffer, fragment);
     }
 
-    private void CompleteOrWait(Datagram state, Collecting buffer, Fragment fragment,
-        ImmutableArray<IpReassemblyUpdate>.Builder events)
+    private IpReassemblyUpdate CompleteOrWait(Datagram state, Collecting buffer, Fragment fragment)
     {
         if (buffer.First is FirstHeader { Bytes: var first } && buffer.Length is FinalLength { Value: var total })
         {
             var ipLength = first.Length + total;
             if (ipLength > (state.Version == 4 ? 65535 : 65575))
-            {
-                Fail(state, IpReassemblyStatus.Invalid, "reassembled IP length exceeds limit", events);
-
-                return;
-            }
+                return Fail(state, IpReassemblyStatus.Invalid, "reassembled IP length exceeds limit");
             if (ipLength > options.MaxDatagramBytes)
-            {
-                Fail(state, IpReassemblyStatus.ResourceLimit, "single datagram byte limit reached", events);
-
-                return;
-            }
+                return Fail(state, IpReassemblyStatus.ResourceLimit, "single datagram byte limit reached");
             // Accepted parts cannot overlap or exceed the final length, so equal byte counts prove coverage.
             if (buffer.PayloadBytes == total)
             {
@@ -241,13 +201,14 @@ public sealed class IpFragmentReassembler : IDisposable
                     part.Bytes.CopyTo(payload, part.Offset);
                 var packet = BuildPacket(first, fragment, payload, (buffer.EcnCodepoints & 0b1000) != 0);
                 var decodedPacket = Decode(packet, fragment.Key.Version);
-                events.Add(Event(state, IpReassemblyStatus.Complete, "all fragment bytes captured", decodedPacket));
+                var update = Event(state, IpReassemblyStatus.Complete, "all fragment bytes captured", decodedPacket);
                 Remove(fragment.Key, state);
 
-                return;
+                return update;
             }
         }
-        events.Add(Event(state, IpReassemblyStatus.Pending, "waiting for contiguous fragments and final length"));
+
+        return Event(state, IpReassemblyStatus.Pending, "waiting for contiguous fragments and final length");
     }
 
     private (IpReassemblyStatus Status, string Message)? ValidateForDatagram(
@@ -351,14 +312,15 @@ public sealed class IpFragmentReassembler : IDisposable
             (first.Length == fragment.Prefix.Length && first.AsSpan(20).SequenceEqual(fragment.Prefix.Span[20..]));
     }
 
-    private void Fail(Datagram state, IpReassemblyStatus status, string message,
-        ImmutableArray<IpReassemblyUpdate>.Builder events)
+    private IpReassemblyUpdate Fail(Datagram state, IpReassemblyStatus status, string message)
     {
-        events.Add(Event(state, status, message));
+        var update = Event(state, status, message);
         if (state.Buffer is Collecting buffer)
             bufferedBytes -= buffer.Bytes;
         // A bounded tombstone prevents later fragments from reviving an ambiguous datagram.
         state.Buffer = new Discarded(status);
+
+        return update;
     }
 
     private void Remove(Key key, Datagram state)
