@@ -42,7 +42,7 @@ jobs:
           global-json-file: global.json
 
       - name: Compare benchmarks
-        # Protocols: 47 cases x 2 revisions x up to 23 iterations x 250 ms is about 9 minutes,
+        # Protocols: 47 cases x 2 revisions x up to 20 measured iterations x 250 ms is about 8 minutes,
         # plus JIT/pilot/build overhead. Filters reduce cases; reserve time for artifact upload.
         timeout-minutes: ${{ inputs.suite == 'Protocols' && 45 || 25 }}
         shell: pwsh
