@@ -7,6 +7,7 @@ open System.IO
 open System.IO.Compression
 open System.Security.Cryptography
 open System.Text.Json.Nodes
+open System.Text.RegularExpressions
 
 let (</>) a b = Path.Combine(a, b)
 let root = Path.GetFullPath(__SOURCE_DIRECTORY__ </> "..")
@@ -79,7 +80,10 @@ let readMeasurement (raw: JsonNode) failure =
         match field "Median" stats, field "OriginalValues" stats with
         | value, (:? JsonArray as samples) when not (isNull value) && samples.Count > 0 ->
             let ns = value.GetValue<float>()
-            if Double.IsFinite(ns) && ns > 0. then Some ns else None
+            let validSamples = samples |> Seq.forall (fun value ->
+                let sample = value.GetValue<float>()
+                Double.IsFinite(sample) && sample > 0.)
+            if validSamples && Double.IsFinite(ns) && ns > 0. then Some ns else None
         | _ -> None
     let allocation =
         match field "Memory" raw |> field "BytesAllocatedPerOperation" with
@@ -110,7 +114,7 @@ type Side = {
     Errors: ResizeArray<string>
 }
 
-let runSide temp output project candidate affinity (name, revision) =
+let runSide temp output project candidate affinity filter (name, revision) =
     printfn "Measuring %s %s" name revision
     let folder = directory (output </> name)
     let log = folder </> "run.log"
@@ -151,8 +155,11 @@ let runSide temp output project candidate affinity (name, revision) =
                 if not failedChild.HasExited then failedChild.Kill(true)
                 reraise()
         runProcess launch (Path.GetDirectoryName bench) (Some log) env "dotnet"
-            [target; "--filter"; "*"; "--inProcess"; "--iterationCount"; "12"; "--warmupCount"; "3"
-             "--iterationTime"; "250"; "--exporters"; "fulljson"; "--artifacts"; folder] |> ignore
+            // JIT preparation warms the benchmark before pilot measurements; do not add separate warmup iterations.
+            [target; "--filter"; filter; "--jitTieringMode"; "Force"; "--warmupCount"; "0"
+             "--iterationTime"; "250"; "--iterationCount"; "15"
+             "--outliers"; "DontRemove"
+             "--exporters"; "fulljson"; "--artifacts"; folder] |> ignore
     with ex -> errors.Add(ex.Message)
     let failures = executionErrors log
     let mutable rows, environments = Map.empty, Set.empty
@@ -201,13 +208,38 @@ let shortScenarioName project (fullName: string) =
         else relative
     else fullName
 
-let report output project scenarios affinity baseline candidate compare =
+// Short manifest names omit the project namespace and the benchmark class suffix.
+let fullScenarioName project (name: string) =
+    let prefix = Path.GetFileNameWithoutExtension(project: string) + "."
+    if name.StartsWith(prefix, StringComparison.Ordinal) then name
+    else
+        let separator = name.IndexOf('.')
+        if separator <= 0 then failwith $"Invalid scenario name: {name}"
+        prefix + name.Insert(separator, "Benchmarks")
+
+let selectScenarios project filter scenarios =
+    if String.IsNullOrWhiteSpace(filter) || filter.StartsWith("-", StringComparison.Ordinal) then
+        failwith "Filter must be a non-empty benchmark name pattern"
+    // Match BenchmarkDotNet GlobFilter: full name or method name without parameters.
+    let pattern = "^" + Regex.Escape(filter).Replace("\\*", ".*").Replace("\\?", ".") + "$"
+    let matcher = Regex(pattern, RegexOptions.IgnoreCase ||| RegexOptions.CultureInvariant)
+    let selected =
+        scenarios |> List.map (fullScenarioName project)
+        |> List.filter (fun name -> matcher.IsMatch(name) || matcher.IsMatch(name.Split('(')[0]))
+    if selected.IsEmpty then failwith $"Filter '{filter}' matches no scenarios in the candidate manifest"
+    selected
+
+let report output project (scenarios: string list) (filter: string) affinity baseline candidate compare =
     let lines = ResizeArray<string>()
     let mutable failed = false
     lines.Add("# Benchmark comparison\n")
     lines.Add($"- Benchmark source: {candidate.Sha} / {project}")
+    let displayedFilter = filter.ReplaceLineEndings(" ")
+    lines.Add($"- Scenario filter: `{displayedFilter}`, {scenarios.Length} expected cases")
     lines.Add($"- Benchmark CPU policy: {BenchmarkAffinity.describe affinity}")
     lines.Add($"- ResultsComparer: {comparerRev}, threshold {threshold}, noise filter 0.3 ns")
+    lines.Add("- Measurement: isolated benchmark processes, JIT tier promotion enabled, 0 additional warmups, 15 measured iterations, 250 ms target per iteration; all samples retained.")
+    lines.Add("- BenchmarkDotNet diagnostic warnings remain in the run logs and exported reports. Warnings are not treated as execution failures; a comparison does not prove absence of environmental noise.")
     for side in [baseline; candidate] do
         lines.Add($"- {side.Name} product: {side.Sha} ([run log]({side.Name}/run.log))")
         for cpu in side.CpuModels do lines.Add($"  - CPU: {cpu}")
@@ -233,7 +265,7 @@ let report output project scenarios affinity baseline candidate compare =
     if expected.Count <> keys.Length then failwith "Multiple manifest entries refer to the same benchmark"
     for key in keys @ Set.toList (Set.difference observed expected) do
         let diagnostics = ResizeArray<string>()
-        if not (expected.Contains key) then diagnostics.Add("Scenario absent from candidate manifest")
+        if not (expected.Contains key) then diagnostics.Add("Scenario absent from selected candidate manifest")
         let lookup side =
             let row = Map.tryFind key side.Rows
             let problems = row |> Option.map _.Errors |> Option.defaultValue ["Missing result"]
@@ -247,7 +279,7 @@ let report output project scenarios affinity baseline candidate compare =
         let allocation row = row |> Option.bind _.Allocation |> Option.map string |> Option.defaultValue "—"
         let change =
             match median left, median right with
-            | Some a, Some b -> sprintf "%+.2f%%" ((b / a - 1.) * 100.)
+            | Some a, Some b when diagnostics.Count = 0 -> sprintf "%+.2f%%" ((b / a - 1.) * 100.)
             | _ -> "—"
         let verdict =
             match left, right with
@@ -273,7 +305,7 @@ let report output project scenarios affinity baseline candidate compare =
     printfn "%s" path
     if failed then 1 else 0
 
-let main project baseRef candidateRef =
+let main project baseRef candidateRef filter =
     let resolve reference = git root ["rev-parse"; "--verify"; "--end-of-options"; reference + "^{commit}"]
     let baseline, candidate = resolve baseRef, resolve candidateRef
     let project = (project: string).Replace('\\', '/')
@@ -284,18 +316,19 @@ let main project baseRef candidateRef =
                     |> Seq.map (fun node -> node.GetValue<string>()) |> List.ofSeq
     if scenarios.IsEmpty || List.exists String.IsNullOrWhiteSpace scenarios || List.distinct scenarios <> scenarios then
         failwith $"{manifest} must list unique scenario names"
+    let scenarios = selectScenarios project filter scenarios
     let output = directory (root </> "artifacts/benchmarks" </> ("compare-" + Guid.NewGuid().ToString("N")))
     printfn "Benchmark comparison: %s" output
     let temp = Directory.CreateTempSubdirectory("pl-").FullName
     try
         let affinity = BenchmarkAffinity.detect()
         printfn "Benchmark CPU policy: %s" (BenchmarkAffinity.describe affinity)
-        let measure = runSide temp output project candidate affinity
+        let measure = runSide temp output project candidate affinity filter
         let left = measure ("base", baseline)
         let right = measure ("candidate", candidate)
         let log = output </> "comparer.log"
         let comparer = lazy (buildComparer temp log)
-        report output project scenarios affinity left right (fun a b -> comparePair temp log comparer.Value a b)
+        report output project scenarios filter affinity left right (fun a b -> comparePair temp log comparer.Value a b)
     finally
         // Git pack files can be read-only on Windows.
         for file in Directory.EnumerateFiles(temp, "*", SearchOption.AllDirectories) do
@@ -305,9 +338,11 @@ let main project baseRef candidateRef =
 let status =
     try
         match fsi.CommandLineArgs |> Array.tail with
-        | [| project; baseline |] -> main project baseline "HEAD"
-        | [| project; baseline; candidate |] -> main project baseline candidate
-        | _ -> failwith "Usage: dotnet fsi scripts/Compare-Benchmarks.fsx <project> <base> [candidate]"
+        | [| project; baseline |] -> main project baseline "HEAD" "*"
+        | [| project; baseline; candidate |] -> main project baseline candidate "*"
+        | [| project; baseline; "--filter"; filter |] -> main project baseline "HEAD" filter
+        | [| project; baseline; candidate; "--filter"; filter |] -> main project baseline candidate filter
+        | _ -> failwith "Usage: dotnet fsi scripts/Compare-Benchmarks.fsx <project> <base> [candidate] [--filter <pattern>]"
     with ex ->
         eprintfn "%s" ex.Message
         1

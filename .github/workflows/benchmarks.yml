@@ -19,13 +19,18 @@ on:
           - Analysis
           - Protocols
 
+      filter:
+        description: BenchmarkDotNet name pattern (for example *IPv6ParserBenchmarks*)
+        type: string
+        default: '*'
+
 permissions:
   contents: read
 
 jobs:
   compare:
     runs-on: windows-2025
-    timeout-minutes: 30
+    timeout-minutes: ${{ inputs.suite == 'Protocols' && 55 || 30 }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -37,9 +42,12 @@ jobs:
           global-json-file: global.json
 
       - name: Compare benchmarks
-        timeout-minutes: 25
+        # Protocols: 47 cases x 2 revisions x 15 measured iterations x 250 ms is about 6 minutes,
+        # plus JIT/pilot/build overhead. Filters reduce cases; reserve time for artifact upload.
+        timeout-minutes: ${{ inputs.suite == 'Protocols' && 45 || 25 }}
         shell: pwsh
         env:
+          BENCHMARK_FILTER: ${{ inputs.filter || '*' }}
           BENCHMARK_SUITE: ${{ inputs.suite }}
           BASE_REF: ${{ inputs.base }}
           CANDIDATE_REF: ${{ inputs.candidate || github.sha }}
@@ -47,9 +55,9 @@ jobs:
           $projectName = "PacketLab.$env:BENCHMARK_SUITE.Benchmarks"
           $project = "benchmarks/$projectName/$projectName.csproj"
           New-Item -ItemType Directory -Force artifacts/benchmarks | Out-Null
-          "Project=$project Base=$env:BASE_REF Candidate=$env:CANDIDATE_REF" |
+          "Project=$project Base=$env:BASE_REF Candidate=$env:CANDIDATE_REF Filter=$env:BENCHMARK_FILTER" |
             Set-Content artifacts/benchmarks/comparison.log
-          dotnet fsi scripts/Compare-Benchmarks.fsx $project $env:BASE_REF $env:CANDIDATE_REF 2>&1 |
+          dotnet fsi scripts/Compare-Benchmarks.fsx $project $env:BASE_REF $env:CANDIDATE_REF --filter $env:BENCHMARK_FILTER 2>&1 |
             Tee-Object -FilePath artifacts/benchmarks/comparison.log -Append
           exit $LASTEXITCODE
 
