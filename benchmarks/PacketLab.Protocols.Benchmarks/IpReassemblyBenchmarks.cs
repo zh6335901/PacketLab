@@ -56,6 +56,7 @@ public class IpReassemblyBenchmarks
         if (complete?.Status != IpReassemblyStatus.Complete || complete.Packet is not { } packet ||
             probe.IsRetained(complete.DatagramId))
             throw new InvalidDataException("Expected one completed and released datagram.");
+
         UdpParseResult parsed = packet.Decoding switch
         {
             IPv4DecodeResult v4 when !ipv6 && v4 is DecodedIPv4 decoded && decoded.Payload is UdpParseResult result => result,
@@ -65,6 +66,7 @@ public class IpReassemblyBenchmarks
         if (parsed is not UdpDatagram datagram || datagram.Checksum is not UdpChecksumStatus.Match ||
             !datagram.Payload.Span.SequenceEqual(udp.AsSpan(8)))
             throw new InvalidDataException("UDP payload or checksum changed during reassembly.");
+
         reassembler = new();
     }
 
@@ -74,6 +76,7 @@ public class IpReassemblyBenchmarks
         IpReassemblyUpdate? update = null;
         foreach (var fragment in fragments)
             update = reassembler.Process(fragment);
+
         return update;
     }
 

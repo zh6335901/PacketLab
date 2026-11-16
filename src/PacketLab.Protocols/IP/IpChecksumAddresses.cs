@@ -38,6 +38,7 @@ internal static class IpChecksumAddresses
 
             if (i + 2 > options.Length)
                 return null;
+
             var length = options[i + 1];
             if (length < 2 || i + length > options.Length)
                 return null;
@@ -46,16 +47,19 @@ internal static class IpChecksumAddresses
             {
                 if (sawRoute || length < 3 || (length - 3) % 4 != 0)
                     return null;
+
                 sawRoute = true;
                 var pointer = options[i + 2];
                 if (pointer < 4 || (pointer - 4) % 4 != 0 || pointer > length + 1)
                     return null;
+
                 // An exhausted source route has already installed the final destination.
                 if (pointer <= length)
                     destination = IPv4Address.Read(options.Slice(i + length - 4, 4));
             }
             i += length;
         }
+
         return destination;
     }
 }

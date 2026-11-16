@@ -26,6 +26,7 @@ public sealed record DecodedIPv4
         {
             Payload = new IPv4FragmentPayload(header.FragmentOffset, header.MoreFragments, header.Identification,
                 header.Protocol, length, packet.Payload);
+
             return;
         }
 

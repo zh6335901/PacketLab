@@ -26,6 +26,7 @@ internal static class InternetChecksum
             sum += (uint)bytes[0] << 8;
         while (sum > ushort.MaxValue)
             sum = (sum & 0xffff) + (sum >> 16);
+
         return sum == ushort.MaxValue;
     }
 
@@ -50,6 +51,7 @@ internal static class InternetChecksum
             // Folding first lets us fix network byte order once per block, not per word.
             sum += BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness((ushort)partial) : partial;
         }
+
         return IsValidScalar(bytes, sum);
     }
 }

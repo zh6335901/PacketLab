@@ -29,6 +29,7 @@ public sealed class PcapReader
         var input = new PcapInput(stream);
         var settings = options ?? PcapReaderOptions.Default;
         Span<byte> bytes = stackalloc byte[24];
+
         return input.ReadBlock(bytes) switch
         {
             BlockReadResult.Complete => PcapParser.ParseHeader(bytes) switch
@@ -73,6 +74,7 @@ public sealed class PcapReader
     {
         var recordOffset = input.Offset;
         Span<byte> bytes = stackalloc byte[16];
+
         return input.ReadBlock(bytes) switch
         {
             BlockReadResult.Complete => PcapParser.ValidatedPacketHeader.Parse(bytes, Header, recordOffset, recordNumber, options) switch
@@ -91,6 +93,7 @@ public sealed class PcapReader
     {
         var dataOffset = input.Offset;
         var data = new byte[packet.CapturedLength];
+
         return input.ReadBlock(data) switch
         {
             BlockReadResult.Complete => FinishPacket(packet, data),
@@ -103,12 +106,14 @@ public sealed class PcapReader
     private PcapReadResult FinishPacket(PcapParser.ValidatedPacketHeader packet, byte[] data)
     {
         recordNumber++;
+
         return new PcapPacket(packet.Timestamp, packet.OriginalLength, data);
     }
 
     private PcapReadResult Fail(PcapError error)
     {
         state = error;
+
         return error;
     }
 
@@ -116,6 +121,7 @@ public sealed class PcapReader
     {
         var eof = new PcapEndOfFile();
         state = eof;
+
         return eof;
     }
 

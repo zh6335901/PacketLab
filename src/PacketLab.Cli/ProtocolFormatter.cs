@@ -55,6 +55,7 @@ internal static class ProtocolFormatter
     {
         var items = options.Items.IsEmpty ? "none" : string.Join(", ", options.Items.Select(DescribeTcpOption));
         var padding = options.HasNonZeroPadding ? " (nonzero)" : "";
+
         return $"; Options {items}; option bytes {Convert.ToHexString(options.RawBytes.Span)}"
             + $"; padding {options.Padding.Length} bytes{padding}";
     }
@@ -74,6 +75,7 @@ internal static class ProtocolFormatter
             TcpOptionValue.Invalid invalid => $"kind {option.Kind} {invalid.Reason} (required {invalid.RequiredLength}, available {invalid.AvailableLength})",
             null => throw new InvalidOperationException("Uninitialized TCP option.")
         };
+
         return $"offset {option.Offset} {description}";
     }
 
@@ -175,6 +177,7 @@ internal static class ProtocolFormatter
             IPv4ChecksumStatus.Mismatch => "mismatch (captured header bytes fail checksum; outbound capture may precede checksum offload, but neither offload nor on-wire corruption is established)",
             _ => "unavailable"
         };
+
         return $"IPv4 src {header.Source} dst {header.Destination} Version {header.Version} IHL {header.Ihl} DSCP {header.Dscp} ECN {header.Ecn} Protocol {header.Protocol} TTL {header.Ttl}"
             + $"; header complete: {header.HeaderLength} bytes, datagram {capture}: declared {header.TotalLength} bytes, captured {packet.CapturedLength} bytes"
             + $"; Identification 0x{header.Identification:X4} Flags 0x{header.Flags:X1} (reserved {Bit(header.ReservedFlag)} DF {Bit(header.DontFragment)} MF {Bit(header.MoreFragments)}) Fragment Offset {header.FragmentOffset} (8-byte units, {header.FragmentOffsetBytes} bytes)"
@@ -201,6 +204,7 @@ internal static class ProtocolFormatter
                 + $"; {unknown.CapturedBytes.Length} bytes captured after fixed header; datagram completeness undetermined",
             null => throw new InvalidOperationException("Uninitialized IPv6 payload result.")
         };
+
         return $"IPv6 src {header.Source} dst {header.Destination} Version {header.Version} Traffic Class {header.TrafficClass} Flow Label 0x{header.FlowLabel:X5}"
             + $" Next Header {header.NextHeader} Hop Limit {header.HopLimit} Payload Length {header.PayloadLength}"
             + $"; header complete: 40 bytes; {payload}; {DescribeIPv6Extensions(packet)}.";
@@ -233,6 +237,7 @@ internal static class ProtocolFormatter
             _ => throw new InvalidOperationException("Inconsistent IPv6 decoded payload.")
         };
         var diagnostics = string.Join("", packet.Diagnostics.Select(d => $"; {d.Code} at IPv6 offset {d.Offset}: {d.Message}"));
+
         return $"extensions {headers}; {upper}; remaining offset {packet.RemainingOffset}, {packet.RemainingBytes.Length} bytes"
             + $"; upper checksum context {(packet.CanBuildChecksumContext ? "available (not validated)" : "unavailable")}{diagnostics}";
 
@@ -247,6 +252,7 @@ internal static class ProtocolFormatter
             return description;
 
         var status = fragment.IsAtomic ? "atomic" : "reassembly required";
+
         return description + $" [offset {fragment.Offset} (8-byte units, {fragment.OffsetBytes} bytes)"
             + $" M {Bit(fragment.MoreFragments)} ID 0x{fragment.Identification:X8} {status}]";
     }
@@ -264,6 +270,7 @@ internal static class ProtocolFormatter
             return Convert.ToHexString(address.Span);
 
         var octets = address.ToArray().Select(value => value.ToString("X2"));
+
         return string.Join(":", octets);
     }
 

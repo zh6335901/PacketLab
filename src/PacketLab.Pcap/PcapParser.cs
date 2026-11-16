@@ -67,6 +67,7 @@ internal static class PcapParser
                 PcapTimestampPrecision.Nanoseconds => PcapTimestamp.FromNanoseconds(seconds, fraction),
                 _ => throw new InvalidOperationException("Invalid precision in a validated file header.")
             };
+
             return new ValidatedPacketHeader(timestamp, (int)capturedLength, ReadUInt32(bytes[12..], order));
         }
 

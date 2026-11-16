@@ -33,11 +33,14 @@ public sealed class IpReassemblyAnalyzer : IDisposable
         if (!(frame.Payload is IPv4DecodeResult ipv4 && ipv4 is DecodedIPv4) &&
             !(frame.Payload is IPv6DecodeResult ipv6 && ipv6 is DecodedIPv6))
             return events.ToImmutable();
+
         var ipBytes = frame.Frame.RemainingBytes;
         if (DiscardAtRecordLimit(ipBytes, recordNumber, events))
             return events.ToImmutable();
+
         if (reassembler.Process(ipBytes) is { } update)
             AssociateRecord(update, recordNumber, events);
+
         return events.ToImmutable();
     }
 
@@ -53,6 +56,7 @@ public sealed class IpReassemblyAnalyzer : IDisposable
         {
             if (recordNumber - association.FirstRecord < options.MaxRecordAge)
                 continue;
+
             if (reassembler.Expire(id) is { } expired)
                 EndAssociation(expired, IpReassemblyAnalysisReason.RecordAgeLimit, events);
         }
@@ -70,8 +74,10 @@ public sealed class IpReassemblyAnalyzer : IDisposable
             prior.Records.Clear();
             prior.Pending = false;
             prior.Reason = IpReassemblyAnalysisReason.RecordAssociationLimit;
+
             return true;
         }
+
         return false;
     }
 
@@ -100,12 +106,15 @@ public sealed class IpReassemblyAnalyzer : IDisposable
         ObjectDisposedException.ThrowIf(disposed, this);
         if (reason is not (IpReassemblyAnalysisReason.EndOfCapture or IpReassemblyAnalysisReason.Aborted))
             throw new ArgumentOutOfRangeException(nameof(reason));
+
         var events = reassembler.Finish().Select(update =>
         {
             var state = associations[update.DatagramId];
+
             return new IpReassemblyEvent(state.FirstRecord, [.. state.Records], update, reason);
         }).ToImmutableArray();
         associations.Clear();
+
         return events;
     }
 
@@ -121,6 +130,7 @@ public sealed class IpReassemblyAnalyzer : IDisposable
     {
         if (!associations.Remove(update.DatagramId, out var state))
             return;
+
         if (state.Pending)
             events.Add(new(state.FirstRecord, [.. state.Records], update, reason));
     }
@@ -128,6 +138,7 @@ public sealed class IpReassemblyAnalyzer : IDisposable
     private static ImmutableArray<long> Append(List<long> records, long record)
     {
         records.Add(record);
+
         return [.. records];
     }
 

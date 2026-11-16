@@ -23,6 +23,7 @@ internal static class PacketSamples
         macs.CopyTo(frame, 0);
         Write16(frame, 12, etherType);
         payload.CopyTo(frame, 14);
+
         return frame;
     }
 
@@ -39,6 +40,7 @@ internal static class PacketSamples
             var value = Checksum(bytes, addressSum + 17 + (uint)bytes.Length);
             Write16(bytes, 6, value == 0 ? ushort.MaxValue : value);
         }
+
         return bytes;
     }
 
@@ -55,6 +57,7 @@ internal static class PacketSamples
             Convert.FromHexString("0101080A0000000100000002").CopyTo(bytes, 20);
         FillPayload(bytes.AsSpan(headerLength));
         Write16(bytes, 16, Checksum(bytes, IPv4AddressSum + 6 + (uint)bytes.Length));
+
         return bytes;
     }
 
@@ -74,6 +77,7 @@ internal static class PacketSamples
         var headerChecksum = Checksum(packet.AsSpan(0, headerLength));
         Write16(packet, 10, headerChecksum);
         payload.CopyTo(packet.AsSpan(headerLength));
+
         return packet;
     }
 
@@ -86,6 +90,7 @@ internal static class PacketSamples
         packet[7] = 64;
         IPv6Addresses.CopyTo(packet, 8);
         payload.CopyTo(packet.AsSpan(40));
+
         return packet;
     }
 
@@ -95,6 +100,7 @@ internal static class PacketSamples
         payload[0] = 60; // Hop-by-Hop followed by Destination Options; both use Pad1.
         payload[8] = 17;
         udp.CopyTo(payload, 16);
+
         return IPv6(payload, 0);
     }
 
@@ -105,6 +111,7 @@ internal static class PacketSamples
         Write16(payload, 2, offset | (more ? 1 : 0));
         BinaryPrimitives.WriteUInt32BigEndian(payload.AsSpan(4), 1);
         data.CopyTo(payload.AsSpan(8));
+
         return IPv6(payload, 44);
     }
 
@@ -122,6 +129,7 @@ internal static class PacketSamples
         ulong sum = 0;
         for (int i = 0; i < bytes.Length; i++)
             sum += (uint)(i % 2 == 0 ? bytes[i] << 8 : bytes[i]);
+
         return sum;
     }
 
@@ -130,6 +138,7 @@ internal static class PacketSamples
         ulong sum = initial + SumWords(bytes);
         while (sum > ushort.MaxValue)
             sum = (sum & 0xffff) + (sum >> 16);
+
         return (ushort)~sum;
     }
 }
