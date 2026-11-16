@@ -34,6 +34,7 @@ public sealed record IpReassemblyDiagnostic
     {
         if (status is IpReassemblyStatus.Complete or IpReassemblyStatus.Atomic || !Enum.IsDefined(status))
             throw new ArgumentOutOfRangeException(nameof(status));
+
         Status = status;
     }
     public IpReassemblyStatus Status { get; }

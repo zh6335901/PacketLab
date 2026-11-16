@@ -36,6 +36,7 @@ public static class EthernetParser
         var destination = MacAddress.Read(bytes);
         var source = MacAddress.Read(bytes[6..]);
         var remaining = data[headerLength..];
+
         return field switch
         {
             <= 1500 => new EthernetParseResult.Ieee8023Length(field, destination, source, remaining),

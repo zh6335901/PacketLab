@@ -12,3 +12,5 @@ PL0006 | Readability | Warning | Multiple assignments in one step
 PL0007 | Readability | Warning | Deeply nested method calls
 PL0008 | Readability | Warning | Complex argument expression
 PL0009 | Readability | Warning | Single-statement body shares the control header's line
+PL0010 | Readability | Warning | Separate a return from the preceding statement
+PL0011 | Readability | Warning | Separate guard clauses from the following statements

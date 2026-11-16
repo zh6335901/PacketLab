@@ -115,6 +115,47 @@ public class AnalyzeReadabilityTests
     }
 
     [Test]
+    [Arguments("x++;\nreturn;")]
+    [Arguments("x++; // finished\nreturn;")]
+    [Arguments("x++;\n/* a\n\ncomment */\nreturn;")]
+    [Arguments("if (x > 0)\n return;\nreturn;")]
+    [Arguments("if (x > 0) { x++;\nreturn; }")]
+    [Arguments("switch (x) { case 0: x++;\nreturn; }")]
+    public async Task Return_after_a_statement_requires_one_separator(string statements)
+    {
+        var diagnostic = (await Analyze("0", statements)).Single();
+        await Assert.That(diagnostic.Id).IsEqualTo("PL0010");
+    }
+
+    [Test]
+    [Arguments("if (x > 0)\n return;\nx++;")]
+    [Arguments("if (x > 0)\n throw new System.Exception();\nx++;")]
+    [Arguments("if (x > 0) { x++;\n\n return; }\nx++;")]
+    [Arguments("for (; x > 0; x--) { if (y > 0)\n continue;\ny--; }")]
+    [Arguments("while (x > 0) { if (y > 0)\n continue;\nif (z > 0)\n break;\nx--; }")]
+    public async Task Last_guard_requires_a_separator_before_normal_flow(string statements)
+    {
+        var diagnostic = (await Analyze("0", statements)).Single();
+        await Assert.That(diagnostic.Id).IsEqualTo("PL0011");
+    }
+
+    [Test]
+    [Arguments("return;")]
+    [Arguments("if (x > 0)\n return;")]
+    [Arguments("while (x > 0) {\n return; }")]
+    [Arguments("switch (x) { case 0: return; default: x++; break; }")]
+    [Arguments("while (x > 0) { x--;\ncontinue; }")]
+    [Arguments("x++;\r\n  \r\n// result\r\nreturn;")]
+    [Arguments("if (x > 0)\n return;\nif (y > 0)\n throw new System.Exception();\n\nx++;")]
+    [Arguments("while (x > 0) { if (y > 0)\n continue;\nif (z > 0)\n break;\n\nx--; }")]
+    [Arguments("if (x > 0)\n return; else\n x++;\nx--;")]
+    public async Task Spacing_respects_statement_groups_and_embedded_exits(string statements)
+    {
+        var diagnostics = await Analyze("0", statements);
+        await Assert.That(diagnostics.IsEmpty).IsTrue();
+    }
+
+    [Test]
     [Arguments("Read(Read(Read(0)))")]
     [Arguments("Read(Read(Read(Read(0))))")]
     [Arguments("Read(Read((int)(Read(Read(Read(0))))))")]
@@ -181,7 +222,13 @@ public class AnalyzeReadabilityTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error);
         await Assert.That(string.Join("\n", errors)).IsEqualTo("");
-        return await compilation.WithAnalyzers([new ReadabilityAnalyzer(), new AssignmentLayoutAnalyzer(), new CallComplexityAnalyzer()])
-            .GetAnalyzerDiagnosticsAsync();
+        ImmutableArray<DiagnosticAnalyzer> analyzers = [
+            new ReadabilityAnalyzer(),
+            new AssignmentLayoutAnalyzer(),
+            new CallComplexityAnalyzer(),
+            new StatementSpacingAnalyzer()
+        ];
+
+        return await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync();
     }
 }

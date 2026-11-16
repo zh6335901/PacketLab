@@ -22,6 +22,7 @@ internal static class PcapCommands
         if (string.IsNullOrWhiteSpace(file))
         {
             Console.Error.WriteLine("The file path must not be empty or whitespace.");
+
             return 1;
         }
 
@@ -46,6 +47,7 @@ internal static class PcapCommands
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             Console.Error.WriteLine($"Unable to read '{file}': {exception.Message}");
+
             return 1;
         }
     }
@@ -56,6 +58,7 @@ internal static class PcapCommands
         if (reader.LinkLayer == LinkLayerProtocol.Unsupported)
         {
             Console.Error.WriteLine($"Unsupported link type {reader.Header.LinkType}. Ethernet inspection requires LinkType 1.");
+
             return 1;
         }
 
@@ -70,9 +73,11 @@ internal static class PcapCommands
                     break;
                 case PcapEndOfFile:
                     PrintReassembly(reader);
+
                     return 0;
                 case PcapError error:
                     PrintReassembly(reader);
+
                     return PrintError(error);
                 default:
                     throw new InvalidOperationException("ReadNext returned an uninitialized result.");
@@ -140,6 +145,7 @@ internal static class PcapCommands
         Console.WriteLine($"SnapLen: {header.SnapLen}");
         Console.WriteLine($"Link type: {header.LinkType}");
         Console.WriteLine($"Packets: {count}");
+
         return 0;
     }
 
@@ -147,6 +153,7 @@ internal static class PcapCommands
     {
         var record = error.RecordNumber is { } number ? $", record {number}" : "";
         Console.Error.WriteLine($"Error at byte {error.Offset}{record}: {error.Message}");
+
         return 1;
     }
 }

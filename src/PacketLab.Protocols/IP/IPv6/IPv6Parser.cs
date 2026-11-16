@@ -13,6 +13,7 @@ public readonly record struct IPv6Address(ulong High, ulong Low)
         Span<byte> bytes = stackalloc byte[16];
         BinaryPrimitives.WriteUInt64BigEndian(bytes, High);
         BinaryPrimitives.WriteUInt64BigEndian(bytes[8..], Low);
+
         return new IPAddress(bytes).ToString();
     }
 }
@@ -65,6 +66,7 @@ public static class IPv6Parser
             HopLimit: bytes[7],
             Source: IPv6Address.Read(bytes[8..]),
             Destination: IPv6Address.Read(bytes[24..]));
+
         return IPv6ExtensionParser.Parse(header, data[40..]);
     }
 }

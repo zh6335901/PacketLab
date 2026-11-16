@@ -70,6 +70,7 @@ public static class UdpParser
 
         var end = (int)Math.Min((uint)data.Length, length);
         var checksum = Checksum(header, bytes[..end], length, ipv6, pseudoHeaderAddressSum);
+
         return new UdpDatagram(header, length, data[8..end], declaredLength - length, data[end..], checksum);
     }
 
@@ -84,6 +85,7 @@ public static class UdpParser
             return new UdpChecksumUnavailable(UdpUnavailableReason.PseudoHeaderUnavailable);
 
         var pseudoHeaderSum = addressSum + 17 + (length >> 16) + (length & 0xffff);
+
         return InternetChecksum.IsValid(bytes, pseudoHeaderSum) ? UdpChecksumStatus.Match : UdpChecksumStatus.Mismatch;
     }
 }

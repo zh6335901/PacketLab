@@ -32,6 +32,7 @@ public static class ArpParser
         var senderProtocolOffset = 8 + hardwareLength;
         var targetHardwareOffset = senderProtocolOffset + protocolLength;
         var targetProtocolOffset = targetHardwareOffset + hardwareLength;
+
         return new ArpPacket(
             HardwareType: BinaryPrimitives.ReadUInt16BigEndian(bytes),
             ProtocolType: BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]),

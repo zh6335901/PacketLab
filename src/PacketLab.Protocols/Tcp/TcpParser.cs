@@ -94,6 +94,7 @@ public static class TcpParser
             return new TcpParseResult.OptionsTruncated(header, declaredLength, options, data);
 
         var checksum = Checksum(data.Span, declaredLength, pseudoHeaderAddressSum);
+
         return new TcpSegment(header, declaredLength, options, data[headerLength..], checksum);
     }
 
@@ -117,6 +118,7 @@ public static class TcpParser
             return new TcpChecksumUnavailable(TcpUnavailableReason.PseudoHeaderUnavailable);
 
         var pseudoHeaderSum = addressSum + 6 + (declaredLength >> 16) + (declaredLength & 0xffff);
+
         return InternetChecksum.IsValid(bytes, pseudoHeaderSum) ? TcpChecksumStatus.Match : TcpChecksumStatus.Mismatch;
     }
 }

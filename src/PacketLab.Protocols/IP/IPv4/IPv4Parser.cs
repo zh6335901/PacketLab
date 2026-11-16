@@ -55,9 +55,11 @@ public static class IPv4Parser
         var version = (byte)(bytes[0] >> 4);
         if (version != 4)
             return new IPv4ParseResult.InvalidVersion(version, data);
+
         var ihl = (byte)(bytes[0] & 0x0f);
         if (ihl < 5)
             return new IPv4ParseResult.InvalidHeaderLength(ihl, data);
+
         var headerLength = ihl * 4;
         var totalLength = BinaryPrimitives.ReadUInt16BigEndian(bytes[2..]);
         if (totalLength < headerLength)
@@ -83,6 +85,7 @@ public static class IPv4Parser
             Options: data[20..headerLength]);
 
         var capturedEnd = Math.Min(data.Length, totalLength);
+
         return new IPv4Packet(header, Checksum(bytes[..headerLength]),
             data[headerLength..capturedEnd], data[capturedEnd..]);
     }
@@ -110,6 +113,7 @@ public static class IPv4Parser
             sum += BinaryPrimitives.ReadUInt16BigEndian(header[offset..]);
         while (sum > ushort.MaxValue)
             sum = (sum & 0xffff) + (sum >> 16);
+
         return sum == ushort.MaxValue ? IPv4ChecksumStatus.Match : IPv4ChecksumStatus.Mismatch;
     }
 }

@@ -11,6 +11,7 @@ internal static class PcapCaptureSamples
         // An unrecognized EtherType keeps this workload focused on Ethernet decoding.
         Convert.FromHexString("00112233445566778899AABBABCD").CopyTo(frame, 0);
         frame.AsSpan(EthernetHeaderLength).Fill(0x5a);
+
         return Create(frame);
     }
 
@@ -22,6 +23,7 @@ internal static class PcapCaptureSamples
             "450005CE000140004011B11AC0000201C0000202" + "3039D43105BA20C0");
         headers.CopyTo(frame, 0);
         frame.AsSpan(headers.Length).Fill(0x5a);
+
         return Create(frame);
     }
 
@@ -46,6 +48,7 @@ internal static class PcapCaptureSamples
             writer.Write((uint)frame.Length);
             writer.Write(frame);
         }
+
         return new MemoryStream(bytes.GetBuffer(), 0, (int)bytes.Length, writable: false);
     }
 }

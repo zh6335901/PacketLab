@@ -50,6 +50,7 @@ internal static class TcpOptionParser
             if (kind == 0)
             {
                 items.Add(new(headerOffset, data.Slice(i, 1), new TcpOptionValue.End()));
+
                 return new(data, items.ToImmutable(), data[(i + 1)..]);
             }
 
@@ -82,6 +83,7 @@ internal static class TcpOptionParser
             items.Add(new(headerOffset, optionBytes, ReadValue(kind, optionBytes.Span)));
             i += length;
         }
+
         return new(data, items.ToImmutable(), ReadOnlyMemory<byte>.Empty);
 
         TcpOptionValue.Invalid BoundaryFailure(int required, int offset) => new(
@@ -112,6 +114,7 @@ internal static class TcpOptionParser
             blocks.Add(new(
                 LeftEdge: BinaryPrimitives.ReadUInt32BigEndian(bytes[i..]),
                 RightEdge: BinaryPrimitives.ReadUInt32BigEndian(bytes[(i + 4)..])));
+
         return new(blocks.MoveToImmutable());
     }
 }
