@@ -155,9 +155,9 @@ let runSide temp output project candidate affinity filter (name, revision) =
                 if not failedChild.HasExited then failedChild.Kill(true)
                 reraise()
         runProcess launch (Path.GetDirectoryName bench) (Some log) env "dotnet"
-            // Promote hot methods before pilot measurements; retain long warmup until shorter runs are validated.
-            [target; "--filter"; filter; "--jitTieringMode"; "Force"; "--warmupCount"; "20"
-             "--iterationTime"; "1000"; "--minIterationCount"; "15"; "--maxIterationCount"; "20"
+            // Promote hot methods before pilot measurements, with additional warmup for callees.
+            [target; "--filter"; filter; "--jitTieringMode"; "Force"; "--warmupCount"; "3"
+             "--iterationTime"; "250"; "--minIterationCount"; "15"; "--maxIterationCount"; "20"
              "--outliers"; "DontRemove"
              "--exporters"; "fulljson"; "--artifacts"; folder] |> ignore
     with ex -> errors.Add(ex.Message)
@@ -238,7 +238,7 @@ let report output project (scenarios: string list) (filter: string) affinity bas
     lines.Add($"- Scenario filter: `{displayedFilter}`, {scenarios.Length} expected cases")
     lines.Add($"- Benchmark CPU policy: {BenchmarkAffinity.describe affinity}")
     lines.Add($"- ResultsComparer: {comparerRev}, threshold {threshold}, noise filter 0.3 ns")
-    lines.Add("- Measurement: isolated benchmark processes, JIT tier promotion enabled, 20 warmups, 15–20 measured iterations, 1 s target per iteration; all samples retained.")
+    lines.Add("- Measurement: isolated benchmark processes, JIT tier promotion enabled, 3 warmups, 15–20 measured iterations, 250 ms target per iteration; all samples retained.")
     lines.Add("- BenchmarkDotNet diagnostic warnings remain in the run logs and exported reports. Warnings are not treated as execution failures; a comparison does not prove absence of environmental noise.")
     for side in [baseline; candidate] do
         lines.Add($"- {side.Name} product: {side.Sha} ([run log]({side.Name}/run.log))")
