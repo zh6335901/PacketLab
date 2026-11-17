@@ -71,12 +71,16 @@ public class PcapAnalysisReaderBenchmarks
                     packets++;
                     bytes += packet.Data.Length;
                     break;
+
                 case PcapEndOfFile when packets == PcapCaptureSamples.PacketCount && bytes == (long)PcapCaptureSamples.PacketCount * frameSize:
                     return;
+
                 case PcapEndOfFile:
                     throw new InvalidDataException($"Unexpected EOF after {packets} packets and {bytes} bytes.");
+
                 case PcapError error:
                     throw new InvalidDataException(error.Message);
+
                 default:
                     throw new InvalidOperationException("Uninitialized packet result.");
             }
@@ -104,14 +108,19 @@ public class PcapAnalysisReaderBenchmarks
                     packets++;
                     bytes += PcapCaptureSamples.EthernetHeaderLength + frame.Frame.RemainingBytes.Length;
                     break;
+
                 case AnalyzedPacket:
                     throw new InvalidDataException("Expected a decoded Ethernet II frame.");
+
                 case PcapEndOfFile when packets == PcapCaptureSamples.PacketCount && bytes == (long)PcapCaptureSamples.PacketCount * frameSize:
                     return;
+
                 case PcapEndOfFile:
                     throw new InvalidDataException($"Unexpected EOF after {packets} packets and {bytes} bytes.");
+
                 case PcapError error:
                     throw new InvalidDataException(error.Message);
+
                 default:
                     throw new InvalidOperationException("Uninitialized analysis result.");
             }

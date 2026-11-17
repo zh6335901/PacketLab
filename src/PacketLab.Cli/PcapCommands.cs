@@ -71,14 +71,15 @@ internal static class PcapCommands
                     PrintFrame(packet);
                     PrintReassembly(reader);
                     break;
+
                 case PcapEndOfFile:
                     PrintReassembly(reader);
-
                     return 0;
+
                 case PcapError error:
                     PrintReassembly(reader);
-
                     return PrintError(error);
+
                 default:
                     throw new InvalidOperationException("ReadNext returned an uninitialized result.");
             }
@@ -122,10 +123,13 @@ internal static class PcapCommands
                 case PcapPacket:
                     count++;
                     break;
+
                 case PcapEndOfFile:
                     return PrintSummary(reader.Header, count);
+
                 case PcapError error:
                     return PrintError(error);
+
                 default:
                     throw new InvalidOperationException("ReadNext returned an uninitialized result.");
             }
