@@ -120,7 +120,7 @@ public class AnalyzeReadabilityTests
     [Arguments("x++;\n/* a\n\ncomment */\nreturn;")]
     [Arguments("if (x > 0)\n return;\nreturn;")]
     [Arguments("if (x > 0) { x++;\nreturn; }")]
-    [Arguments("switch (x) { case 0: x++;\nreturn; }")]
+    [Arguments("switch (x) { case 0: if (y > 0) { x++;\nreturn; }\n\nbreak; }")]
     public async Task Return_after_a_statement_requires_one_separator(string statements)
     {
         var diagnostic = (await Analyze("0", statements)).Single();
@@ -143,7 +143,7 @@ public class AnalyzeReadabilityTests
     [Arguments("return;")]
     [Arguments("if (x > 0)\n return;")]
     [Arguments("while (x > 0) {\n return; }")]
-    [Arguments("switch (x) { case 0: return; default: x++; break; }")]
+    [Arguments("switch (x) { case 0: return;\n\ndefault: x++; break; }")]
     [Arguments("while (x > 0) { x--;\ncontinue; }")]
     [Arguments("x++;\r\n  \r\n// result\r\nreturn;")]
     [Arguments("if (x > 0)\n return;\nif (y > 0)\n throw new System.Exception();\n\nx++;")]
@@ -153,6 +153,38 @@ public class AnalyzeReadabilityTests
     {
         var diagnostics = await Analyze("0", statements);
         await Assert.That(diagnostics.IsEmpty).IsTrue();
+    }
+
+    [Test]
+    [Arguments("switch (x) { case 0: x++;\nreturn; }")]
+    [Arguments("switch (x) { case 0: { x++;\nreturn; } }")]
+    [Arguments("switch (x) { case 0: case 1: x++;\nreturn; }")]
+    [Arguments("switch (x) { case 0: x++; break;\n\n// next section\ndefault: return; }")]
+    [Arguments("switch (x) { case 0: x++; break;\r\n \t\r\ndefault: return; }")]
+    public async Task Switch_sections_keep_terminal_returns_with_their_work(string statements)
+    {
+        var diagnostics = await Analyze("0", statements);
+        await Assert.That(diagnostics.IsEmpty).IsTrue();
+    }
+
+    [Test]
+    [Arguments("switch (x) { case 0: x++; return; default: return; }")]
+    [Arguments("switch (x) { case 0: break;\ndefault: return; }")]
+    [Arguments("switch (x) { case 0: { x++; return; }\ndefault: return; }")]
+    [Arguments("switch (x) { case 0: break;\n/* next\n\nsection */\ndefault: return; }")]
+    public async Task Adjacent_switch_sections_require_a_blank_line(string statements)
+    {
+        var diagnostic = (await Analyze("0", statements)).Single();
+        await Assert.That(diagnostic.Id).IsEqualTo("PL0012");
+        await Assert.That(diagnostic.Location.SourceTree!.GetText().ToString(diagnostic.Location.SourceSpan))
+            .IsEqualTo("default");
+    }
+
+    [Test]
+    public async Task Guard_spacing_still_applies_before_a_section_return()
+    {
+        var diagnostics = await Analyze("0", "switch (x) { case 0: if (y > 0)\nreturn;\nreturn; }");
+        await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0011");
     }
 
     [Test]

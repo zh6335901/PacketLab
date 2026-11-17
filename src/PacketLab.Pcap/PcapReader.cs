@@ -58,13 +58,17 @@ public sealed class PcapReader
                     state = ExceptionDispatchInfo.Capture(exception);
                     throw;
                 }
+
             case PcapEndOfFile eof:
                 return eof;
+
             case PcapError error:
                 return error;
+
             case ExceptionDispatchInfo failure:
                 failure.Throw();
                 throw new UnreachableException();
+
             default:
                 throw new InvalidOperationException("Uninitialized reader state.");
         }

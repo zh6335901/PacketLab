@@ -45,16 +45,16 @@ public sealed class PcapAnalysisReader : IDisposable
                     var analyzed = new AnalyzedPacket(++recordNumber, packet, PcapAnalysis.Decode(Header, packet));
                     ReassemblyEvents = reassemblyAnalyzer.Process(analyzed.RecordNumber,
                         PcapAnalysis.GetTimestampNanoseconds(packet.Timestamp), analyzed.Decoding);
-
                     return analyzed;
+
                 case PcapEndOfFile eof:
                     ReassemblyEvents = reassemblyAnalyzer.Finish(IpReassemblyAnalysisReason.EndOfCapture);
-
                     return eof;
+
                 case PcapError error:
                     ReassemblyEvents = reassemblyAnalyzer.Finish(IpReassemblyAnalysisReason.Aborted);
-
                     return error;
+
                 default:
                     throw new InvalidOperationException("Uninitialized PCAP read result.");
             }
