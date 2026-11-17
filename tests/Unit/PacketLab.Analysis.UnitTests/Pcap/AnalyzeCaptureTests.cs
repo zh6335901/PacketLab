@@ -215,7 +215,7 @@ public class AnalyzeCaptureTests
     {
         // Arrange
         using var stream = new MemoryStream(Convert.FromHexString(Header + Records));
-        var result = PcapAnalysisReader.Open(stream, new CaptureReaderOptions(15));
+        var result = PcapAnalysisReader.Open(stream, new PcapReaderOptions(15));
         var reader = result is PcapAnalysisReader opened ? opened : throw new AssertionException("Expected a reader.");
 
         // Act

@@ -46,7 +46,7 @@ internal static class PcapParser
     {
         internal static RecordParseResult Parse(
             ReadOnlySpan<byte> bytes, PcapFileHeader fileHeader, long offset, long recordNumber,
-            CaptureReaderOptions options)
+            PcapReaderOptions options)
         {
             var order = fileHeader.ByteOrder;
             var capturedLength = ReadUInt32(bytes[8..], order);

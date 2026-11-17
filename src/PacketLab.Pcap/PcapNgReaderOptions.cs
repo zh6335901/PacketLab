@@ -1,11 +1,11 @@
 namespace PacketLab.Pcap;
 
-public sealed class CaptureReaderOptions
+public sealed class PcapNgReaderOptions
 {
     public const int DefaultMaxPacketBytes = 16 * 1024 * 1024;
-    public static CaptureReaderOptions Default { get; } = new();
+    public static PcapNgReaderOptions Default { get; } = new();
 
-    public CaptureReaderOptions(int maxPacketBytes = DefaultMaxPacketBytes,
+    public PcapNgReaderOptions(int maxPacketBytes = DefaultMaxPacketBytes,
         int maxBlockBytes = 32 * 1024 * 1024, int maxMetadataBytes = 64 * 1024 * 1024,
         int maxOptionsPerBlock = 65536)
     {

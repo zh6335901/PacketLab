@@ -252,7 +252,7 @@ public class ReadPacketTests
     {
         // Arrange
         using var stream = new MemoryStream(PcapSamples.Single("little-micro"));
-        var openResult = PcapReader.Open(stream, new CaptureReaderOptions(limit));
+        var openResult = PcapReader.Open(stream, new PcapReaderOptions(limit));
         var reader = openResult is PcapReader opened ? opened : throw new InvalidOperationException();
 
         // Act
@@ -269,7 +269,7 @@ public class ReadPacketTests
         // Arrange
         var bytes = PcapSamples.Replace(Convert.FromHexString(PcapSamples.Multiple), 36, "01000000");
         using var stream = new MemoryStream(bytes);
-        var openResult = PcapReader.Open(stream, new CaptureReaderOptions(1));
+        var openResult = PcapReader.Open(stream, new PcapReaderOptions(1));
         var reader = openResult is PcapReader opened ? opened : throw new InvalidOperationException();
 
         // Act

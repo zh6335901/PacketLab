@@ -4,8 +4,10 @@ using System.Runtime.ExceptionServices;
 
 namespace PacketLab.Pcap;
 
-internal sealed class PcapNgReader(PcapInput input, CaptureReaderOptions options)
+public sealed class PcapNgReader
 {
+    private readonly PcapInput input;
+    private readonly PcapNgReaderOptions options;
     private readonly List<PcapNgSection> sections = [];
     private readonly List<PcapNgInterface> interfaces = [];
     private readonly List<PcapNgInterface> sectionInterfaces = [];
@@ -15,17 +17,50 @@ internal sealed class PcapNgReader(PcapInput input, CaptureReaderOptions options
     private long metadataBytes;
     private long recordNumber = 1;
 
-    internal IReadOnlyList<PcapNgSection> Sections => sections.AsReadOnly();
-    internal IReadOnlyList<PcapNgInterface> Interfaces => interfaces.AsReadOnly();
+    private PcapNgReader(PcapInput input, PcapNgReaderOptions options)
+    {
+        this.input = input;
+        this.options = options;
+    }
 
-    internal PcapError? OpenSection(ReadOnlySpan<byte> magic) => ReadBlock(magic) switch
+    public static PcapNgOpenResult Open(Stream stream, PcapNgReaderOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        if (!stream.CanRead)
+            throw new ArgumentException("The stream must be readable.", nameof(stream));
+
+        var input = new PcapInput(stream);
+        Span<byte> magic = stackalloc byte[4];
+        if (input.ReadBlock(magic) is BlockReadResult.Incomplete)
+            return Error(0, input.Offset, "Truncated section block type; expected 4 bytes.");
+
+        return Open(input, options ?? PcapNgReaderOptions.Default, magic);
+    }
+
+    internal static PcapNgOpenResult Open(PcapInput input, PcapNgReaderOptions options, ReadOnlySpan<byte> magic)
+    {
+        if (BinaryPrimitives.ReadUInt32BigEndian(magic) != 0x0a0d0d0a)
+            return Error(0, 0, "Expected a PCAPNG Section Header Block.");
+
+        var reader = new PcapNgReader(input, options);
+        if (reader.OpenSection(magic) is { } error)
+            return error;
+
+        return reader;
+    }
+
+    // These views contain metadata encountered so far; later reads can append to them.
+    public IReadOnlyList<PcapNgSection> Sections => sections.AsReadOnly();
+    public IReadOnlyList<PcapNgInterface> Interfaces => interfaces.AsReadOnly();
+
+    private PcapError? OpenSection(ReadOnlySpan<byte> magic) => ReadBlock(magic) switch
     {
         PcapNgBlock block => AddSection(block),
         PcapError error => error,
         _ => throw new InvalidOperationException("Missing initial section header.")
     };
 
-    internal CaptureReadResult ReadNext()
+    public PcapNgReadResult ReadNext()
     {
         switch (state)
         {
@@ -45,7 +80,7 @@ internal sealed class PcapNgReader(PcapInput input, CaptureReaderOptions options
         }
     }
 
-    private CaptureReadResult ReadPacket()
+    private PcapNgReadResult ReadPacket()
     {
         while (true)
         {
@@ -201,7 +236,7 @@ internal sealed class PcapNgReader(PcapInput input, CaptureReaderOptions options
     private static PcapError Error(long blockOffset, long offset, string detail) =>
         new PcapError.InvalidPcapNg(blockOffset, offset, null, detail);
 
-    private CaptureReadResult Fail(PcapError error)
+    private PcapNgReadResult Fail(PcapError error)
     {
         if (error is PcapError.InvalidPcapNg ng)
             error = ng with { PacketNumber = recordNumber };

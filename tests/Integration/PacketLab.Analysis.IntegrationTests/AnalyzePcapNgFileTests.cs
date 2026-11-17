@@ -12,7 +12,7 @@ public class AnalyzePcapNgFileTests
     public async Task Mixed_file_preserves_packet_order_and_decodes_arp_across_sections()
     {
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "PcapNg", "mixed.pcapng"));
-        using var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened : throw new InvalidOperationException();
+        using var reader = PcapNgAnalysisReader.Open(stream) is PcapNgAnalysisReader opened ? opened : throw new InvalidOperationException();
 
         var first = Read(reader);
         var second = Read(reader);
@@ -27,6 +27,6 @@ public class AnalyzePcapNgFileTests
         await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
     }
 
-    private static AnalyzedPcapNgPacket Read(PcapAnalysisReader reader) => reader.ReadNext() is AnalyzedPcapNgPacket packet
+    private static AnalyzedPcapNgPacket Read(PcapNgAnalysisReader reader) => reader.ReadNext() is AnalyzedPcapNgPacket packet
         ? packet : throw new InvalidOperationException("Expected analyzed PCAPNG packet.");
 }

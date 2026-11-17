@@ -12,10 +12,10 @@ try
     foreach (var sample in samples)
     {
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample));
-        if (PcapAnalysisReader.Open(stream) is not PcapAnalysisReader reader)
-            throw new InvalidOperationException($"Could not open {sample}.");
+        if (Capture.Open(stream) is not PcapReader raw)
+            throw new InvalidOperationException($"Could not detect PCAP in {sample}.");
 
-        using var lifetime = reader;
+        using var reader = new PcapAnalysisReader(raw);
         var sawPacket = false;
         while (true)
         {
@@ -31,10 +31,10 @@ try
     }
 
     using var ngStream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "PcapNg", "mixed.pcapng"));
-    if (PcapAnalysisReader.Open(ngStream) is not PcapAnalysisReader ngReader)
-        throw new InvalidOperationException("Could not open PCAPNG.");
+    if (Capture.Open(ngStream) is not PcapNgReader ngRaw)
+        throw new InvalidOperationException("Could not detect PCAPNG.");
 
-    using var ngLifetime = ngReader;
+    using var ngReader = new PcapNgAnalysisReader(ngRaw);
     for (int i = 0; i < 3; i++)
     {
         if (ngReader.ReadNext() is not AnalyzedPcapNgPacket packet || packet.Decoding.Value is null)

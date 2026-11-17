@@ -14,9 +14,6 @@ public static class PcapAnalysis
     public static ProtocolDecodeResult Decode(PcapFileHeader header, PcapPacket packet) =>
         ProtocolDecoder.Decode(packet.Data, GetLinkLayer(header));
         
-    public static ProtocolDecodeResult Decode(PcapNgPacket packet) =>
-        ProtocolDecoder.Decode(packet.Data, packet.Interface.LinkType == 1 ? LinkLayerProtocol.Ethernet : LinkLayerProtocol.Unsupported);
-
     internal static ulong? GetTimestampNanoseconds(PcapTimestamp timestamp)
     {
         var scale = timestamp.Precision == PcapTimestampPrecision.Microseconds ? 1000UL : 1UL;

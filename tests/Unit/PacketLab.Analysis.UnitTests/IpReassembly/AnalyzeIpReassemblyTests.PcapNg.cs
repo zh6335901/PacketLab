@@ -16,7 +16,7 @@ public partial class AnalyzeIpReassemblyTests
         byte[] tail = Fragment(version, 16, false, Payload[16..]);
         using var stream = new MemoryStream([.. Section(), .. Interface(), .. Interface(),
             .. Packet(first), .. Packet(tail, id: 1), .. Packet(tail)]);
-        using var reader = Open(stream);
+        using var reader = OpenNg(stream);
         reader.ReadNext();
         reader.ReadNext();
         await Assert.That(reader.ReassemblyEvents.Single().Status).IsEqualTo(IpReassemblyStatus.Pending);
@@ -36,7 +36,7 @@ public partial class AnalyzeIpReassemblyTests
         using var stream = new MemoryStream([.. Section(), .. Interface(),
             .. Packet(Fragment(version, 0, true, Payload[..16])),
             .. Section(true), .. Interface(true), .. Packet(Fragment(version, 16, false, Payload[16..]), true)]);
-        using var reader = Open(stream);
+        using var reader = OpenNg(stream);
         reader.ReadNext();
 
         reader.ReadNext();
@@ -51,7 +51,7 @@ public partial class AnalyzeIpReassemblyTests
         using var stream = new MemoryStream([.. Section(), .. Interface(options: Option(9, [0x81])),
             .. Packet(Fragment(4, 0, true, Payload[..16]), time: 2),
             .. Packet(Fragment(4, 16, false, Payload[16..]), time: 1000)]);
-        using var reader = Open(stream);
+        using var reader = OpenNg(stream);
         reader.ReadNext();
 
         reader.ReadNext();
@@ -59,4 +59,54 @@ public partial class AnalyzeIpReassemblyTests
         await Assert.That(reader.ReassemblyEvents.Any(item => item.Status == IpReassemblyStatus.Expired)).IsTrue();
         await Assert.That(reader.ReassemblyEvents.All(item => item.Status != IpReassemblyStatus.Complete)).IsTrue();
     }
+    [Test]
+    public async Task Pcapng_eof_finishes_pending_fragments_once()
+    {
+        using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet(Fragment(4, 0, true, Payload[..16]))]);
+        using var reader = OpenNg(stream);
+        reader.ReadNext();
+
+        var result = reader.ReadNext();
+
+        await Assert.That(result is PcapEndOfFile).IsTrue();
+        await Assert.That(reader.ReassemblyEvents.Single().Reason).IsEqualTo(PacketLab.Analysis.IpReassembly.IpReassemblyAnalysisReason.EndOfCapture);
+        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
+        await Assert.That(reader.ReassemblyEvents.IsEmpty).IsTrue();
+        await Assert.That(stream.CanRead).IsTrue();
+    }
+
+    [Test]
+    public async Task Pcapng_read_errors_abort_pending_fragments_once()
+    {
+        using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet(Fragment(4, 0, true, Payload[..16])), 1]);
+        using var reader = OpenNg(stream);
+        reader.ReadNext();
+
+        var result = reader.ReadNext();
+
+        await Assert.That(result is PcapError).IsTrue();
+        await Assert.That(reader.ReassemblyEvents.Single().Reason).IsEqualTo(PacketLab.Analysis.IpReassembly.IpReassemblyAnalysisReason.Aborted);
+        await Assert.That(reader.ReadNext() is PcapError).IsTrue();
+        await Assert.That(reader.ReassemblyEvents.IsEmpty).IsTrue();
+    }
+
+    [Test]
+    public async Task Disposing_pcapng_analysis_aborts_pending_fragments_and_keeps_the_stream_open()
+    {
+        using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet(Fragment(4, 0, true, Payload[..16]))]);
+        var reader = OpenNg(stream);
+        reader.ReadNext();
+
+        reader.Dispose();
+
+        await Assert.That(reader.ReassemblyEvents.Single().Reason).IsEqualTo(PacketLab.Analysis.IpReassembly.IpReassemblyAnalysisReason.Aborted);
+        await Assert.That(stream.CanRead).IsTrue();
+        Action read = () => reader.ReadNext();
+        await Assert.That(read).Throws<ObjectDisposedException>();
+        reader.Dispose();
+    }
+
+    private static PcapNgAnalysisReader OpenNg(Stream stream) => PcapNgAnalysisReader.Open(stream) is PcapNgAnalysisReader reader
+        ? reader : throw new InvalidOperationException("Expected a PCAPNG analysis reader.");
+
 }

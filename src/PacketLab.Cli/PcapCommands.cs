@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using ConsoleAppFramework;
 using PacketLab.Analysis.Pcap;
 using PacketLab.Analysis.IpReassembly;
@@ -29,17 +30,11 @@ internal static class PcapCommands
         try
         {
             using var stream = File.OpenRead(file);
-            if (inspect)
-                return PcapAnalysisReader.Open(stream) switch
-                {
-                    PcapAnalysisReader reader => InspectFile(reader),
-                    PcapError error => PrintError(error),
-                    null => throw new InvalidOperationException("Open returned an uninitialized result.")
-                };
 
-            return CaptureReader.Open(stream) switch
+            return Capture.Open(stream) switch
             {
-                CaptureReader reader => ReadFile(reader),
+                PcapReader reader => inspect ? InspectFile(new PcapAnalysisReader(reader)) : ReadFile(reader),
+                PcapNgReader reader => inspect ? InspectFile(new PcapNgAnalysisReader(reader)) : ReadFile(reader),
                 PcapError error => PrintError(error),
                 null => throw new InvalidOperationException("Open returned an uninitialized result.")
             };
@@ -55,7 +50,7 @@ internal static class PcapCommands
     private static int InspectFile(PcapAnalysisReader reader)
     {
         using var lifetime = reader;
-        if (reader.CaptureHeader is PcapFileHeader && reader.LinkLayer == LinkLayerProtocol.Unsupported)
+        if (reader.LinkLayer == LinkLayerProtocol.Unsupported)
         {
             Console.Error.WriteLine($"Unsupported link type {reader.Header.LinkType}. Ethernet inspection requires LinkType 1.");
 
@@ -69,19 +64,14 @@ internal static class PcapCommands
             {
                 case AnalyzedPacket packet:
                     PrintFrame(packet);
-                    PrintReassembly(reader);
-                    break;
-                case AnalyzedPcapNgPacket packet:
-                    PrintNgFrame(packet);
-                    PrintReassembly(reader);
+                    PrintReassembly(reader.ReassemblyEvents);
                     break;
                 case PcapEndOfFile:
-                    PrintNgMetadata(reader.Sections, reader.Interfaces);
-                    PrintReassembly(reader);
+                    PrintReassembly(reader.ReassemblyEvents);
 
                     return 0;
                 case PcapError error:
-                    PrintReassembly(reader);
+                    PrintReassembly(reader.ReassemblyEvents);
 
                     return PrintError(error);
                 default:
@@ -90,9 +80,35 @@ internal static class PcapCommands
         }
     }
 
-    private static void PrintReassembly(PcapAnalysisReader reader)
+    private static int InspectFile(PcapNgAnalysisReader reader)
     {
-        foreach (var item in reader.ReassemblyEvents)
+        using var lifetime = reader;
+        while (true)
+        {
+            switch (reader.ReadNext())
+            {
+                case AnalyzedPcapNgPacket packet:
+                    PrintNgFrame(packet);
+                    PrintReassembly(reader.ReassemblyEvents);
+                    break;
+                case PcapEndOfFile:
+                    PrintNgMetadata(reader.Sections, reader.Interfaces);
+                    PrintReassembly(reader.ReassemblyEvents);
+
+                    return 0;
+                case PcapError error:
+                    PrintReassembly(reader.ReassemblyEvents);
+
+                    return PrintError(error);
+                default:
+                    throw new InvalidOperationException("ReadNext returned an uninitialized result.");
+            }
+        }
+    }
+
+    private static void PrintReassembly(ImmutableArray<IpReassemblyEvent> events)
+    {
+        foreach (var item in events)
         {
             Console.WriteLine($"  Reassembly {item.DatagramNumber}: IPv{item.IpVersion} id={item.Identification} {DescribeReassemblyStatus(item)}; records=[{string.Join(",", item.RecordNumbers)}]; {DescribeReassemblyMessage(item)}");
             if (item.Packet is { } packet)
@@ -119,7 +135,7 @@ internal static class PcapCommands
         _ => item.Reassembly.Message
     };
 
-    private static int ReadFile(CaptureReader reader)
+    private static int ReadFile(PcapReader reader)
     {
         long count = 0;
         while (true)
@@ -127,13 +143,29 @@ internal static class PcapCommands
             switch (reader.ReadNext())
             {
                 case PcapPacket:
+                    count++;
+                    break;
+                case PcapEndOfFile:
+                    return PrintSummary(reader.Header, count);
+                case PcapError error:
+                    return PrintError(error);
+                default:
+                    throw new InvalidOperationException("ReadNext returned an uninitialized result.");
+            }
+        }
+    }
+
+    private static int ReadFile(PcapNgReader reader)
+    {
+        long count = 0;
+        while (true)
+        {
+            switch (reader.ReadNext())
+            {
                 case PcapNgPacket:
                     count++;
                     break;
                 case PcapEndOfFile:
-                    if (reader.Header is PcapFileHeader classic)
-                        return PrintSummary(classic, count);
-
                     Console.WriteLine("PCAPNG");
                     PrintNgMetadata(reader.Sections, reader.Interfaces);
                     Console.WriteLine($"Packets: {count}");
