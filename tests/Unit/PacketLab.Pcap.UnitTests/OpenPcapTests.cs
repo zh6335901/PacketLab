@@ -236,7 +236,7 @@ public class OpenPcapTests
     public async Task Options_reject_limits_outside_the_supported_range(int limit)
     {
         // Act
-        Action act = () => new PcapReaderOptions(limit);
+        Action act = () => new CaptureReaderOptions(limit);
 
         // Assert
         await Assert.That(act).Throws<ArgumentOutOfRangeException>();
@@ -251,7 +251,7 @@ public class OpenPcapTests
         int limit = maximum ? Array.MaxLength : 1;
 
         // Act
-        var options = new PcapReaderOptions(limit);
+        var options = new CaptureReaderOptions(limit);
 
         // Assert
         await Assert.That(options.MaxPacketBytes).IsEqualTo(limit);

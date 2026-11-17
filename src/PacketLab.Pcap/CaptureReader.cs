@@ -20,8 +20,7 @@ public sealed class CaptureReader
     public IReadOnlyList<PcapNgInterface> Interfaces => reader is PcapNgReader ng ? ng.Interfaces : [];
 
     // Detection does not seek, and the caller retains ownership of the stream.
-    public static CaptureOpenResult Open(Stream stream, PcapReaderOptions? options = null,
-        PcapNgReaderOptions? pcapNgOptions = null)
+    public static CaptureOpenResult Open(Stream stream, CaptureReaderOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(stream);
         if (!stream.CanRead)
@@ -32,10 +31,10 @@ public sealed class CaptureReader
         if (input.ReadBlock(magic) is BlockReadResult.Incomplete partial)
             return (PcapError)new PcapError.IncompleteFileHeader(partial.ReadBytes);
 
-        var settings = options ?? PcapReaderOptions.Default;
+        var settings = options ?? CaptureReaderOptions.Default;
         if (BinaryPrimitives.ReadUInt32BigEndian(magic) == 0x0a0d0d0a)
         {
-            var ng = new PcapNgReader(input, settings, pcapNgOptions ?? PcapNgReaderOptions.Default);
+            var ng = new PcapNgReader(input, settings);
             if (ng.OpenSection(magic) is { } error)
                 return error;
 

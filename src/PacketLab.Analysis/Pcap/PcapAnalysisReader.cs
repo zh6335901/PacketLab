@@ -31,9 +31,9 @@ public sealed class PcapAnalysisReader : IDisposable
         : throw new InvalidOperationException("PCAPNG has per-interface headers; use CaptureHeader and packet.Interface.");
     public LinkLayerProtocol LinkLayer => CaptureHeader is PcapFileHeader classic ? PcapAnalysis.GetLinkLayer(classic) : LinkLayerProtocol.Unsupported;
 
-    public static PcapAnalysisOpenResult Open(Stream stream, PcapReaderOptions? options = null,
-        IpReassemblyAnalysisOptions? reassemblyOptions = null, PcapNgReaderOptions? pcapNgOptions = null) =>
-        CaptureReader.Open(stream, options, pcapNgOptions) switch
+    public static PcapAnalysisOpenResult Open(Stream stream, CaptureReaderOptions? options = null,
+        IpReassemblyAnalysisOptions? reassemblyOptions = null) =>
+        CaptureReader.Open(stream, options) switch
         {
             CaptureReader reader => new PcapAnalysisReader(reader, reassemblyOptions),
             PcapError error => error,

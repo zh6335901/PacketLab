@@ -6,11 +6,11 @@ namespace PacketLab.Pcap;
 public sealed class PcapReader
 {
     private readonly PcapInput input;
-    private readonly PcapReaderOptions options;
+    private readonly CaptureReaderOptions options;
     private long recordNumber = 1;
     private ReaderState state = new Reading();
 
-    private PcapReader(PcapInput input, PcapFileHeader header, PcapReaderOptions options)
+    private PcapReader(PcapInput input, PcapFileHeader header, CaptureReaderOptions options)
     {
         this.input = input;
         Header = header;
@@ -20,7 +20,7 @@ public sealed class PcapReader
     public PcapFileHeader Header { get; }
 
     // The caller retains stream ownership even when opening fails.
-    public static PcapOpenResult Open(Stream stream, PcapReaderOptions? options = null)
+    public static PcapOpenResult Open(Stream stream, CaptureReaderOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(stream);
         if (!stream.CanRead)
@@ -28,10 +28,10 @@ public sealed class PcapReader
 
         var input = new PcapInput(stream);
 
-        return Open(input, options ?? PcapReaderOptions.Default, []);
+        return Open(input, options ?? CaptureReaderOptions.Default, []);
     }
 
-    internal static PcapOpenResult Open(PcapInput input, PcapReaderOptions settings, ReadOnlySpan<byte> prefix)
+    internal static PcapOpenResult Open(PcapInput input, CaptureReaderOptions settings, ReadOnlySpan<byte> prefix)
     {
         Span<byte> bytes = stackalloc byte[24];
         prefix.CopyTo(bytes);

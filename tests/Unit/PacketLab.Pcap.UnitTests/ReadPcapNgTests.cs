@@ -271,7 +271,7 @@ public class ReadPcapNgTests
     public async Task Packet_limit_is_enforced_for_pcapng()
     {
         using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet([1, 2])]);
-        var reader = CaptureReader.Open(stream, new PcapReaderOptions(1)) is CaptureReader opened ? opened : throw new InvalidOperationException();
+        var reader = CaptureReader.Open(stream, new CaptureReaderOptions(1)) is CaptureReader opened ? opened : throw new InvalidOperationException();
 
         var result = reader.ReadNext();
 
@@ -282,7 +282,7 @@ public class ReadPcapNgTests
     public async Task Metadata_limit_bounds_retained_sections_and_interfaces()
     {
         using var stream = new MemoryStream([.. Section(), .. Interface()]);
-        var reader = CaptureReader.Open(stream, pcapNgOptions: new(maxMetadataBytes: 300)) is CaptureReader opened ? opened : throw new InvalidOperationException();
+        var reader = CaptureReader.Open(stream, options: new(maxMetadataBytes: 300)) is CaptureReader opened ? opened : throw new InvalidOperationException();
 
         var result = reader.ReadNext();
 
@@ -321,7 +321,7 @@ public class ReadPcapNgTests
     public async Task Many_empty_options_are_bounded_before_large_object_allocation()
     {
         using var stream = new MemoryStream([.. Section(), .. Interface(options: [.. Option(1, []), .. Option(1, [])])]);
-        var reader = CaptureReader.Open(stream, pcapNgOptions: new(maxOptionsPerBlock: 1)) is CaptureReader opened ? opened : throw new InvalidOperationException();
+        var reader = CaptureReader.Open(stream, options: new(maxOptionsPerBlock: 1)) is CaptureReader opened ? opened : throw new InvalidOperationException();
 
         var result = reader.ReadNext();
 

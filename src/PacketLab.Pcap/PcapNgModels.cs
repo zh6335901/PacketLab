@@ -90,26 +90,3 @@ public union PcapNgPacketDetails(PcapNgPacketDetails.Enhanced, PcapNgPacketDetai
     public sealed record Simple;
     public sealed record Obsolete(PcapNgTimestamp Timestamp, ushort DropsCount);
 }
-
-public sealed class PcapNgReaderOptions
-{
-    public static PcapNgReaderOptions Default { get; } = new();
-
-    public PcapNgReaderOptions(int maxBlockBytes = 32 * 1024 * 1024, int maxMetadataBytes = 64 * 1024 * 1024,
-        int maxOptionsPerBlock = 65536)
-    {
-        if (maxBlockBytes < 28 || maxBlockBytes > Array.MaxLength)
-            throw new ArgumentOutOfRangeException(nameof(maxBlockBytes));
-        if (maxMetadataBytes < 28)
-            throw new ArgumentOutOfRangeException(nameof(maxMetadataBytes));
-
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxOptionsPerBlock);
-        MaxOptionsPerBlock = maxOptionsPerBlock;
-        MaxBlockBytes = maxBlockBytes;
-        MaxMetadataBytes = maxMetadataBytes;
-    }
-
-    public int MaxOptionsPerBlock { get; }
-    public int MaxBlockBytes { get; }
-    public int MaxMetadataBytes { get; }
-}

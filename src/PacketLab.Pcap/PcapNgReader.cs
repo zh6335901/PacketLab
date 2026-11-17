@@ -4,7 +4,7 @@ using System.Runtime.ExceptionServices;
 
 namespace PacketLab.Pcap;
 
-internal sealed class PcapNgReader(PcapInput input, PcapReaderOptions options, PcapNgReaderOptions ngOptions)
+internal sealed class PcapNgReader(PcapInput input, CaptureReaderOptions options)
 {
     private readonly List<PcapNgSection> sections = [];
     private readonly List<PcapNgInterface> interfaces = [];
@@ -80,7 +80,7 @@ internal sealed class PcapNgReader(PcapInput input, PcapReaderOptions options, P
         if (block.Type == 1)
             return AddInterface(block) is { } error ? error : new Skipped();
         if (block.Type is 2 or 3 or 6)
-            return PcapNgParser.Packet(block, sectionInterfaces, options.MaxPacketBytes, ngOptions.MaxOptionsPerBlock) switch
+            return PcapNgParser.Packet(block, sectionInterfaces, options.MaxPacketBytes, options.MaxOptionsPerBlock) switch
             {
                 PcapNgPacket packet => packet,
                 PcapError error => error,
@@ -92,7 +92,7 @@ internal sealed class PcapNgReader(PcapInput input, PcapReaderOptions options, P
 
     private PcapError? AddSection(PcapNgBlock block)
     {
-        var result = PcapNgParser.Section(block, sections.Count, ngOptions.MaxOptionsPerBlock);
+        var result = PcapNgParser.Section(block, sections.Count, options.MaxOptionsPerBlock);
         if (result is PcapError error)
             return error;
         if (result is not PcapNgSection section)
@@ -113,7 +113,7 @@ internal sealed class PcapNgReader(PcapInput input, PcapReaderOptions options, P
 
     private PcapError? AddInterface(PcapNgBlock block)
     {
-        var result = PcapNgParser.Interface(block, sections[^1], (uint)sectionInterfaces.Count, ngOptions.MaxOptionsPerBlock);
+        var result = PcapNgParser.Interface(block, sections[^1], (uint)sectionInterfaces.Count, options.MaxOptionsPerBlock);
         if (result is PcapError error)
             return error;
         if (result is not PcapNgInterface captureInterface)
@@ -133,8 +133,8 @@ internal sealed class PcapNgReader(PcapInput input, PcapReaderOptions options, P
         // Include object overhead so a flood of empty sections/interfaces is bounded too.
         metadataBytes += block.Body.Length + 256L + optionCount * 64L;
 
-        return metadataBytes > ngOptions.MaxMetadataBytes
-            ? block.Error(0, $"Section/interface metadata exceeds the configured limit {ngOptions.MaxMetadataBytes} bytes.") : (PcapError?)null;
+        return metadataBytes > options.MaxMetadataBytes
+            ? block.Error(0, $"Section/interface metadata exceeds the configured limit {options.MaxMetadataBytes} bytes.") : (PcapError?)null;
     }
 
     private BlockResult ReadBlock(ReadOnlySpan<byte> prefix)
@@ -180,8 +180,8 @@ internal sealed class PcapNgReader(PcapInput input, PcapReaderOptions options, P
     {
         if (length < (section ? 28 : 12) || length % 4 != 0)
             return Error(offset, offset + 4, $"Invalid block length {length}; expected an aligned length of at least {(section ? 28 : 12)}.");
-        if (length > ngOptions.MaxBlockBytes)
-            return Error(offset, offset + 4, $"Block length {length} exceeds the configured limit {ngOptions.MaxBlockBytes} bytes.");
+        if (length > options.MaxBlockBytes)
+            return Error(offset, offset + 4, $"Block length {length} exceeds the configured limit {options.MaxBlockBytes} bytes.");
         if (sectionBoundary is KnownEnd(var end) && (section ? offset != end : offset >= end || length > end - offset))
             return Error(offset, offset, "Block boundary does not match the declared section length.");
 

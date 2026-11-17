@@ -66,20 +66,3 @@ public sealed class PcapPacket
     public ReadOnlyMemory<byte> Data { get; }
     public bool OriginalLengthIsLessThanCaptured => OriginalLength < CapturedLength;
 }
-
-public sealed class PcapReaderOptions
-{
-    public const int DefaultMaxPacketBytes = 16 * 1024 * 1024;
-    public static PcapReaderOptions Default { get; } = new();
-
-    public PcapReaderOptions(int maxPacketBytes = DefaultMaxPacketBytes)
-    {
-        if (maxPacketBytes <= 0 || maxPacketBytes > Array.MaxLength)
-            throw new ArgumentOutOfRangeException(nameof(maxPacketBytes),
-                $"The packet limit must be between 1 and {Array.MaxLength}.");
-
-        MaxPacketBytes = maxPacketBytes;
-    }
-
-    public int MaxPacketBytes { get; }
-}

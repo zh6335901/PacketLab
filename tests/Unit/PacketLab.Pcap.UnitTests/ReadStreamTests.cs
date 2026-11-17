@@ -169,7 +169,7 @@ public class ReadStreamTests
         var bytes = Convert.FromHexString(PcapSamples.Multiple);
         if (!resource) bytes = PcapSamples.Replace(bytes, 16, "01000000");
         using var stream = new ProbeStream(bytes);
-        var openResult = PcapReader.Open(stream, new PcapReaderOptions(resource ? 1 : 10));
+        var openResult = PcapReader.Open(stream, new CaptureReaderOptions(resource ? 1 : 10));
         var reader = openResult is PcapReader opened ? opened : throw new InvalidOperationException();
         var error = reader.ReadNext() is PcapError initial ? initial : throw new InvalidOperationException();
         PcapError expectedError = resource
