@@ -1,4 +1,3 @@
-using PacketLab.Testing;
 using PacketLab.Analysis.Pcap;
 using PacketLab.Analyzers.Annotations;
 using PacketLab.Pcap;
@@ -17,18 +16,18 @@ public class AnalyzeEthernetCaptureTests
     {
         // Arrange
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
-        var reader = PcapAnalysisScenario.Open(stream) is PcapAnalysisScenario opened ? opened
-            : throw new InvalidOperationException($"Expected an analysis reader for {sample}.");
+        var reader = PcapReader.Open(stream) is PcapReader opened ? opened
+            : throw new InvalidOperationException($"Expected a PCAP reader for {sample}.");
         var snapshots = new List<RecordSnapshot>();
 
         // Act
-        foreach (var expected in ExpectedRecords)
+        for (int recordIndex = 0; recordIndex < ExpectedRecords.Length; recordIndex++)
         {
-            var context = $"{sample}, record {expected.RecordNumber}";
-            var packet = reader.ReadNext() is AnalyzedPacket read ? read
+            var context = $"{sample}, record {recordIndex + 1}";
+            var packet = reader.ReadNext() is PcapPacket read ? read
                 : throw new InvalidOperationException($"Expected {context}.");
-            var actual = new RecordSnapshot(packet.RecordNumber, packet.Packet.Timestamp, packet.Packet.CapturedLength,
-                packet.Packet.OriginalLength, Hex(packet.Packet.Data), Snapshot(packet.Decoding));
+            var actual = new RecordSnapshot(packet.Timestamp, packet.CapturedLength,
+                packet.OriginalLength, Hex(packet.Data), Snapshot(PcapAnalysis.Decode(reader.Header, packet)));
             snapshots.Add(actual);
         }
         var terminal = reader.ReadNext();
@@ -39,7 +38,7 @@ public class AnalyzeEthernetCaptureTests
         await Assert.That(terminal is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
     }
 
-    private sealed record RecordSnapshot(long RecordNumber, PcapTimestamp Timestamp, uint CapturedLength, uint OriginalLength,
+    private sealed record RecordSnapshot(PcapTimestamp Timestamp, uint CapturedLength, uint OriginalLength,
         string Bytes, EthernetSnapshot Ethernet);
     [TransportModel]
     private sealed record EthernetSnapshot(string Kind, string? Source = null, string? Destination = null,
@@ -86,16 +85,16 @@ public class AnalyzeEthernetCaptureTests
 
     private static readonly RecordSnapshot[] ExpectedRecords =
     [
-        new(1, PcapTimestamp.FromMicroseconds(1, 0), 14, 60, "FFFFFFFFFFFF0200000000010806",
+        new(PcapTimestamp.FromMicroseconds(1, 0), 14, 60, "FFFFFFFFFFFF0200000000010806",
             new("Frame", "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", EtherType: 0x0806,
                 RequiredArpHeaderLength: 8, ArpRemainingBytes: "")),
-        new(2, PcapTimestamp.FromMicroseconds(2, 0), 3, 3, "010203",
+        new(PcapTimestamp.FromMicroseconds(2, 0), 3, 3, "010203",
             new("IncompleteHeader", CapturedHeaderLength: 3, RemainingBytes: "010203")),
-        new(3, PcapTimestamp.FromMicroseconds(3, 0), 14, 1514, "00112233445566554433221105DC",
+        new(PcapTimestamp.FromMicroseconds(3, 0), 14, 1514, "00112233445566554433221105DC",
             new("Ieee8023Length", "66:55:44:33:22:11", "00:11:22:33:44:55", Length: 1500)),
-        new(4, PcapTimestamp.FromMicroseconds(4, 0), 14, 14, "00112233445566554433221105DD",
+        new(PcapTimestamp.FromMicroseconds(4, 0), 14, 14, "00112233445566554433221105DD",
             new("InvalidLengthOrType", "66:55:44:33:22:11", "00:11:22:33:44:55", InvalidLengthOrType: 1501)),
-        new(5, PcapTimestamp.FromMicroseconds(5, 0), 22, 60, "0011223344556655443322118100002A0800ABCD0000",
+        new(PcapTimestamp.FromMicroseconds(5, 0), 22, 60, "0011223344556655443322118100002A0800ABCD0000",
             new("Frame", "66:55:44:33:22:11", "00:11:22:33:44:55", EtherType: 0x8100, RemainingBytes: "002A0800ABCD0000"))
     ];
 }

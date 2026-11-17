@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <Compile Include="../../Support/*Scenario.cs;../../Support/ReassemblySteps.cs" />
     <None Include="../../TestData/PcapNg/*.pcapng" Link="TestData/PcapNg/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <ProjectReference Include="../../../analyzers/PacketLab.Analyzers.Annotations/PacketLab.Analyzers.Annotations.csproj" />
     <ProjectReference Include="../../../src/PacketLab.Analysis/PacketLab.Analysis.csproj" />

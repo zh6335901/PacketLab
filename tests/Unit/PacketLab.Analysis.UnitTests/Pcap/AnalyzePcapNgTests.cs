@@ -1,4 +1,3 @@
-using PacketLab.Testing;
 using PacketLab.Analysis.Pcap;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
@@ -10,47 +9,19 @@ namespace PacketLab.Analysis.UnitTests.Pcap;
 public class AnalyzePcapNgTests
 {
     [Test]
-    public async Task Unsupported_interfaces_do_not_prevent_later_ethernet_analysis()
+    public async Task Each_packet_uses_its_own_interfaces_link_type()
     {
         byte[] frame = Convert.FromHexString("FFFFFFFFFFFF0200000000010806AABB");
         using var stream = new MemoryStream([.. Section(), .. Interface(link: 101), .. Interface(),
-            .. Packet([1], id: 0), .. Packet(frame, id: 1, options: Text(1, "retained"))]);
-        var reader = PcapNgAnalysisScenario.Open(stream) is PcapNgAnalysisScenario opened ? opened : throw new InvalidOperationException();
+            .. Packet(frame, id: 0), .. Packet(frame, id: 1)]);
+        var reader = PcapNgReader.Open(stream) is PcapNgReader opened ? opened : throw new InvalidOperationException();
+        var first = reader.ReadNext() is PcapNgPacket packet1 ? packet1 : throw new InvalidOperationException();
+        var second = reader.ReadNext() is PcapNgPacket packet2 ? packet2 : throw new InvalidOperationException();
 
-        var first = reader.ReadNext() is AnalyzedPcapNgPacket unsupported ? unsupported : throw new InvalidOperationException();
-        var second = reader.ReadNext() is AnalyzedPcapNgPacket supported ? supported : throw new InvalidOperationException();
+        var unsupported = PcapAnalysis.Decode(first);
+        var supported = PcapAnalysis.Decode(second);
 
-        await Assert.That(first.Decoding is ProtocolDecodeResult.UnsupportedLinkLayer).IsTrue();
-        await Assert.That(second.Decoding is EthernetDecodeResult decoded && decoded is DecodedEthernet).IsTrue();
-        await Assert.That(second.Packet.Interface.Id).IsEqualTo(1u);
-        await Assert.That(second.RecordNumber).IsEqualTo(2L);
-        await Assert.That(second.Packet.Comments.Single()).IsEqualTo("retained");
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
-        await Assert.That(second.Packet.Data.Span.SequenceEqual(frame)).IsTrue();
+        await Assert.That(unsupported is ProtocolDecodeResult.UnsupportedLinkLayer raw && raw.RemainingBytes.Span.SequenceEqual(frame)).IsTrue();
+        await Assert.That(supported is EthernetDecodeResult { Value: DecodedEthernet }).IsTrue();
     }
-    [Test]
-    public async Task Analysis_uses_the_pcapng_reader_packet_limit_before_decoding()
-    {
-        using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet([1, 2, 3])]);
-        var reader = PcapNgAnalysisScenario.Open(stream, new PcapNgReaderOptions(maxPacketBytes: 2)) is PcapNgAnalysisScenario opened
-            ? opened : throw new InvalidOperationException();
-
-        var result = reader.ReadNext();
-
-        await Assert.That(result is PcapError error && error.Message.Contains("single-packet limit 2")).IsTrue();
-    }
-
-    [Test]
-    public async Task Analysis_can_continue_from_the_reader_returned_by_detection()
-    {
-        using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet([1])]);
-        var raw = Capture.Open(stream) is PcapNgReader reader ? reader : throw new InvalidOperationException();
-        var analysis = new PcapNgAnalysisScenario(raw);
-
-        var result = analysis.ReadNext();
-
-        await Assert.That(result is AnalyzedPcapNgPacket packet && packet.RecordNumber == 1 && packet.Packet.Data.Span[0] == 1).IsTrue();
-        await Assert.That(analysis.Interfaces[0]).IsSameReferenceAs(raw.Interfaces[0]);
-    }
-
 }

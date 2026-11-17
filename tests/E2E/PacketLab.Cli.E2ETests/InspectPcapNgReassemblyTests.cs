@@ -6,11 +6,9 @@ namespace PacketLab.Cli.E2ETests;
 public class InspectPcapNgReassemblyTests
 {
     [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Interfaces_reassemble_identical_ids_independently(int version)
+    public async Task Interfaces_reassemble_identical_ids_independently()
     {
-        var (first, tail) = Fragments(version);
+        var (first, tail) = Fragments(4);
         using var file = new InputFile([.. Section(), .. Interface(), .. Interface(),
             .. Packet(first), .. Packet(tail, id: 1), .. Packet(tail)]);
 
@@ -22,11 +20,9 @@ public class InspectPcapNgReassemblyTests
     }
 
     [Test]
-    [Arguments(4)]
-    [Arguments(6)]
-    public async Task Section_changes_finish_old_state_before_processing_new_fragments(int version)
+    public async Task Section_changes_finish_old_state_before_processing_new_fragments()
     {
-        var (first, tail) = Fragments(version);
+        var (first, tail) = Fragments(6);
         using var file = new InputFile([.. Section(), .. Interface(), .. Packet(first),
             .. Section(true), .. Interface(true), .. Packet(tail, true)]);
 

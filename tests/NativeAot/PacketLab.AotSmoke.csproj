@@ -5,7 +5,6 @@
     <PublishAot>true</PublishAot>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../Support/ReassemblySteps.cs" />
     <None Include="../TestData/PcapNg/*.pcapng" Link="TestData/PcapNg/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <ProjectReference Include="../../src/PacketLab.Analysis/PacketLab.Analysis.csproj" />
     <None Include="../TestData/Pcap/*-micro.pcap;../TestData/Pcap/*-nano.pcap;../TestData/Pcap/arp-little.pcap;../TestData/Pcap/arp-big.pcap;../TestData/Pcap/ethernet-little.pcap;../TestData/Pcap/ipv4-mixed.pcap;../TestData/Pcap/udp-*.pcap;../TestData/Pcap/tcp-*.pcap;../TestData/Pcap/ipv6-*.pcap;../TestData/Pcap/ip-reassembly-*.pcap" Link="TestData/Pcap/%(Filename)%(Extension)"
