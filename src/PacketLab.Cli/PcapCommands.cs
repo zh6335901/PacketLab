@@ -70,6 +70,7 @@ internal static class PcapCommands
                     PrintReassembly(inspection.Expire(recordNumber));
                     PrintReassembly(inspection.AnalyzePacket(recordNumber, decoding));
                     break;
+
                 case PcapError error:
                     PrintReassembly(inspection.Finish(IpReassemblyAnalysisReason.Aborted));
 
@@ -97,6 +98,7 @@ internal static class PcapCommands
                     PrintNgFrame(analyzed);
                     inspection.AnalyzePacket(analyzed);
                     break;
+
                 case PcapError error:
                     inspection.Finish(IpReassemblyAnalysisReason.Aborted);
 

@@ -80,9 +80,11 @@ public class EnumerateCaptureTests
                 case PcapReader reader:
                     _ = reader.ReadPackets().ToArray();
                     break;
+
                 case PcapNgReader reader:
                     _ = reader.ReadPackets().ToArray();
                     break;
+
                 default:
                     throw new InvalidOperationException();
             }

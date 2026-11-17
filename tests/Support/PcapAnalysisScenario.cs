@@ -2,12 +2,11 @@ using System.Collections.Immutable;
 using PacketLab.Analysis.IpReassembly;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
-
 using PacketLab.Analysis.Pcap;
 
 namespace PacketLab.Testing;
 
-public sealed class PcapAnalysisScenario : IDisposable
+internal sealed class PcapAnalysisScenario : IDisposable
 {
     private readonly PcapReader reader;
     private long recordNumber;
@@ -48,14 +47,17 @@ public sealed class PcapAnalysisScenario : IDisposable
                     PcapAnalysis.GetTimestampNanoseconds(packet.Timestamp), analyzed.Decoding);
 
                 return analyzed;
+
             case PcapEndOfFile eof:
                 ReassemblyEvents = reassemblyAnalyzer.Finish(IpReassemblyAnalysisReason.EndOfCapture);
 
                 return eof;
+
             case PcapError error:
                 ReassemblyEvents = reassemblyAnalyzer.Finish(IpReassemblyAnalysisReason.Aborted);
 
                 return error;
+
             default:
                 throw new InvalidOperationException("Uninitialized PCAP read result.");
         }
@@ -73,5 +75,5 @@ public sealed class PcapAnalysisScenario : IDisposable
     }
 }
 
-public union PcapScenarioOpenResult(PcapAnalysisScenario, PcapError);
-public union PcapScenarioReadResult(AnalyzedPacket, PcapEndOfFile, PcapError);
+internal union PcapScenarioOpenResult(PcapAnalysisScenario, PcapError);
+internal union PcapScenarioReadResult(AnalyzedPacket, PcapEndOfFile, PcapError);

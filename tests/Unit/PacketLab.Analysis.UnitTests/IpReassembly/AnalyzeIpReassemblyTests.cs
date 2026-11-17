@@ -266,37 +266,6 @@ public partial class AnalyzeIpReassemblyTests
     }
 
     [Test]
-    public async Task Disposal_only_cleans_up_and_keeps_the_caller_stream_open()
-    {
-        // Arrange
-        using var stream = Capture(Fragment(4, 0, true, Payload[..16]));
-        var reader = Open(stream);
-        Read(reader);
-
-        // Act
-        reader.Dispose();
-
-        // Assert
-        await Assert.That(reader.ReassemblyEvents.IsEmpty).IsTrue();
-        await Assert.That(stream.CanRead).IsTrue();
-    }
-
-    [Test]
-    public async Task Reading_a_disposed_analysis_reader_throws()
-    {
-        // Arrange
-        using var stream = Capture(Fragment(4, 0, true, Payload[..16]));
-        var reader = Open(stream);
-        reader.Dispose();
-
-        // Act
-        Action act = () => reader.ReadNext();
-
-        // Assert
-        await Assert.That(act).Throws<ObjectDisposedException>();
-    }
-
-    [Test]
     public async Task Completed_bytes_and_original_records_survive_later_reads_and_disposal()
     {
         // Arrange

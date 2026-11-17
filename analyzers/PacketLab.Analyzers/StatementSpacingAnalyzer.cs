@@ -20,13 +20,19 @@ public sealed class StatementSpacingAnalyzer : DiagnosticAnalyzer
         "Leave a blank line after the last guard clause",
         "Readability", DiagnosticSeverity.Warning, isEnabledByDefault: true);
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [BeforeReturn, AfterGuards];
+    private static readonly DiagnosticDescriptor BetweenSections = new(
+        "PL0012", "Separate switch sections",
+        "Leave a blank line between switch sections",
+        "Readability", DiagnosticSeverity.Warning, isEnabledByDefault: true);
+
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [BeforeReturn, AfterGuards, BetweenSections];
 
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
         context.RegisterSyntaxNodeAction(AnalyzeStatements, SyntaxKind.Block, SyntaxKind.SwitchSection, SyntaxKind.CompilationUnit);
+        context.RegisterSyntaxNodeAction(AnalyzeSwitch, SyntaxKind.SwitchStatement);
     }
 
     private static void AnalyzeStatements(SyntaxNodeAnalysisContext context)
@@ -45,7 +51,7 @@ public sealed class StatementSpacingAnalyzer : DiagnosticAnalyzer
             var isGuard = IsGuard(statement);
             if (previous is not null)
             {
-                if (statement is ReturnStatementSyntax)
+                if (statement is ReturnStatementSyntax && !IsSectionReturn(statement))
                     CheckSpacing(context, previous, statement, BeforeReturn);
                 else if (previousWasGuard && !isGuard)
                     CheckSpacing(context, previous, statement, AfterGuards);
@@ -54,6 +60,23 @@ public sealed class StatementSpacingAnalyzer : DiagnosticAnalyzer
             previous = statement;
             previousWasGuard = isGuard;
         }
+    }
+
+    private static bool IsSectionReturn(StatementSyntax statement)
+    {
+        if (statement.Parent is SwitchSectionSyntax section)
+            return section.Statements.LastOrDefault() == statement;
+
+        return statement.Parent is BlockSyntax block &&
+            block.Statements.LastOrDefault() == statement &&
+            block.Parent is SwitchSectionSyntax { Statements.Count: 1 };
+    }
+
+    private static void AnalyzeSwitch(SyntaxNodeAnalysisContext context)
+    {
+        var sections = ((SwitchStatementSyntax)context.Node).Sections;
+        for (var i = 1; i < sections.Count; i++)
+            CheckSpacing(context, sections[i - 1], sections[i], BetweenSections);
     }
 
     private static bool IsGuard(StatementSyntax statement)
@@ -66,7 +89,7 @@ public sealed class StatementSpacingAnalyzer : DiagnosticAnalyzer
         return last is ReturnStatementSyntax or ThrowStatementSyntax or ContinueStatementSyntax or BreakStatementSyntax;
     }
 
-    private static void CheckSpacing(SyntaxNodeAnalysisContext context, StatementSyntax previous, StatementSyntax next,
+    private static void CheckSpacing(SyntaxNodeAnalysisContext context, SyntaxNode previous, SyntaxNode next,
         DiagnosticDescriptor rule)
     {
         var tree = context.Node.SyntaxTree;

@@ -69,11 +69,14 @@ public sealed class PcapNgReader
                 case PcapNgPacket packet:
                     yield return packet;
                     break;
+
                 case PcapError error:
                     yield return error;
                     yield break;
+
                 case PcapEndOfFile:
                     yield break;
+
                 default:
                     throw new InvalidOperationException("Uninitialized read result.");
             }
@@ -85,10 +88,13 @@ public sealed class PcapNgReader
         switch (state)
         {
             case PcapError error: return error;
+
             case PcapEndOfFile eof: return eof;
+
             case ExceptionDispatchInfo failure:
                 failure.Throw();
                 throw new UnreachableException();
+
             case Reading:
                 try { return ReadPacket(); }
                 catch (Exception exception)
@@ -96,6 +102,7 @@ public sealed class PcapNgReader
                     state = ExceptionDispatchInfo.Capture(exception);
                     throw;
                 }
+
             default: throw new InvalidOperationException("Uninitialized reader state.");
         }
     }
@@ -118,11 +125,14 @@ public sealed class PcapNgReader
                         return Fail(failure);
 
                     break;
+
                 case PcapError error: return Fail(error);
+
                 case PcapEndOfFile eof:
                     state = eof;
 
                     return eof;
+
                 default: throw new InvalidOperationException("Uninitialized block result.");
             }
         }

@@ -13,7 +13,7 @@ public class AnalyzePcapNgFileTests
     public async Task Mixed_file_preserves_packet_order_and_decodes_arp_across_sections()
     {
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "PcapNg", "mixed.pcapng"));
-        using var reader = PcapNgAnalysisScenario.Open(stream) is PcapNgAnalysisScenario opened ? opened : throw new InvalidOperationException();
+        var reader = PcapNgAnalysisScenario.Open(stream) is PcapNgAnalysisScenario opened ? opened : throw new InvalidOperationException();
 
         var first = Read(reader);
         var second = Read(reader);
