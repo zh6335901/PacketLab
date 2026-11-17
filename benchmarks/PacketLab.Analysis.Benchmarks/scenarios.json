@@ -1,7 +1,7 @@
 [
-  "PcapAnalysisReader.Read64",
-  "PcapAnalysisReader.AnalyzeEthernet64",
-  "PcapAnalysisReader.Read1500",
-  "PcapAnalysisReader.AnalyzeEthernet1500",
-  "PcapAnalysisReader.AnalyzeIPv4Udp1500"
+  "PcapAnalysis.Read64",
+  "PcapAnalysis.AnalyzeEthernet64",
+  "PcapAnalysis.Read1500",
+  "PcapAnalysis.AnalyzeEthernet1500",
+  "PcapAnalysis.AnalyzeIPv4Udp1500"
 ]

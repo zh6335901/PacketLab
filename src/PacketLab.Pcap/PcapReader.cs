@@ -49,6 +49,26 @@ public sealed class PcapReader
         };
     }
 
+    public IEnumerable<PcapPacketResult> ReadPackets()
+    {
+        while (true)
+        {
+            switch (ReadNext())
+            {
+                case PcapPacket packet:
+                    yield return packet;
+                    break;
+                case PcapError error:
+                    yield return error;
+                    yield break;
+                case PcapEndOfFile:
+                    yield break;
+                default:
+                    throw new InvalidOperationException("Uninitialized read result.");
+            }
+        }
+    }
+
     public PcapReadResult ReadNext()
     {
         switch (state)

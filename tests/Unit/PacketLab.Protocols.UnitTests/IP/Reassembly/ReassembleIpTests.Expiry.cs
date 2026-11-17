@@ -12,11 +12,13 @@ public partial class ReassembleIpTests
         // Arrange
         using var reassembler = new IpFragmentReassembler();
         reassembler.AdvanceTime(ulong.MaxValue - (ulong)elapsedSeconds * 1_000_000_000UL);
+        reassembler.Expire();
         var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         long[] expected = expired ? [pending.DatagramId] : [];
 
         // Act
-        var updates = reassembler.AdvanceTime(ulong.MaxValue);
+        reassembler.AdvanceTime(ulong.MaxValue);
+        var updates = reassembler.Expire();
 
         // Assert
         await Assert.That(updates.Select(x => x.DatagramId).ToArray()).IsEquivalentTo(expected);
@@ -32,12 +34,14 @@ public partial class ReassembleIpTests
         using var reassembler = new IpFragmentReassembler();
         var oldest = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         reassembler.AdvanceTime(30_000_000_000);
+        reassembler.Expire();
         var younger = reassembler.Process(Fragment(4, 0, true, Payload[..16], 2))!;
         reassembler.Expire(oldest.DatagramId);
         long[] expected = expired ? [younger.DatagramId] : [];
 
         // Act
-        var updates = reassembler.AdvanceTime(time);
+        reassembler.AdvanceTime(time);
+        var updates = reassembler.Expire();
 
         // Assert
         await Assert.That(updates.Select(x => x.DatagramId).ToArray()).IsEquivalentTo(expected);
@@ -50,6 +54,7 @@ public partial class ReassembleIpTests
         using var reassembler = new IpFragmentReassembler(new(maxDatagrams: 1));
         reassembler.Process(Fragment(4, 0, true, Payload[..16]));
         reassembler.AdvanceTime(60_000_000_000);
+        reassembler.Expire();
 
         // Act
         var result = reassembler.Process(Fragment(4, 0, true, Payload[..16], 2))!;
@@ -65,10 +70,12 @@ public partial class ReassembleIpTests
         using var reassembler = new IpFragmentReassembler();
         var older = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         reassembler.AdvanceTime(30_000_000_000);
+        reassembler.Expire();
         reassembler.Process(Fragment(4, 0, true, Payload[..16], 2));
 
         // Act
-        var updates = reassembler.AdvanceTime(60_000_000_000);
+        reassembler.AdvanceTime(60_000_000_000);
+        var updates = reassembler.Expire();
 
         // Assert
         await Assert.That(updates.Select(x => x.DatagramId).ToArray()).IsEquivalentTo([older.DatagramId]);

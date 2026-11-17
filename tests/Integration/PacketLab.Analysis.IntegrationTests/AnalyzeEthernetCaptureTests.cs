@@ -1,3 +1,4 @@
+using PacketLab.Testing;
 using PacketLab.Analysis.Pcap;
 using PacketLab.Analyzers.Annotations;
 using PacketLab.Pcap;
@@ -16,7 +17,7 @@ public class AnalyzeEthernetCaptureTests
     {
         // Arrange
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
-        var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened
+        var reader = PcapAnalysisScenario.Open(stream) is PcapAnalysisScenario opened ? opened
             : throw new InvalidOperationException($"Expected an analysis reader for {sample}.");
         var snapshots = new List<RecordSnapshot>();
 

@@ -110,7 +110,12 @@ public class ReassemblyClockBenchmarks
     }
 
     [Benchmark]
-    public ImmutableArray<IpReassemblyUpdate> AdvanceTime() => reassembler.AdvanceTime(1_000_000);
+    public ImmutableArray<IpReassemblyUpdate> AdvanceTime()
+    {
+        reassembler.AdvanceTime(1_000_000);
+
+        return reassembler.Expire();
+    }
 
     [GlobalCleanup]
     public void Close() => reassembler.Dispose();

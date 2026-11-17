@@ -1,3 +1,4 @@
+using PacketLab.Testing;
 using PacketLab.Analysis.Pcap;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
@@ -203,7 +204,7 @@ public class AnalyzeCaptureTests
         using var stream = new MemoryStream([0xd4]);
 
         // Act
-        var result = PcapAnalysisReader.Open(stream);
+        var result = PcapAnalysisScenario.Open(stream);
 
         // Assert
         await Assert.That(result is PcapError error && error is PcapError.IncompleteFileHeader { ReadBytes: 1 }).IsTrue();
@@ -215,8 +216,8 @@ public class AnalyzeCaptureTests
     {
         // Arrange
         using var stream = new MemoryStream(Convert.FromHexString(Header + Records));
-        var result = PcapAnalysisReader.Open(stream, new PcapReaderOptions(15));
-        var reader = result is PcapAnalysisReader opened ? opened : throw new AssertionException("Expected a reader.");
+        var result = PcapAnalysisScenario.Open(stream, new PcapReaderOptions(15));
+        var reader = result is PcapAnalysisScenario opened ? opened : throw new AssertionException("Expected a reader.");
 
         // Act
         var failure = reader.ReadNext();
@@ -233,7 +234,7 @@ public class AnalyzeCaptureTests
         using var stream = new FailingStream(Convert.FromHexString(Header + Records)) { Fail = true };
 
         // Act
-        Action act = () => PcapAnalysisReader.Open(stream);
+        Action act = () => PcapAnalysisScenario.Open(stream);
 
         // Assert
         var error = await Assert.That(act).Throws<IOException>();
@@ -265,10 +266,10 @@ public class AnalyzeCaptureTests
         await Assert.That(stream.CanRead).IsTrue();
     }
 
-    private static PcapAnalysisReader Open(Stream stream) => PcapAnalysisReader.Open(stream) is PcapAnalysisReader reader
+    private static PcapAnalysisScenario Open(Stream stream) => PcapAnalysisScenario.Open(stream) is PcapAnalysisScenario reader
         ? reader : throw new AssertionException("Expected an analysis reader.");
 
-    private static AnalyzedPacket Read(PcapAnalysisReader reader) => reader.ReadNext() is AnalyzedPacket packet
+    private static AnalyzedPacket Read(PcapAnalysisScenario reader) => reader.ReadNext() is AnalyzedPacket packet
         ? packet : throw new AssertionException("Expected an analyzed packet.");
 
     private sealed class FailingStream(byte[] bytes) : MemoryStream(bytes)

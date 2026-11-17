@@ -1,3 +1,4 @@
+using PacketLab.Testing;
 using PacketLab.Analysis.Pcap;
 using PacketLab.Protocols.IP;
 using PacketLab.Analyzers.Annotations;
@@ -19,7 +20,7 @@ public class AnalyzeIPv6CaptureTests
     {
         // Arrange
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
-        var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened
+        var reader = PcapAnalysisScenario.Open(stream) is PcapAnalysisScenario opened ? opened
             : throw new InvalidOperationException($"Expected an analysis reader for {sample}.");
         var snapshots = new List<RecordSnapshot>();
 
@@ -51,7 +52,7 @@ public class AnalyzeIPv6CaptureTests
     {
         // Arrange
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", $"ipv6-extensions-{order}.pcap"));
-        var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened
+        var reader = PcapAnalysisScenario.Open(stream) is PcapAnalysisScenario opened ? opened
             : throw new InvalidOperationException("Expected PCAP reader.");
         var snapshots = new List<ExtensionSnapshot>();
         var packets = new List<AnalyzedPacket>();

@@ -1,3 +1,4 @@
+using PacketLab.Testing;
 using System.Buffers.Binary;
 using FsCheck.Fluent;
 using FsCheck;
@@ -265,7 +266,7 @@ public partial class AnalyzeIpReassemblyTests
     }
 
     [Test]
-    public async Task Disposal_reports_aborted_datagrams_and_keeps_the_caller_stream_open()
+    public async Task Disposal_only_cleans_up_and_keeps_the_caller_stream_open()
     {
         // Arrange
         using var stream = Capture(Fragment(4, 0, true, Payload[..16]));
@@ -276,7 +277,7 @@ public partial class AnalyzeIpReassemblyTests
         reader.Dispose();
 
         // Assert
-        await Assert.That(reader.ReassemblyEvents.Single().Reason).IsEqualTo(IpReassemblyAnalysisReason.Aborted);
+        await Assert.That(reader.ReassemblyEvents.IsEmpty).IsTrue();
         await Assert.That(stream.CanRead).IsTrue();
     }
 
@@ -376,10 +377,10 @@ public partial class AnalyzeIpReassemblyTests
         using var analyzer = new IpReassemblyAnalyzer();
         var first = PacketLab.Protocols.ProtocolDecoder.Decode(Fragment(4, 0, true, Payload[..16]), PacketLab.Protocols.LinkLayerProtocol.Ethernet);
         var tail = PacketLab.Protocols.ProtocolDecoder.Decode(Fragment(4, 16, false, Payload[16..]), PacketLab.Protocols.LinkLayerProtocol.Ethernet);
-        analyzer.Process(100, 1_000_000_000, first);
+        ReassemblySteps.Process(analyzer, 100, 1_000_000_000, first);
 
         // Act
-        var complete = analyzer.Process(102, 2_000_000_000, tail).Single();
+        var complete = ReassemblySteps.Process(analyzer, 102, 2_000_000_000, tail).Single();
 
         // Assert
         await Assert.That(complete.Status).IsEqualTo(IpReassemblyStatus.Complete);
@@ -409,7 +410,7 @@ public partial class AnalyzeIpReassemblyTests
         var input = PacketLab.Protocols.ProtocolDecoder.Decode(new byte[14], PacketLab.Protocols.LinkLayerProtocol.Ethernet);
 
         // Act
-        Action act = () => analyzer.Process(1, null, input);
+        Action act = () => ReassemblySteps.Process(analyzer, 1, null, input);
 
         // Assert
         await Assert.That(act).Throws<ObjectDisposedException>();
@@ -437,10 +438,10 @@ public partial class AnalyzeIpReassemblyTests
         throw new InvalidOperationException("Expected UDP");
     }
 
-    private static PcapAnalysisReader Open(Stream stream, IpReassemblyAnalysisOptions? options = null) =>
-        PcapAnalysisReader.Open(stream, reassemblyOptions: options) is PcapAnalysisReader reader ? reader : throw new InvalidOperationException();
+    private static PcapAnalysisScenario Open(Stream stream, IpReassemblyAnalysisOptions? options = null) =>
+        PcapAnalysisScenario.Open(stream, reassemblyOptions: options) is PcapAnalysisScenario reader ? reader : throw new InvalidOperationException();
 
-    private static AnalyzedPacket Read(PcapAnalysisReader reader) => reader.ReadNext() is AnalyzedPacket packet ? packet : throw new InvalidOperationException();
+    private static AnalyzedPacket Read(PcapAnalysisScenario reader) => reader.ReadNext() is AnalyzedPacket packet ? packet : throw new InvalidOperationException();
 
     private static byte[] Fragment(int version, int offset, bool more, byte[] payload, ushort id = 1,
         byte nextHeader = 17, bool hopByHop = false)

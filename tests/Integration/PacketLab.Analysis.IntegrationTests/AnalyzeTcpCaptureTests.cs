@@ -1,3 +1,4 @@
+using PacketLab.Testing;
 using PacketLab.Analysis.Pcap;
 using PacketLab.Pcap;
 using PacketLab.Protocols.Ethernet;
@@ -259,9 +260,9 @@ public class AnalyzeTcpCaptureTests
 
     private static FileStream OpenSample(string sample) =>
         File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
-    private static PcapAnalysisReader OpenReader(Stream stream) =>
-        PcapAnalysisReader.Open(stream) is PcapAnalysisReader reader ? reader : throw new InvalidOperationException("Expected a readable PCAP.");
-    private static AnalyzedPacket ReadPacket(PcapAnalysisReader reader) =>
+    private static PcapAnalysisScenario OpenReader(Stream stream) =>
+        PcapAnalysisScenario.Open(stream) is PcapAnalysisScenario reader ? reader : throw new InvalidOperationException("Expected a readable PCAP.");
+    private static AnalyzedPacket ReadPacket(PcapAnalysisScenario reader) =>
         reader.ReadNext() is AnalyzedPacket packet ? packet : throw new InvalidOperationException("Expected another analyzed packet.");
     private static DecodedEthernet ReadRecord(string sample, SampleRecord record)
     {

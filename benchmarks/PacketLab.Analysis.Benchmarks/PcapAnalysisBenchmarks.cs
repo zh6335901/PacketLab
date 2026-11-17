@@ -10,7 +10,7 @@ namespace PacketLab.Analysis.Benchmarks;
 
 [MemoryDiagnoser]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
-public class PcapAnalysisReaderBenchmarks
+public class PcapAnalysisBenchmarks
 {
     private MemoryStream capture = null!;
 
@@ -24,13 +24,12 @@ public class PcapAnalysisReaderBenchmarks
     public void PrepareIPv4Udp()
     {
         capture = PcapCaptureSamples.IPv4Udp();
-        using var reader = OpenAnalysis();
-        if (reader.ReadNext() is not AnalyzedPacket packet || packet.Decoding is not EthernetDecodeResult ethernet ||
+        var reader = OpenCapture();
+        if (reader.ReadNext() is not PcapPacket packet || PcapAnalysis.Decode(reader.Header, packet) is not EthernetDecodeResult ethernet ||
             ethernet is not DecodedEthernet decoded || decoded.Payload is not IPv4DecodeResult ipv4 ||
             ipv4 is not DecodedIPv4 ip || ip.Packet.ChecksumStatus != IPv4ChecksumStatus.Match ||
             ip.Payload is not UdpParseResult udp || udp is not UdpDatagram { IsComplete: true } datagram ||
-            datagram.Checksum is not UdpChecksumStatus.Match || datagram.Payload.Length != 1458 ||
-            !reader.ReassemblyEvents.IsEmpty)
+            datagram.Checksum is not UdpChecksumStatus.Match || datagram.Payload.Length != 1458)
             throw new InvalidDataException("Expected an unfragmented IPv4 packet with a complete checksummed UDP datagram.");
     }
 
@@ -83,9 +82,9 @@ public class PcapAnalysisReaderBenchmarks
         }
     }
 
-    private PcapAnalysisReader OpenAnalysis() => PcapAnalysisReader.Open(capture) switch
+    private PcapReader OpenCapture() => PcapReader.Open(capture) switch
     {
-        PcapAnalysisReader opened => opened,
+        PcapReader opened => opened,
         PcapError error => throw new InvalidDataException(error.Message),
         null => throw new InvalidOperationException("Uninitialized analysis open result.")
     };
@@ -93,18 +92,18 @@ public class PcapAnalysisReaderBenchmarks
     private void AnalyzeToEnd(int frameSize)
     {
         capture.Position = 0;
-        using var reader = OpenAnalysis();
+        var reader = OpenCapture();
         int packets = 0;
         long bytes = 0;
         while (true)
         {
             switch (reader.ReadNext())
             {
-                case AnalyzedPacket packet when packet.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame:
+                case PcapPacket packet when PcapAnalysis.Decode(reader.Header, packet) is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame:
                     packets++;
                     bytes += PcapCaptureSamples.EthernetHeaderLength + frame.Frame.RemainingBytes.Length;
                     break;
-                case AnalyzedPacket:
+                case PcapPacket:
                     throw new InvalidDataException("Expected a decoded Ethernet II frame.");
                 case PcapEndOfFile when packets == PcapCaptureSamples.PacketCount && bytes == (long)PcapCaptureSamples.PacketCount * frameSize:
                     return;

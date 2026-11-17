@@ -3,9 +3,11 @@ using PacketLab.Analysis.IpReassembly;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
 
-namespace PacketLab.Analysis.Pcap;
+using PacketLab.Analysis.Pcap;
 
-public sealed class PcapNgAnalysisReader : IDisposable
+namespace PacketLab.Testing;
+
+public sealed class PcapNgAnalysisScenario : IDisposable
 {
     private readonly PcapNgReader reader;
     private readonly IpReassemblyAnalysisOptions reassemblyOptions;
@@ -13,7 +15,7 @@ public sealed class PcapNgAnalysisReader : IDisposable
     private long recordNumber;
     private bool disposed;
 
-    public PcapNgAnalysisReader(PcapNgReader reader, IpReassemblyAnalysisOptions? reassemblyOptions = null)
+    public PcapNgAnalysisScenario(PcapNgReader reader, IpReassemblyAnalysisOptions? reassemblyOptions = null)
     {
         ArgumentNullException.ThrowIfNull(reader);
         this.reader = reader;
@@ -24,41 +26,33 @@ public sealed class PcapNgAnalysisReader : IDisposable
     public IReadOnlyList<PcapNgInterface> Interfaces => reader.Interfaces;
     public ImmutableArray<IpReassemblyEvent> ReassemblyEvents { get; private set; } = [];
 
-    public static PcapNgAnalysisOpenResult Open(Stream stream, PcapNgReaderOptions? options = null,
+    public static PcapNgScenarioOpenResult Open(Stream stream, PcapNgReaderOptions? options = null,
         IpReassemblyAnalysisOptions? reassemblyOptions = null) =>
         PcapNgReader.Open(stream, options) switch
         {
-            PcapNgReader reader => new PcapNgAnalysisReader(reader, reassemblyOptions),
+            PcapNgReader reader => new PcapNgAnalysisScenario(reader, reassemblyOptions),
             PcapError error => error,
             null => throw new InvalidOperationException("Uninitialized PCAPNG open result.")
         };
 
-    public PcapNgAnalysisReadResult ReadNext()
+    public PcapNgScenarioReadResult ReadNext()
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         ReassemblyEvents = [];
-        try
+        switch (reader.ReadNext())
         {
-            switch (reader.ReadNext())
-            {
-                case PcapNgPacket packet:
-                    return Analyze(packet);
-                case PcapEndOfFile eof:
-                    ReassemblyEvents = Finish(IpReassemblyAnalysisReason.EndOfCapture);
+            case PcapNgPacket packet:
+                return Analyze(packet);
+            case PcapEndOfFile eof:
+                ReassemblyEvents = Finish(IpReassemblyAnalysisReason.EndOfCapture);
 
-                    return eof;
-                case PcapError error:
-                    ReassemblyEvents = Finish(IpReassemblyAnalysisReason.Aborted);
+                return eof;
+            case PcapError error:
+                ReassemblyEvents = Finish(IpReassemblyAnalysisReason.Aborted);
 
-                    return error;
-                default:
-                    throw new InvalidOperationException("Uninitialized PCAPNG read result.");
-            }
-        }
-        catch
-        {
-            ReassemblyEvents = Finish(IpReassemblyAnalysisReason.Aborted);
-            throw;
+                return error;
+            default:
+                throw new InvalidOperationException("Uninitialized PCAPNG read result.");
         }
     }
 
@@ -75,7 +69,7 @@ public sealed class PcapNgAnalysisReader : IDisposable
             analyzer = new IpReassemblyAnalyzer(reassemblyOptions);
             interfaceAnalyzers.Add(packet.Interface, analyzer);
         }
-        events.AddRange(analyzer.Process(analyzed.RecordNumber, packet.Timestamp?.GetNanoseconds(), analyzed.Decoding));
+        events.AddRange(ReassemblySteps.Process(analyzer, analyzed.RecordNumber, packet.Timestamp?.GetNanoseconds(), analyzed.Decoding));
         ReassemblyEvents = events.ToImmutable();
 
         return analyzed;
@@ -100,7 +94,13 @@ public sealed class PcapNgAnalysisReader : IDisposable
         if (disposed)
             return;
 
-        ReassemblyEvents = Finish(IpReassemblyAnalysisReason.Aborted);
+        foreach (var analyzer in interfaceAnalyzers.Values)
+            analyzer.Dispose();
+        interfaceAnalyzers.Clear();
+        ReassemblyEvents = [];
         disposed = true;
     }
 }
+
+public union PcapNgScenarioOpenResult(PcapNgAnalysisScenario, PcapError);
+public union PcapNgScenarioReadResult(AnalyzedPcapNgPacket, PcapEndOfFile, PcapError);

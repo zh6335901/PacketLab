@@ -11,10 +11,17 @@ public static class PcapAnalysis
         _ => LinkLayerProtocol.Unsupported
     };
 
+    public static ProtocolDecodeResult Decode(PcapNgPacket packet)
+    {
+        var linkLayer = packet.Interface.LinkType == 1 ? LinkLayerProtocol.Ethernet : LinkLayerProtocol.Unsupported;
+
+        return ProtocolDecoder.Decode(packet.Data, linkLayer);
+    }
+
     public static ProtocolDecodeResult Decode(PcapFileHeader header, PcapPacket packet) =>
         ProtocolDecoder.Decode(packet.Data, GetLinkLayer(header));
         
-    internal static ulong? GetTimestampNanoseconds(PcapTimestamp timestamp)
+    public static ulong? GetTimestampNanoseconds(PcapTimestamp timestamp)
     {
         var scale = timestamp.Precision == PcapTimestampPrecision.Microseconds ? 1000UL : 1UL;
         var fraction = timestamp.Fraction * scale;

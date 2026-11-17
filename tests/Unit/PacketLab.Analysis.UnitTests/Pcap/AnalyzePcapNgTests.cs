@@ -1,3 +1,4 @@
+using PacketLab.Testing;
 using PacketLab.Analysis.Pcap;
 using PacketLab.Pcap;
 using PacketLab.Protocols;
@@ -14,7 +15,7 @@ public class AnalyzePcapNgTests
         byte[] frame = Convert.FromHexString("FFFFFFFFFFFF0200000000010806AABB");
         using var stream = new MemoryStream([.. Section(), .. Interface(link: 101), .. Interface(),
             .. Packet([1], id: 0), .. Packet(frame, id: 1, options: Text(1, "retained"))]);
-        using var reader = PcapNgAnalysisReader.Open(stream) is PcapNgAnalysisReader opened ? opened : throw new InvalidOperationException();
+        using var reader = PcapNgAnalysisScenario.Open(stream) is PcapNgAnalysisScenario opened ? opened : throw new InvalidOperationException();
 
         var first = reader.ReadNext() is AnalyzedPcapNgPacket unsupported ? unsupported : throw new InvalidOperationException();
         var second = reader.ReadNext() is AnalyzedPcapNgPacket supported ? supported : throw new InvalidOperationException();
@@ -31,7 +32,7 @@ public class AnalyzePcapNgTests
     public async Task Analysis_uses_the_pcapng_reader_packet_limit_before_decoding()
     {
         using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet([1, 2, 3])]);
-        using var reader = PcapNgAnalysisReader.Open(stream, new PcapNgReaderOptions(maxPacketBytes: 2)) is PcapNgAnalysisReader opened
+        using var reader = PcapNgAnalysisScenario.Open(stream, new PcapNgReaderOptions(maxPacketBytes: 2)) is PcapNgAnalysisScenario opened
             ? opened : throw new InvalidOperationException();
 
         var result = reader.ReadNext();
@@ -45,7 +46,7 @@ public class AnalyzePcapNgTests
     {
         using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet([1])]);
         var raw = Capture.Open(stream) is PcapNgReader reader ? reader : throw new InvalidOperationException();
-        using var analysis = new PcapNgAnalysisReader(raw);
+        using var analysis = new PcapNgAnalysisScenario(raw);
 
         var result = analysis.ReadNext();
 

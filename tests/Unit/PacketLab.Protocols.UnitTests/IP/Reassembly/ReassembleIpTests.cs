@@ -630,13 +630,15 @@ public partial class ReassembleIpTests
         // Arrange
         using var reassembler = new IpFragmentReassembler(new(maxDatagrams: 2));
         reassembler.AdvanceTime(1_000_000_000);
+        reassembler.Expire();
         var first = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         var second = reassembler.Process(Fragment(4, 0, true, Payload[..16], 2))!;
         reassembler.Discard(second.DatagramId);
         long[] expected = expires ? [first.DatagramId, second.DatagramId] : [];
 
         // Act
-        var expired = reassembler.AdvanceTime(time);
+        reassembler.AdvanceTime(time);
+        var expired = reassembler.Expire();
 
         // Assert
         await Assert.That(expired.Select(x => x.DatagramId).ToArray()).IsEquivalentTo(expected);
@@ -651,6 +653,7 @@ public partial class ReassembleIpTests
         var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         reassembler.Discard(pending.DatagramId);
         reassembler.AdvanceTime(60_000_000_000);
+        reassembler.Expire();
 
         // Act
         var retained = reassembler.IsRetained(pending.DatagramId);

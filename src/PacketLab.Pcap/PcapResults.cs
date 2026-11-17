@@ -78,3 +78,5 @@ public union PcapOpenResult(PcapReader, PcapError);
 public union PcapReadResult(PcapPacket, PcapEndOfFile, PcapError);
 
 public sealed record PcapEndOfFile;
+
+public union PcapPacketResult(PcapPacket, PcapError);

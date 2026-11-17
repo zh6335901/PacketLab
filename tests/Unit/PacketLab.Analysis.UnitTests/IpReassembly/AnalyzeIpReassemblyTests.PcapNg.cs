@@ -1,3 +1,4 @@
+using PacketLab.Testing;
 using PacketLab.Analysis.Pcap;
 using PacketLab.Pcap;
 using PacketLab.Protocols.IP.Reassembly;
@@ -91,7 +92,7 @@ public partial class AnalyzeIpReassemblyTests
     }
 
     [Test]
-    public async Task Disposing_pcapng_analysis_aborts_pending_fragments_and_keeps_the_stream_open()
+    public async Task Disposing_pcapng_scenario_only_cleans_up_and_keeps_the_stream_open()
     {
         using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet(Fragment(4, 0, true, Payload[..16]))]);
         var reader = OpenNg(stream);
@@ -99,14 +100,14 @@ public partial class AnalyzeIpReassemblyTests
 
         reader.Dispose();
 
-        await Assert.That(reader.ReassemblyEvents.Single().Reason).IsEqualTo(PacketLab.Analysis.IpReassembly.IpReassemblyAnalysisReason.Aborted);
+        await Assert.That(reader.ReassemblyEvents.IsEmpty).IsTrue();
         await Assert.That(stream.CanRead).IsTrue();
         Action read = () => reader.ReadNext();
         await Assert.That(read).Throws<ObjectDisposedException>();
         reader.Dispose();
     }
 
-    private static PcapNgAnalysisReader OpenNg(Stream stream) => PcapNgAnalysisReader.Open(stream) is PcapNgAnalysisReader reader
+    private static PcapNgAnalysisScenario OpenNg(Stream stream) => PcapNgAnalysisScenario.Open(stream) is PcapNgAnalysisScenario reader
         ? reader : throw new InvalidOperationException("Expected a PCAPNG analysis reader.");
 
 }

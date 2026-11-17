@@ -60,6 +60,26 @@ public sealed class PcapNgReader
         _ => throw new InvalidOperationException("Missing initial section header.")
     };
 
+    public IEnumerable<PcapNgPacketResult> ReadPackets()
+    {
+        while (true)
+        {
+            switch (ReadNext())
+            {
+                case PcapNgPacket packet:
+                    yield return packet;
+                    break;
+                case PcapError error:
+                    yield return error;
+                    yield break;
+                case PcapEndOfFile:
+                    yield break;
+                default:
+                    throw new InvalidOperationException("Uninitialized read result.");
+            }
+        }
+    }
+
     public PcapNgReadResult ReadNext()
     {
         switch (state)
