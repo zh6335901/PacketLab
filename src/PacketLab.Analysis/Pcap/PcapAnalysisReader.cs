@@ -7,7 +7,9 @@ namespace PacketLab.Analysis.Pcap;
 
 public sealed class PcapAnalysisReader : IDisposable
 {
-    private readonly PcapReader reader;
+    private readonly CaptureReader reader;
+    private readonly IpReassemblyAnalysisOptions reassemblyOptions;
+    private readonly Dictionary<PcapNgInterface, IpReassemblyAnalyzer> interfaceAnalyzers = [];
     private long recordNumber;
     private readonly IpReassemblyAnalyzer reassemblyAnalyzer;
     private bool disposed;
@@ -15,20 +17,25 @@ public sealed class PcapAnalysisReader : IDisposable
     // Events from the most recent read, including expiry, EOF, and PCAP failures.
     public ImmutableArray<IpReassemblyEvent> ReassemblyEvents { get; private set; } = [];
 
-    private PcapAnalysisReader(PcapReader reader, IpReassemblyAnalysisOptions? reassemblyOptions)
+    private PcapAnalysisReader(CaptureReader reader, IpReassemblyAnalysisOptions? reassemblyOptions)
     {
         this.reader = reader;
-        reassemblyAnalyzer = new(reassemblyOptions ?? new());
+        this.reassemblyOptions = reassemblyOptions ?? new();
+        reassemblyAnalyzer = new(this.reassemblyOptions);
     }
 
-    public PcapFileHeader Header => reader.Header;
-    public LinkLayerProtocol LinkLayer => PcapAnalysis.GetLinkLayer(Header);
+    public CaptureHeader CaptureHeader => reader.Header;
+    public IReadOnlyList<PcapNgSection> Sections => reader.Sections;
+    public IReadOnlyList<PcapNgInterface> Interfaces => reader.Interfaces;
+    public PcapFileHeader Header => CaptureHeader is PcapFileHeader classic ? classic
+        : throw new InvalidOperationException("PCAPNG has per-interface headers; use CaptureHeader and packet.Interface.");
+    public LinkLayerProtocol LinkLayer => CaptureHeader is PcapFileHeader classic ? PcapAnalysis.GetLinkLayer(classic) : LinkLayerProtocol.Unsupported;
 
     public static PcapAnalysisOpenResult Open(Stream stream, PcapReaderOptions? options = null,
-        IpReassemblyAnalysisOptions? reassemblyOptions = null) =>
-        PcapReader.Open(stream, options) switch
+        IpReassemblyAnalysisOptions? reassemblyOptions = null, PcapNgReaderOptions? pcapNgOptions = null) =>
+        CaptureReader.Open(stream, options, pcapNgOptions) switch
         {
-            PcapReader reader => new PcapAnalysisReader(reader, reassemblyOptions),
+            CaptureReader reader => new PcapAnalysisReader(reader, reassemblyOptions),
             PcapError error => error,
             null => throw new InvalidOperationException("Uninitialized PCAP open result.")
         };
@@ -47,12 +54,14 @@ public sealed class PcapAnalysisReader : IDisposable
                         PcapAnalysis.GetTimestampNanoseconds(packet.Timestamp), analyzed.Decoding);
 
                     return analyzed;
+                case PcapNgPacket packet:
+                    return Analyze(packet);
                 case PcapEndOfFile eof:
-                    ReassemblyEvents = reassemblyAnalyzer.Finish(IpReassemblyAnalysisReason.EndOfCapture);
+                    ReassemblyEvents = Finish(IpReassemblyAnalysisReason.EndOfCapture);
 
                     return eof;
                 case PcapError error:
-                    ReassemblyEvents = reassemblyAnalyzer.Finish(IpReassemblyAnalysisReason.Aborted);
+                    ReassemblyEvents = Finish(IpReassemblyAnalysisReason.Aborted);
 
                     return error;
                 default:
@@ -61,9 +70,48 @@ public sealed class PcapAnalysisReader : IDisposable
         }
         catch
         {
-            ReassemblyEvents = reassemblyAnalyzer.Finish(IpReassemblyAnalysisReason.Aborted);
+            ReassemblyEvents = Finish(IpReassemblyAnalysisReason.Aborted);
             throw;
         }
+    }
+
+    private AnalyzedPcapNgPacket Analyze(PcapNgPacket packet)
+    {
+        var analyzed = new AnalyzedPcapNgPacket(++recordNumber, packet, PcapAnalysis.Decode(packet));
+        var events = ImmutableArray.CreateBuilder<IpReassemblyEvent>();
+        if (interfaceAnalyzers.Keys.FirstOrDefault() is { } previous && previous.Section.Number != packet.Interface.Section.Number)
+            events.AddRange(FinishInterfaces(IpReassemblyAnalysisReason.EndOfSection));
+        if (!interfaceAnalyzers.TryGetValue(packet.Interface, out var analyzer))
+        {
+            analyzer = new IpReassemblyAnalyzer(reassemblyOptions);
+            interfaceAnalyzers.Add(packet.Interface, analyzer);
+        }
+        events.AddRange(analyzer.Process(analyzed.RecordNumber, packet.Timestamp?.GetNanoseconds(), analyzed.Decoding));
+        ReassemblyEvents = events.ToImmutable();
+
+        return analyzed;
+    }
+
+    private ImmutableArray<IpReassemblyEvent> Finish(IpReassemblyAnalysisReason reason)
+    {
+        var events = ImmutableArray.CreateBuilder<IpReassemblyEvent>();
+        events.AddRange(reassemblyAnalyzer.Finish(reason));
+        events.AddRange(FinishInterfaces(reason));
+
+        return events.ToImmutable();
+    }
+
+    private ImmutableArray<IpReassemblyEvent> FinishInterfaces(IpReassemblyAnalysisReason reason)
+    {
+        var events = ImmutableArray.CreateBuilder<IpReassemblyEvent>();
+        foreach (var analyzer in interfaceAnalyzers.Values)
+        {
+            events.AddRange(analyzer.Finish(reason));
+            analyzer.Dispose();
+        }
+        interfaceAnalyzers.Clear();
+
+        return events.ToImmutable();
     }
 
     // The stream remains owned by the caller; disposal only releases reassembly state.
@@ -72,7 +120,7 @@ public sealed class PcapAnalysisReader : IDisposable
         if (disposed)
             return;
 
-        ReassemblyEvents = reassemblyAnalyzer.Finish(IpReassemblyAnalysisReason.Aborted);
+        ReassemblyEvents = Finish(IpReassemblyAnalysisReason.Aborted);
         reassemblyAnalyzer.Dispose();
         disposed = true;
     }

@@ -104,7 +104,7 @@ public sealed class IpReassemblyAnalyzer : IDisposable
     public ImmutableArray<IpReassemblyEvent> Finish(IpReassemblyAnalysisReason reason)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        if (reason is not (IpReassemblyAnalysisReason.EndOfCapture or IpReassemblyAnalysisReason.Aborted))
+        if (reason is not (IpReassemblyAnalysisReason.EndOfCapture or IpReassemblyAnalysisReason.EndOfSection or IpReassemblyAnalysisReason.Aborted))
             throw new ArgumentOutOfRangeException(nameof(reason));
 
         var events = reassembler.Finish().Select(update =>

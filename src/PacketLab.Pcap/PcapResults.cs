@@ -1,6 +1,7 @@
 namespace PacketLab.Pcap;
 
 public union PcapError(
+    PcapError.InvalidPcapNg,
     PcapError.UnsupportedFormat,
     PcapError.PcapNgNotSupported,
     PcapError.UnsupportedVersion,
@@ -12,6 +13,7 @@ public union PcapError(
     PcapError.CapturedLengthExceedsSnapLen,
     PcapError.PacketLimitExceeded)
 {
+    public sealed record InvalidPcapNg(long BlockOffset, long ErrorOffset, long? PacketNumber, string Detail);
     public sealed record UnsupportedFormat(uint Magic);
     public sealed record PcapNgNotSupported;
     public sealed record UnsupportedVersion(ushort Major, ushort Minor);
@@ -27,6 +29,7 @@ public union PcapError(
     // Offsets are relative to Open; truncation points to the first missing byte.
     public long Offset => this switch
     {
+        InvalidPcapNg error => error.ErrorOffset,
         UnsupportedFormat or PcapNgNotSupported => 0,
         UnsupportedVersion version => version.Major != 2 ? 4 : 6,
         IncompleteFileHeader partial => partial.ReadBytes,
@@ -42,6 +45,7 @@ public union PcapError(
     // Record numbers start at one; file-header failures have none.
     public long? RecordNumber => this switch
     {
+        InvalidPcapNg error => error.PacketNumber,
         UnsupportedFormat or PcapNgNotSupported or UnsupportedVersion or IncompleteFileHeader
             or InvalidSnapLen or InvalidLinkTypeReservedBits => null,
         IncompleteRecordHeader partial => partial.RecordNumber,
@@ -53,6 +57,7 @@ public union PcapError(
 
     public string Message => this switch
     {
+        InvalidPcapNg error => $"PCAPNG block at byte {error.BlockOffset}: {error.Detail}",
         UnsupportedFormat format => $"Unknown PCAP magic number 0x{format.Magic:X8}.",
         PcapNgNotSupported => "PCAPNG is not supported.",
         UnsupportedVersion version => $"PCAP version {version.Major}.{version.Minor} is not supported; expected 2.4.",

@@ -30,6 +30,20 @@ try
         Console.WriteLine($"PASS: Native AOT consumed {sample}.");
     }
 
+    using var ngStream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "PcapNg", "mixed.pcapng"));
+    if (PcapAnalysisReader.Open(ngStream) is not PcapAnalysisReader ngReader)
+        throw new InvalidOperationException("Could not open PCAPNG.");
+
+    using var ngLifetime = ngReader;
+    for (int i = 0; i < 3; i++)
+    {
+        if (ngReader.ReadNext() is not AnalyzedPcapNgPacket packet || packet.Decoding.Value is null)
+            throw new InvalidOperationException("Could not analyze PCAPNG.");
+        Console.WriteLine($"PASS: Native AOT consumed PCAPNG packet at {packet.Packet.Timestamp}.");
+    }
+    if (ngReader.ReadNext() is not PcapEndOfFile)
+        throw new InvalidOperationException("Expected PCAPNG EOF.");
+
     return 0;
 }
 catch (Exception error)
