@@ -14,8 +14,11 @@ public class AnalyzeReadabilityTests
     [Arguments("a ? 1 :\n b ? 2 : ((c ? 3 : 4))")]
     public async Task Nested_decisions_report_one_warning_per_chain(string expression)
     {
-        var diagnostic = (await Analyze(expression)).Single();
+        // Act
+        var diagnostics = await Analyze(expression);
 
+        // Assert
+        var diagnostic = diagnostics.Single();
         await Assert.That(diagnostic.Id).IsEqualTo("PL0004");
         await Assert.That(diagnostic.Location.SourceSpan.Length).IsEqualTo(1);
     }
@@ -30,9 +33,11 @@ public class AnalyzeReadabilityTests
     [Arguments("Header((byte)1, (byte)2, 3, 4)")]
     public async Task Simple_or_separated_expressions_pass(string expression)
     {
+        // Act
         var diagnostics = await Analyze(expression);
 
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     [Test]
@@ -41,8 +46,11 @@ public class AnalyzeReadabilityTests
     [Arguments("new Sample(Read(0), Read(2), Read(4), Read(6)).Value", "Read(2)")]
     public async Task Packed_computations_point_to_the_second_argument_on_the_line(string expression, string expected)
     {
-        var diagnostic = (await Analyze(expression)).Single();
+        // Act
+        var diagnostics = await Analyze(expression);
 
+        // Assert
+        var diagnostic = diagnostics.Single();
         await Assert.That(diagnostic.Id).IsEqualTo("PL0005");
         var span = diagnostic.Location.SourceSpan;
         await Assert.That(diagnostic.Location.SourceTree!.GetText().ToString(span)).IsEqualTo(expected);
@@ -51,10 +59,12 @@ public class AnalyzeReadabilityTests
     [Test]
     public async Task Generated_code_skips_readability_warnings()
     {
+        // Act
         var diagnostics = await Analyze("Header(Read(0), Read(2), Read(Read(Read(Read(0)))), a ? 1 : b ? 2 : 3)",
             statements: "x = y = 0; x = Total(values.Where(v => v > 0).Select(v => v + 1));", path: "Case.g.cs");
 
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     [Test]
@@ -66,8 +76,10 @@ public class AnalyzeReadabilityTests
     [Arguments("switch (x) { case 1: y = 1; z = 2; break; }")]
     public async Task Packed_assignments_report_one_warning(string statements)
     {
+        // Act
         var diagnostics = await Analyze("0", statements);
 
+        // Assert
         await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0006");
     }
 
@@ -76,9 +88,11 @@ public class AnalyzeReadabilityTests
     [Arguments("(x, y) = (y, x);")]
     public async Task Separate_assignments_and_deconstruction_pass(string statements)
     {
+        // Act
         var diagnostics = await Analyze("0", statements);
 
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     [Test]
@@ -94,8 +108,10 @@ public class AnalyzeReadabilityTests
     [Arguments("do x++; while (x < 0);")]
     public async Task Single_statement_on_the_header_line_reports_a_warning(string statements)
     {
+        // Act
         var diagnostics = await Analyze("0", statements);
 
+        // Assert
         await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0009");
     }
 
@@ -109,9 +125,11 @@ public class AnalyzeReadabilityTests
     [Arguments("do\n x++; while (x < 0);")]
     public async Task Body_on_a_separate_line_passes(string statements)
     {
+        // Act
         var diagnostics = await Analyze("0", statements);
 
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     [Test]
@@ -123,7 +141,11 @@ public class AnalyzeReadabilityTests
     [Arguments("switch (x) { case 0: if (y > 0) { x++;\nreturn; }\n\nbreak; }")]
     public async Task Return_after_a_statement_requires_one_separator(string statements)
     {
-        var diagnostic = (await Analyze("0", statements)).Single();
+        // Act
+        var diagnostics = await Analyze("0", statements);
+
+        // Assert
+        var diagnostic = diagnostics.Single();
         await Assert.That(diagnostic.Id).IsEqualTo("PL0010");
     }
 
@@ -135,7 +157,11 @@ public class AnalyzeReadabilityTests
     [Arguments("while (x > 0) { if (y > 0)\n continue;\nif (z > 0)\n break;\nx--; }")]
     public async Task Last_guard_requires_a_separator_before_normal_flow(string statements)
     {
-        var diagnostic = (await Analyze("0", statements)).Single();
+        // Act
+        var diagnostics = await Analyze("0", statements);
+
+        // Assert
+        var diagnostic = diagnostics.Single();
         await Assert.That(diagnostic.Id).IsEqualTo("PL0011");
     }
 
@@ -151,8 +177,11 @@ public class AnalyzeReadabilityTests
     [Arguments("if (x > 0)\n return; else\n x++;\nx--;")]
     public async Task Spacing_respects_statement_groups_and_embedded_exits(string statements)
     {
+        // Act
         var diagnostics = await Analyze("0", statements);
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     [Test]
@@ -163,8 +192,11 @@ public class AnalyzeReadabilityTests
     [Arguments("switch (x) { case 0: x++; break;\r\n \t\r\ndefault: return; }")]
     public async Task Switch_sections_keep_terminal_returns_with_their_work(string statements)
     {
+        // Act
         var diagnostics = await Analyze("0", statements);
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     [Test]
@@ -174,7 +206,11 @@ public class AnalyzeReadabilityTests
     [Arguments("switch (x) { case 0: break;\n/* next\n\nsection */\ndefault: return; }")]
     public async Task Adjacent_switch_sections_require_a_blank_line(string statements)
     {
-        var diagnostic = (await Analyze("0", statements)).Single();
+        // Act
+        var diagnostics = await Analyze("0", statements);
+
+        // Assert
+        var diagnostic = diagnostics.Single();
         await Assert.That(diagnostic.Id).IsEqualTo("PL0012");
         await Assert.That(diagnostic.Location.SourceTree!.GetText().ToString(diagnostic.Location.SourceSpan))
             .IsEqualTo("default");
@@ -183,7 +219,10 @@ public class AnalyzeReadabilityTests
     [Test]
     public async Task Guard_spacing_still_applies_before_a_section_return()
     {
+        // Act
         var diagnostics = await Analyze("0", "switch (x) { case 0: if (y > 0)\nreturn;\nreturn; }");
+
+        // Assert
         await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0011");
     }
 
@@ -193,8 +232,10 @@ public class AnalyzeReadabilityTests
     [Arguments("Read(Read((int)(Read(Read(Read(0))))))")]
     public async Task Three_or_more_directly_nested_calls_report_once(string expression)
     {
+        // Act
         var diagnostics = await Analyze(expression);
 
+        // Assert
         await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0007");
     }
 
@@ -208,8 +249,10 @@ public class AnalyzeReadabilityTests
     [Arguments("Read(1 + 2 * (3 + 4))")]
     public async Task Computations_inside_one_argument_report_even_without_sibling_arguments(string expression)
     {
+        // Act
         var diagnostics = await Analyze(expression);
 
+        // Assert
         await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0008");
     }
 
@@ -223,9 +266,11 @@ public class AnalyzeReadabilityTests
     [Arguments("Read(1 + 2 * 3)")]
     public async Task Short_arguments_and_standalone_pipelines_pass(string expression)
     {
+        // Act
         var diagnostics = await Analyze(expression);
 
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     private static readonly ImmutableArray<MetadataReference> References =
@@ -253,7 +298,7 @@ public class AnalyzeReadabilityTests
         var compilation = CSharpCompilation.Create("ReadabilityCase", [tree], References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error);
-        await Assert.That(string.Join("\n", errors)).IsEqualTo("");
+        await Assert.That(errors).IsEmpty();
         ImmutableArray<DiagnosticAnalyzer> analyzers = [
             new ReadabilityAnalyzer(),
             new AssignmentLayoutAnalyzer(),
