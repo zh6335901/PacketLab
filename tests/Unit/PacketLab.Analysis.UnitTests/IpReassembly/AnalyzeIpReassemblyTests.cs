@@ -136,16 +136,15 @@ public partial class AnalyzeIpReassemblyTests
         }).Check(Config.QuickThrowOnFailure);
 
     [Test]
-    [Arguments(1)]
-    [Arguments(2)]
-    public async Task Record_limit_is_enforced_before_a_fragment_can_complete_the_datagram(int preceding)
+    [Arguments(1, new long[] { 1, 2 })]
+    [Arguments(2, new long[] { 3 })]
+    public async Task Record_limit_is_enforced_before_a_fragment_can_complete_the_datagram(int preceding, long[] expected)
     {
         // Arrange
         using var stream = Capture(Fragment(4, 0, true, Payload[..16]), Fragment(4, 16, false, Payload[16..]),
             Fragment(4, 16, false, Payload[16..]));
         using var reader = Open(stream, new(maxRecordsPerDatagram: 1));
         for (int i = 0; i < preceding; i++) Read(reader);
-        long[] expected = preceding == 1 ? [1, 2] : [3];
 
         // Act
         Read(reader);

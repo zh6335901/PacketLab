@@ -623,9 +623,7 @@ public partial class ReassembleIpTests
     }
 
     [Test]
-    [Arguments(60_999_999_999UL, false)]
-    [Arguments(61_000_000_000UL, true)]
-    public async Task Supplied_time_expires_pending_and_discarded_identities_at_the_boundary(ulong time, bool expires)
+    public async Task Supplied_time_expires_pending_and_discarded_identities_at_the_boundary()
     {
         // Arrange
         using var reassembler = new IpFragmentReassembler(new(maxDatagrams: 2));
@@ -633,13 +631,14 @@ public partial class ReassembleIpTests
         var first = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         var second = reassembler.Process(Fragment(4, 0, true, Payload[..16], 2))!;
         reassembler.Discard(second.DatagramId);
-        long[] expected = expires ? [first.DatagramId, second.DatagramId] : [];
 
         // Act
-        var expired = reassembler.AdvanceTime(time);
+        var before = reassembler.AdvanceTime(60_999_999_999UL);
+        var expired = reassembler.AdvanceTime(61_000_000_000UL);
 
         // Assert
-        await Assert.That(expired.Select(x => x.DatagramId).ToArray()).IsEquivalentTo(expected);
+        await Assert.That(before.IsEmpty).IsTrue();
+        await Assert.That(expired.Select(x => x.DatagramId).ToArray()).IsEquivalentTo([first.DatagramId, second.DatagramId]);
         await Assert.That(expired.All(x => x.Status == IpReassemblyStatus.Expired)).IsTrue();
     }
 
@@ -679,23 +678,22 @@ public partial class ReassembleIpTests
     }
 
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task Lookup_finds_a_tombstone_only_until_it_expires(bool expired)
+    public async Task Lookup_finds_a_tombstone_only_until_it_expires()
     {
         // Arrange
         using var reassembler = new IpFragmentReassembler();
         var first = reassembler.Process(Fragment(6, 0, true, Payload[..16]))!;
         reassembler.Discard(first.DatagramId);
-        if (expired) reassembler.Expire(first.DatagramId);
         var tail = Fragment(6, 16, false, Payload[16..]);
-        long? expected = expired ? null : first.DatagramId;
 
         // Act
-        var result = reassembler.FindDatagram(tail);
+        var before = reassembler.FindDatagram(tail);
+        reassembler.Expire(first.DatagramId);
+        var after = reassembler.FindDatagram(tail);
 
         // Assert
-        await Assert.That(result).IsEqualTo(expected);
+        await Assert.That(before).IsEqualTo(first.DatagramId);
+        await Assert.That(after).IsNull();
     }
 
     [Test]
@@ -808,22 +806,19 @@ public partial class ReassembleIpTests
     }
 
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task Explicit_expiry_only_removes_the_selected_identity(bool selected)
+    public async Task Explicit_expiry_only_removes_the_selected_identity()
     {
         // Arrange
         using var reassembler = new IpFragmentReassembler();
         var first = reassembler.Process(Fragment(4, 0, true, Payload[..16], 1))!;
         var second = reassembler.Process(Fragment(4, 0, true, Payload[..16], 2))!;
-        reassembler.Expire(second.DatagramId);
-        long id = selected ? second.DatagramId : first.DatagramId;
 
         // Act
-        var retained = reassembler.IsRetained(id);
+        reassembler.Expire(second.DatagramId);
 
         // Assert
-        await Assert.That(retained).IsEqualTo(!selected);
+        await Assert.That(reassembler.IsRetained(first.DatagramId)).IsTrue();
+        await Assert.That(reassembler.IsRetained(second.DatagramId)).IsFalse();
     }
 
     [Test]

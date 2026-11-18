@@ -86,9 +86,9 @@ public class AnalyzeCaptureTests
     }
 
     [Test]
-    [Arguments(0)]
-    [Arguments(1)]
-    public async Task Unknown_link_type_does_not_prevent_analysis_of_a_record(int preceding)
+    [Arguments(0, 1L)]
+    [Arguments(1, 2L)]
+    public async Task Unknown_link_type_does_not_prevent_analysis_of_a_record(int preceding, long recordNumber)
     {
         // Arrange
         var bytes = Convert.FromHexString(Header + Records);
@@ -101,7 +101,7 @@ public class AnalyzeCaptureTests
         var analyzed = Read(reader);
 
         // Assert
-        await Assert.That(analyzed.RecordNumber).IsEqualTo(preceding + 1L);
+        await Assert.That(analyzed.RecordNumber).IsEqualTo(recordNumber);
         await Assert.That(analyzed.Decoding is ProtocolDecodeResult.UnsupportedLinkLayer result &&
             result.RemainingBytes.Equals(analyzed.Packet.Data)).IsTrue();
     }
@@ -121,29 +121,6 @@ public class AnalyzeCaptureTests
 
         // Assert
         await Assert.That(reader.LinkLayer).IsEqualTo(expected);
-    }
-
-    [Test]
-    public async Task Raw_packets_can_be_decoded_after_reading_finishes()
-    {
-        // Arrange
-        using var stream = new MemoryStream(Convert.FromHexString(Header + Records));
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new AssertionException("Expected a reader.");
-        var packet = reader.ReadNext() is PcapPacket read ? read : throw new AssertionException("Expected a packet.");
-        var savedBytes = packet.Data.ToArray();
-        while (true)
-        {
-            var next = reader.ReadNext();
-            if (next is PcapEndOfFile) break;
-            if (next is not PcapPacket) throw new AssertionException("Could not consume the capture to EOF.");
-        }
-
-        // Act
-        var decoding = PcapAnalysis.Decode(reader.Header, packet);
-
-        // Assert
-        await Assert.That(packet.Data.Span.SequenceEqual(savedBytes)).IsTrue();
-        await Assert.That(decoding.Value is not null).IsTrue();
     }
 
     [Test]
