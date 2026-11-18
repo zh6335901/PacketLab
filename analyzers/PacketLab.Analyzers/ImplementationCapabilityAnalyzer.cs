@@ -225,8 +225,11 @@ public sealed class ImplementationCapabilityAnalyzer : DiagnosticAnalyzer
         if (receiver is IdentifierNameSyntax && context.SemanticModel.GetSymbolInfo(receiver, context.CancellationToken).Symbol is ILocalSymbol local)
         {
             var declaration = local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(context.CancellationToken) as VariableDeclaratorSyntax;
-            if (declaration?.Initializer is { } initializer)
-                receiver = Unwrap(initializer.Value);
+            if (declaration?.Initializer is not { } initializer || !Unwrap(initializer.Value).IsKind(SyntaxKind.AsExpression) ||
+                !AliasIsUnchanged(context, local, declaration, access))
+                return null;
+
+            receiver = Unwrap(initializer.Value);
         }
         if (receiver is not BinaryExpressionSyntax cast || !cast.IsKind(SyntaxKind.AsExpression))
             return null;
@@ -243,6 +246,34 @@ public sealed class ImplementationCapabilityAnalyzer : DiagnosticAnalyzer
         }
 
         return null;
+    }
+
+    private static bool AliasIsUnchanged(SyntaxNodeAnalysisContext context, ILocalSymbol local,
+        VariableDeclaratorSyntax declaration, ConditionalAccessExpressionSyntax access)
+    {
+        if (declaration.Parent is not VariableDeclarationSyntax { Variables.Count: 1, Parent: LocalDeclarationStatementSyntax statement })
+            return false;
+
+        var model = context.SemanticModel;
+        var initializerFlow = model.AnalyzeDataFlow(statement);
+        if (initializerFlow is not { Succeeded: true })
+            return false;
+        if (!initializerFlow.WrittenOutside.Contains(local, SymbolEqualityComparer.Default))
+            return true;
+
+        // Captured writes can execute out of source order.
+        if (initializerFlow.Captured.Contains(local, SymbolEqualityComparer.Default) || statement.Parent is not BlockSyntax block)
+            return false;
+
+        var use = access.Ancestors().OfType<StatementSyntax>().FirstOrDefault(node => node.Parent == block);
+        int next = block.Statements.IndexOf(statement) + 1;
+        if (use is null || next >= block.Statements.Count || block.Statements[next].SpanStart > use.SpanStart)
+            return false;
+
+        var first = block.Statements[next];
+        var flow = model.AnalyzeDataFlow(first, use);
+        return flow is { Succeeded: true } && !flow.WrittenInside.Contains(local, SymbolEqualityComparer.Default)
+            && model.AnalyzeControlFlow(first, use) is { Succeeded: true, EntryPoints.IsEmpty: true };
     }
 
     private static TypeGate? GetGate(SyntaxNodeAnalysisContext context, ISymbol member, ExpressionSyntax condition)
@@ -406,10 +437,11 @@ public sealed class ImplementationCapabilityAnalyzer : DiagnosticAnalyzer
 
     private static bool HasContractMember(INamedTypeSymbol contract, ITypeSymbol implementation, ISymbol capability)
     {
+        var definition = capability is IMethodSymbol methodSymbol ? methodSymbol.ConstructedFrom : capability;
         foreach (var member in contract.GetMembers(capability.Name))
         {
             if (contract.TypeKind == TypeKind.Interface && implementation is INamedTypeSymbol named &&
-                SymbolEqualityComparer.Default.Equals(named.FindImplementationForInterfaceMember(member), capability))
+                SymbolEqualityComparer.Default.Equals(named.FindImplementationForInterfaceMember(member), definition))
                 return true;
             for (ISymbol? current = capability; current is not null; current = current switch
             {

@@ -44,6 +44,7 @@ public class AnalyzeImplementationCapabilitiesTests
     [Arguments("public string[] Sections { get { switch(reader) { case Special s: return s.Sections; default: return []; } } }")]
     [Arguments("public string[] Sections => (reader as Special)?.Sections ?? [];")]
     [Arguments("public string[] Sections { get { var s = reader as Special; return s?.Sections ?? []; } }")]
+    [Arguments("public string[] Sections { get { var s = reader as Special; if (reader != null) return s?.Sections ?? []; s = new Special(); return s.Sections; } }")]
     [Arguments("public string[] Sections => reader is Special {} s ? s.Sections : throw new InvalidOperationException();")]
     public async Task Conditional_implementation_capabilities_report_evidence(string declaration)
     {
@@ -111,6 +112,57 @@ public class AnalyzeImplementationCapabilitiesTests
         var diagnostics = await Analyze(Wrap(declaration));
 
         await Assert.That(diagnostics.IsEmpty).IsTrue();
+    }
+
+    [Test]
+    [Arguments("s = new Special();")]
+    [Arguments("if (reader is Other) s = new Special();")]
+    [Arguments("Replace(out s);")]
+    [Arguments("ReplaceByRef(ref s);")]
+    [Arguments("ref Special? alias = ref s; alias = new Special();")]
+    [Arguments("ReplaceCaptured(); void ReplaceCaptured() => s = new Special();")]
+    public async Task A_local_that_may_have_been_replaced_does_not_establish_a_capability(string write)
+    {
+        var source = Wrap($$"""
+            public string[] Sections
+            {
+                get
+                {
+                    var s = reader as Special;
+                    {{write}}
+                    return s?.Sections ?? [];
+                }
+            }
+            private static void Replace(out Special? value) => value = new Special();
+            private static void ReplaceByRef(ref Special? value) => value = new Special();
+            """);
+
+        var diagnostics = await Analyze(source);
+
+        await Assert.That(diagnostics.IsEmpty).IsTrue();
+    }
+
+    [Test]
+    public async Task Only_the_generic_overload_outside_the_interface_contract_is_reported()
+    {
+        var source = """
+            public interface IReader<TItem> { TItem[] Read<T>(); }
+            public class Special<TItem> : IReader<TItem>
+            {
+                public TItem[] Read<T>() => [];
+                public TItem[] Read<T>(int count) => [];
+            }
+            public class Wrapper(IReader<string> reader)
+            {
+                public string[] Common => reader is Special<string> s ? s.Read<int>() : [];
+                public string[] Extra => reader is Special<string> s ? s.Read<int>(1) : [];
+            }
+            """;
+
+        var diagnostic = (await Analyze(source)).Single();
+
+        await Assert.That(diagnostic.Id).IsEqualTo("PL0013");
+        await Assert.That(diagnostic.GetMessage()).Contains("'Extra'");
     }
 
     [Test]
