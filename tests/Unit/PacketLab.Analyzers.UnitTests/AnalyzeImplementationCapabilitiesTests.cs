@@ -48,8 +48,14 @@ public class AnalyzeImplementationCapabilitiesTests
     [Arguments("public string[] Sections => reader is Special {} s ? s.Sections : throw new InvalidOperationException();")]
     public async Task Conditional_implementation_capabilities_report_evidence(string declaration)
     {
-        var diagnostic = (await Analyze(Wrap(declaration))).Single();
+        // Arrange
+        var source = Wrap(declaration);
 
+        // Act
+        var diagnostics = await Analyze(source);
+
+        // Assert
+        var diagnostic = diagnostics.Single();
         await Assert.That(diagnostic.Id).IsEqualTo("PL0013");
         await Assert.That(diagnostic.GetMessage()).Contains("'Sections'");
         await Assert.That(diagnostic.GetMessage()).Contains("'reader'");
@@ -65,32 +71,53 @@ public class AnalyzeImplementationCapabilitiesTests
     [Arguments("public string this[int index] => reader is Special s ? s[index] : string.Empty;")]
     [Arguments("public int Count() => reader is Special s ? s.Sections.Length : 0;")]
     [Arguments("public void Reset() { if (reader is Special s) s.Reset(); else throw new NotSupportedException(); }")]
-    public async Task Other_public_capabilities_and_placeholder_forms_are_checked(string declaration)
+    public async Task Implementation_specific_members_with_placeholder_fallbacks_report_an_error(string declaration)
     {
-        var diagnostic = (await Analyze(Wrap(declaration))).Single();
+        // Arrange
+        var source = Wrap(declaration);
 
+        // Act
+        var diagnostics = await Analyze(source);
+
+        // Assert
+        var diagnostic = diagnostics.Single();
+        await Assert.That(diagnostic.Id).IsEqualTo("PL0013");
         await Assert.That(diagnostic.Severity).IsEqualTo(DiagnosticSeverity.Error);
     }
 
     [Test]
     [Arguments("public string[] Sections = reader is Special s ? s.Sections : [];")]
     [Arguments("public string[] Sections { get; } = reader is Special s ? s.Sections : [];")]
-    public async Task Public_initializers_are_checked(string declaration)
+    public async Task Public_initializers_exposing_implementation_specific_data_report_an_error(string declaration)
     {
-        var diagnostics = await Analyze(Types + " public class Wrapper(Reader reader) { " + declaration + " }");
+        // Arrange
+        var source = Wrap(declaration);
 
+        // Act
+        var diagnostics = await Analyze(source);
+
+        // Assert
         await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0013");
     }
 
     [Test]
     [Arguments("public readonly string[] Sections;")]
     [Arguments("public string[] Sections { get; }")]
-    public async Task Constructor_assigned_public_data_is_checked(string declaration)
+    public async Task Constructor_assignments_exposing_implementation_specific_data_report_an_error(string declaration)
     {
-        var source = Types + "public class Wrapper { " + declaration + " public Wrapper(Reader reader) { Sections = reader is Special s ? s.Sections : []; } }";
+        // Arrange
+        var source = Types + $$"""
+            public class Wrapper
+            {
+                {{declaration}}
+                public Wrapper(Reader reader) { Sections = reader is Special s ? s.Sections : []; }
+            }
+            """;
 
+        // Act
         var diagnostics = await Analyze(source);
 
+        // Assert
         await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0013");
     }
 
@@ -109,43 +136,56 @@ public class AnalyzeImplementationCapabilitiesTests
     [Arguments("public string[] Sections => reader is Special s ? ((Special)other).Sections : []; private Reader other = new Reader();")]
     public async Task Normal_dispatch_queries_and_unrelated_conditions_are_not_reported(string declaration)
     {
-        var diagnostics = await Analyze(Wrap(declaration));
+        // Arrange
+        var source = Wrap(declaration);
 
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+        // Act
+        var diagnostics = await Analyze(source);
+
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     [Test]
-    [Arguments("s = new Special();")]
-    [Arguments("if (reader is Other) s = new Special();")]
-    [Arguments("Replace(out s);")]
-    [Arguments("ReplaceByRef(ref s);")]
-    [Arguments("ref Special? alias = ref s; alias = new Special();")]
-    [Arguments("ReplaceCaptured(); void ReplaceCaptured() => s = new Special();")]
-    public async Task A_local_that_may_have_been_replaced_does_not_establish_a_capability(string write)
+    [Arguments("s = new Special(); return s?.Sections ?? [];")]
+    [Arguments("if (reader is Other) s = new Special(); return s?.Sections ?? [];")]
+    [Arguments("ref Special? alias = ref s; alias = new Special(); return s?.Sections ?? [];")]
+    [Arguments("""
+        Replace(ref s);
+        return s?.Sections ?? [];
+        static void Replace(ref Special? value) => value = new Special();
+        """)]
+    [Arguments("""
+        ReplaceCaptured();
+        return s?.Sections ?? [];
+        void ReplaceCaptured() => s = new Special();
+        """)]
+    public async Task A_local_that_may_have_been_replaced_does_not_establish_a_capability(string statements)
     {
+        // Arrange
         var source = Wrap($$"""
             public string[] Sections
             {
                 get
                 {
                     var s = reader as Special;
-                    {{write}}
-                    return s?.Sections ?? [];
+                    {{statements}}
                 }
             }
-            private static void Replace(out Special? value) => value = new Special();
-            private static void ReplaceByRef(ref Special? value) => value = new Special();
             """);
 
+        // Act
         var diagnostics = await Analyze(source);
 
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     [Test]
     public async Task Only_the_generic_overload_outside_the_interface_contract_is_reported()
     {
-        var source = """
+        // Arrange
+        const string source = """
             public interface IReader<TItem> { TItem[] Read<T>(); }
             public class Special<TItem> : IReader<TItem>
             {
@@ -159,8 +199,11 @@ public class AnalyzeImplementationCapabilitiesTests
             }
             """;
 
-        var diagnostic = (await Analyze(source)).Single();
+        // Act
+        var diagnostics = await Analyze(source);
 
+        // Assert
+        var diagnostic = diagnostics.Single();
         await Assert.That(diagnostic.Id).IsEqualTo("PL0013");
         await Assert.That(diagnostic.GetMessage()).Contains("'Extra'");
     }
@@ -168,7 +211,8 @@ public class AnalyzeImplementationCapabilitiesTests
     [Test]
     public async Task Members_already_available_on_the_internal_interface_are_not_specific_capabilities()
     {
-        var source = """
+        // Arrange
+        const string source = """
             public interface IReader { string[] Sections { get; } }
             public class Special : IReader { public string[] Sections => []; }
             public class Wrapper(IReader reader)
@@ -177,39 +221,48 @@ public class AnalyzeImplementationCapabilitiesTests
             }
             """;
 
+        // Act
         var diagnostics = await Analyze(source);
 
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     [Test]
     public async Task Positional_record_members_still_expose_implementation_capabilities()
     {
-        var source = Types + "public record Wrapper(Reader Reader) { public string[] Sections => Reader is Special s ? s.Sections : []; }";
+        // Arrange
+        const string source = Types + "public record Wrapper(Reader Reader) { public string[] Sections => Reader is Special s ? s.Sections : []; }";
 
+        // Act
         var diagnostics = await Analyze(source);
 
+        // Assert
         await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0013");
     }
 
     [Test]
     public async Task A_fixed_value_type_is_not_an_alternative_internal_implementation()
     {
-        var source = """
+        // Arrange
+        const string source = """
             public interface ISections { string[] Sections { get; } }
             public struct Data : ISections { public string[] Sections => []; }
             public class View(Data data) { public string[] Sections => data is ISections s ? s.Sections : []; }
             """;
 
+        // Act
         var diagnostics = await Analyze(source);
 
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     [Test]
     public async Task Source_defined_interfaces_do_not_hide_the_same_contract_problem()
     {
-        var source = Types + """
+        // Arrange
+        const string source = Types + """
             public interface IWrapper { string[] Sections { get; } }
             public class Wrapper(Reader reader) : IWrapper
             {
@@ -217,15 +270,18 @@ public class AnalyzeImplementationCapabilitiesTests
             }
             """;
 
+        // Act
         var diagnostics = await Analyze(source);
 
+        // Assert
         await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0013");
     }
 
     [Test]
-    public async Task Source_defined_base_contracts_remain_checked()
+    public async Task An_override_exposing_an_implementation_specific_capability_reports_an_error()
     {
-        var source = Types + """
+        // Arrange
+        const string source = Types + """
             public abstract class View { public abstract string[] Sections { get; } }
             public class Wrapper(Reader reader) : View
             {
@@ -233,15 +289,18 @@ public class AnalyzeImplementationCapabilitiesTests
             }
             """;
 
+        // Act
         var diagnostics = await Analyze(source);
 
+        // Assert
         await Assert.That(diagnostics.Single().Id).IsEqualTo("PL0013");
     }
 
     [Test]
     public async Task Metadata_contract_implementations_do_not_require_redesigning_external_interfaces()
     {
-        var source = Types + """
+        // Arrange
+        const string source = Types + """
             public class Wrapper(Reader reader) : IEnumerable
             {
                 public IEnumerator GetEnumerator() => reader is Special s ? s.Read() : throw new NotSupportedException();
@@ -249,20 +308,29 @@ public class AnalyzeImplementationCapabilitiesTests
             }
             """;
 
+        // Act
         var diagnostics = await Analyze(source);
 
-        await Assert.That(diagnostics.IsEmpty).IsTrue();
+        // Assert
+        await Assert.That(diagnostics).IsEmpty();
     }
 
     [Test]
-    [Arguments("#pragma warning disable PL0013\n")]
-    public async Task Local_suppressions_do_not_disable_the_rule(string suppression)
+    public async Task A_warning_pragma_cannot_suppress_the_capability_error()
     {
-        var source = Wrap(suppression + "public string[] Sections => reader is Special s ? s.Sections : [];");
+        // Arrange
+        var source = Wrap("""
+            #pragma warning disable PL0013
+            public string[] Sections => reader is Special s ? s.Sections : [];
+            """);
 
+        // Act
         var diagnostics = await Analyze(source);
 
-        await Assert.That(diagnostics.Single().Severity).IsEqualTo(DiagnosticSeverity.Error);
+        // Assert
+        var diagnostic = diagnostics.Single();
+        await Assert.That(diagnostic.Id).IsEqualTo("PL0013");
+        await Assert.That(diagnostic.Severity).IsEqualTo(DiagnosticSeverity.Error);
     }
 
     [Test]
@@ -273,27 +341,37 @@ public class AnalyzeImplementationCapabilitiesTests
     [Arguments("using Hide = System.Diagnostics.CodeAnalysis.SuppressMessageAttribute; [Hide(checkId: Subject.Id, category: \"Design\")] public class Subject { public const string Id = \"PL0013: title\"; }")]
     public async Task Suppression_attributes_produce_a_compiler_error(string source)
     {
+        // Arrange
         var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
         var tree = CSharpSyntaxTree.ParseText("#pragma warning disable CS1029\n" + source, parseOptions, path: "Case.cs");
         var compilation = CSharpCompilation.Create("SuppressionCase", [tree], References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         GeneratorDriver driver = CSharpGeneratorDriver.Create([new ImplementationCapabilitySuppressionGuard().AsSourceGenerator()], parseOptions: parseOptions);
 
+        // Act
         driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var generatorErrors);
-        var errors = output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
 
-        await Assert.That(generatorErrors.IsEmpty).IsTrue();
-        await Assert.That(errors.Single().Id).IsEqualTo("CS1029");
-        await Assert.That(errors.Single().GetMessage()).Contains("PL0013");
-        await Assert.That(errors.Single().GetMessage()).Contains("Case.cs:2");
+        // Assert
+        await Assert.That(generatorErrors).IsEmpty();
+        var error = output.GetDiagnostics().Single(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        await Assert.That(error.Id).IsEqualTo("CS1029");
+        await Assert.That(error.GetMessage()).Contains("PL0013");
+        await Assert.That(error.GetMessage()).Contains("Case.cs:2");
     }
 
     [Test]
     public async Task Diagnostic_configuration_cannot_disable_the_rule()
     {
-        var diagnostics = await Analyze(Wrap("public string[] Sections => reader is Special s ? s.Sections : [];"), suppress: true);
+        // Arrange
+        var source = Wrap("public string[] Sections => reader is Special s ? s.Sections : [];");
 
-        await Assert.That(diagnostics.Single().Severity).IsEqualTo(DiagnosticSeverity.Error);
+        // Act
+        var diagnostics = await Analyze(source, suppress: true);
+
+        // Assert
+        var diagnostic = diagnostics.Single();
+        await Assert.That(diagnostic.Id).IsEqualTo("PL0013");
+        await Assert.That(diagnostic.Severity).IsEqualTo(DiagnosticSeverity.Error);
     }
 
     private static string Wrap(string member) => Types + "\npublic class Wrapper(Reader reader) {\n" + member + "\n}";
@@ -306,7 +384,7 @@ public class AnalyzeImplementationCapabilitiesTests
             options = options.WithSpecificDiagnosticOptions(new Dictionary<string, ReportDiagnostic> { ["PL0013"] = ReportDiagnostic.Suppress });
         var compilation = CSharpCompilation.Create("CapabilityCase", [tree], References, options);
         var errors = compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
-        await Assert.That(string.Join("\n", errors)).IsEqualTo("");
+        await Assert.That(errors).IsEmpty();
         var diagnostics = await compilation.WithAnalyzers([new ImplementationCapabilityAnalyzer()]).GetAnalyzerDiagnosticsAsync();
         await Assert.That(string.Join("\n", diagnostics.Where(diagnostic => diagnostic.Id == "AD0001"))).IsEqualTo("");
 
