@@ -29,12 +29,12 @@ public class ParseIPv6ExtensionsTests
     }
 
     [Test]
-    [Arguments(0, "11010000000000000000000000000000", 16)]
-    [Arguments(60, "11010000000000000000000000000000", 16)]
-    [Arguments(43, "1101FE00000000000000000000000000", 16)]
-    [Arguments(51, "110400000102030405060708000000000000000000000000", 24)]
-    [Arguments(44, "11FF000001020304", 8)]
-    public async Task Header_specific_length_encoding_locates_transport(byte type, string extension, int length)
+    [Arguments(0, "11010000000000000000000000000000", 16, 56)]
+    [Arguments(60, "11010000000000000000000000000000", 16, 56)]
+    [Arguments(43, "1101FE00000000000000000000000000", 16, 56)]
+    [Arguments(51, "110400000102030405060708000000000000000000000000", 24, 64)]
+    [Arguments(44, "11FF000001020304", 8, 48)]
+    public async Task Header_specific_length_encoding_locates_transport(byte type, string extension, int length, int transportOffset)
     {
         // Act
         var packet = Parse(type, extension + "CAFE");
@@ -46,7 +46,7 @@ public class ParseIPv6ExtensionsTests
         await Assert.That(item.Offset).IsEqualTo(40);
         await Assert.That(item.Length).IsEqualTo(length);
         await Assert.That(Hex(item.Bytes)).IsEqualTo(extension);
-        await Assert.That(Upper(packet.Extensions).Offset).IsEqualTo(40 + length);
+        await Assert.That(Upper(packet.Extensions).Offset).IsEqualTo(transportOffset);
         await Assert.That(Hex(Upper(packet.Extensions).Bytes)).IsEqualTo("CAFE");
         await Assert.That(Upper(packet.Extensions).DeclaredLength).IsEqualTo(2u);
         await Assert.That(HasKnownContext(packet.Extensions)).IsTrue();
@@ -73,11 +73,12 @@ public class ParseIPv6ExtensionsTests
     }
 
     [Test]
-    [Arguments(0, false)]
-    [Arguments(1, false)]
-    [Arguments(0, true)]
-    [Arguments(8191, true)]
-    public async Task Fragment_fields_distinguish_atomic_first_and_later_fragments(ushort offset, bool more)
+    [Arguments(0, false, 0, true)]
+    [Arguments(1, false, 8, false)]
+    [Arguments(0, true, 0, false)]
+    [Arguments(8191, true, 65528, false)]
+    public async Task Fragment_fields_distinguish_atomic_first_and_later_fragments(
+        ushort offset, bool more, int offsetBytes, bool atomic)
     {
         // Arrange
         var fragment = new byte[10];
@@ -93,9 +94,9 @@ public class ParseIPv6ExtensionsTests
         // Assert
         var actual = packet.Extensions.Headers[0].Fragment!;
         await Assert.That(actual).IsEqualTo(new IPv6Fragment(offset, more, 0x89abcdef, 60));
-        await Assert.That(actual.OffsetBytes).IsEqualTo(offset * 8);
-        await Assert.That(actual.IsAtomic).IsEqualTo(offset == 0 && !more);
-        await Assert.That(actual.IsAtomic
+        await Assert.That(actual.OffsetBytes).IsEqualTo(offsetBytes);
+        await Assert.That(actual.IsAtomic).IsEqualTo(atomic);
+        await Assert.That(atomic
             ? packet.Extensions.Result is IPv6PayloadUnavailable { Reason: IPv6PayloadFailure.Invalid }
             : packet.Extensions.Result is IPv6FragmentPayload { DeclaredLength: 2 } result && result.Fragment == actual).IsTrue();
         await Assert.That(packet.Extensions.RemainingOffset).IsEqualTo(48);
@@ -115,7 +116,7 @@ public class ParseIPv6ExtensionsTests
         await Assert.That(available
             ? Upper(chain).ChecksumContext is IPv6ChecksumContext.KnownAddresses
             : Upper(chain).ChecksumContext is IPv6ChecksumContext.Unavailable).IsTrue();
-        await Assert.That(chain.Diagnostics.Any(d => d.Code == IPv6DiagnosticCode.FinalDestinationUnavailable)).IsEqualTo(!available);
+        await Assert.That(chain.Diagnostics.All(d => d.Code != IPv6DiagnosticCode.FinalDestinationUnavailable)).IsEqualTo(available);
     }
 
     [Test]
@@ -148,25 +149,26 @@ public class ParseIPv6ExtensionsTests
     }
 
     [Test]
-    [Arguments(60, "1101", 16, IPv6DiagnosticCode.HeaderTruncated)]
-    [Arguments(60, "11", 16, IPv6DiagnosticCode.HeaderTruncated)]
-    [Arguments(60, "11010000000000000000000000000000", 8, IPv6DiagnosticCode.HeaderExceedsPayload)]
-    [Arguments(44, "11000000000000", 8, IPv6DiagnosticCode.HeaderTruncated)]
-    [Arguments(51, "1104", 24, IPv6DiagnosticCode.HeaderTruncated)]
-    [Arguments(51, "1100", 8, IPv6DiagnosticCode.InvalidHeaderLength)]
-    [Arguments(51, "1101", 12, IPv6DiagnosticCode.InvalidHeaderLength)]
-    [Arguments(60, "1100010500000000", 8, IPv6DiagnosticCode.InvalidOptions)]
-    public async Task Invalid_and_short_headers_report_precise_failure_without_transport(byte type, string bytes, ushort declared, IPv6DiagnosticCode code)
+    [Arguments(60, "1101", 16, IPv6DiagnosticCode.HeaderTruncated, 40, 2, IPv6PayloadFailure.Truncated)]
+    [Arguments(60, "11", 16, IPv6DiagnosticCode.HeaderTruncated, 40, 1, IPv6PayloadFailure.Truncated)]
+    [Arguments(60, "11010000000000000000000000000000", 8, IPv6DiagnosticCode.HeaderExceedsPayload, 40, 8, IPv6PayloadFailure.Invalid)]
+    [Arguments(44, "11000000000000", 8, IPv6DiagnosticCode.HeaderTruncated, 40, 7, IPv6PayloadFailure.Truncated)]
+    [Arguments(51, "1104", 24, IPv6DiagnosticCode.HeaderTruncated, 40, 2, IPv6PayloadFailure.Truncated)]
+    [Arguments(51, "1100", 8, IPv6DiagnosticCode.InvalidHeaderLength, 40, 2, IPv6PayloadFailure.Invalid)]
+    [Arguments(51, "1101", 12, IPv6DiagnosticCode.InvalidHeaderLength, 40, 2, IPv6PayloadFailure.Invalid)]
+    [Arguments(60, "1100010500000000", 8, IPv6DiagnosticCode.InvalidOptions, 42, 8, IPv6PayloadFailure.Invalid)]
+    public async Task Invalid_and_short_headers_report_precise_failure_without_transport(
+        byte type, string bytes, ushort declared, IPv6DiagnosticCode code, int offset, int capturedLength,
+        IPv6PayloadFailure reason)
     {
         // Act
         var packet = Parse(type, bytes, declared);
 
         // Assert
         await Assert.That(packet.Extensions.Diagnostics[0].Code).IsEqualTo(code);
-        await Assert.That(packet.Extensions.Diagnostics[0].Offset).IsEqualTo(code == IPv6DiagnosticCode.InvalidOptions ? 42 : 40);
-        await Assert.That(packet.Extensions.Result is IPv6PayloadUnavailable failure && failure.Reason ==
-            (code == IPv6DiagnosticCode.HeaderTruncated ? IPv6PayloadFailure.Truncated : IPv6PayloadFailure.Invalid)).IsTrue();
-        await Assert.That(Known(packet).Bytes.Length).IsEqualTo(Math.Min(declared, bytes.Length / 2));
+        await Assert.That(packet.Extensions.Diagnostics[0].Offset).IsEqualTo(offset);
+        await Assert.That(packet.Extensions.Result is IPv6PayloadUnavailable failure && failure.Reason == reason).IsTrue();
+        await Assert.That(Known(packet).Bytes.Length).IsEqualTo(capturedLength);
     }
 
     [Test]
@@ -201,18 +203,18 @@ public class ParseIPv6ExtensionsTests
     }
 
     [Test]
-    [Arguments("1100C20400010000", 65536u)]
-    [Arguments("1100C204FFFFFFFF", uint.MaxValue)]
-    public async Task Jumbo_length_uses_unsigned_wire_value_even_when_capture_is_short(string bytes, uint expected)
+    [Arguments("1100C20400010000", 65536u, 65576UL, 65528u)]
+    [Arguments("1100C204FFFFFFFF", uint.MaxValue, 4294967335UL, 4294967287u)]
+    public async Task Jumbo_length_uses_unsigned_wire_value_even_when_capture_is_short(string bytes, uint expected, ulong datagramLength, uint upperLength)
     {
         // Act
         var packet = Parse(0, bytes, 0);
 
         // Assert
         await Assert.That(Known(packet).DeclaredLength).IsEqualTo(expected);
-        await Assert.That(Known(packet).DeclaredDatagramLength).IsEqualTo(40UL + expected);
+        await Assert.That(Known(packet).DeclaredDatagramLength).IsEqualTo(datagramLength);
         await Assert.That(Known(packet).IsDatagramComplete).IsFalse();
-        await Assert.That(Upper(packet.Extensions).DeclaredLength).IsEqualTo(expected - 8);
+        await Assert.That(Upper(packet.Extensions).DeclaredLength).IsEqualTo(upperLength);
         await Assert.That(Upper(packet.Extensions).Offset).IsEqualTo(48);
         await Assert.That(HasKnownContext(packet.Extensions)).IsTrue();
         await Assert.That(packet.Extensions.Diagnostics.Single().Code).IsEqualTo(IPv6DiagnosticCode.PayloadTruncated);

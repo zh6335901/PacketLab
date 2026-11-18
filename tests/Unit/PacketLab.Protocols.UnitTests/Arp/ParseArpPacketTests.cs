@@ -7,21 +7,21 @@ namespace PacketLab.Protocols.UnitTests.Arp;
 public class ParseArpPacketTests
 {
     [Test]
-    [Arguments("0001", "000000000000", "00000000")]
-    [Arguments("0001", "102030405060", "C0000201")]
-    [Arguments("0002", "102030405060", "C0000201")]
-    [Arguments("ABCD", "102030405060", "C0000201")]
-    public async Task Ethernet_ipv4_packets_preserve_all_fields(string operation, string targetHardware, string senderProtocol)
+    [Arguments(1, "000000000000", "00000000")]
+    [Arguments(1, "102030405060", "C0000201")]
+    [Arguments(2, "102030405060", "C0000201")]
+    [Arguments(0xABCD, "102030405060", "C0000201")]
+    public async Task Ethernet_ipv4_packets_preserve_all_fields(ushort operation, string targetHardware, string senderProtocol)
     {
         // Act
-        var packet = Parse("000108000604" + operation + "020000000001" + senderProtocol + targetHardware + "C0000202");
+        var packet = Parse("000108000604" + operation.ToString("X4") + "020000000001" + senderProtocol + targetHardware + "C0000202");
 
         // Assert
         await Assert.That(packet.HardwareType).IsEqualTo((ushort)1);
         await Assert.That(packet.ProtocolType).IsEqualTo((ushort)0x0800);
         await Assert.That(packet.HardwareAddressLength).IsEqualTo((byte)6);
         await Assert.That(packet.ProtocolAddressLength).IsEqualTo((byte)4);
-        await Assert.That(packet.Operation).IsEqualTo(Convert.ToUInt16(operation, 16));
+        await Assert.That(packet.Operation).IsEqualTo(operation);
         await Assert.That(Convert.ToHexString(packet.SenderHardwareAddress.Span)).IsEqualTo("020000000001");
         await Assert.That(Convert.ToHexString(packet.SenderProtocolAddress.Span)).IsEqualTo(senderProtocol);
         await Assert.That(Convert.ToHexString(packet.TargetHardwareAddress.Span)).IsEqualTo(targetHardware);

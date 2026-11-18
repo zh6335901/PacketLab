@@ -33,11 +33,11 @@ public class ReadPacketTests
     }
 
     [Test]
-    [Arguments(0, 100u, 1500000u, 3u, 5u, "DEADBE")]
-    [Arguments(1, 99u, 0u, 2u, 1u, "AABB")]
-    [Arguments(2, 98u, 0u, 0u, 0u, "")]
+    [Arguments(0, 100u, 1500000u, 3u, 5u, "DEADBE", false)]
+    [Arguments(1, 99u, 0u, 2u, 1u, "AABB", true)]
+    [Arguments(2, 98u, 0u, 0u, 0u, "", false)]
     public async Task Unaligned_records_preserve_order_and_independent_lengths(
-        int preceding, uint seconds, uint fraction, uint captured, uint original, string data)
+        int preceding, uint seconds, uint fraction, uint captured, uint original, string data, bool originalIsShorter)
     {
         // Arrange
         using var stream = new MemoryStream(Convert.FromHexString(PcapSamples.Multiple));
@@ -53,7 +53,7 @@ public class ReadPacketTests
         await Assert.That(packet.Timestamp.Fraction).IsEqualTo(fraction);
         await Assert.That(packet.CapturedLength).IsEqualTo(captured);
         await Assert.That(packet.OriginalLength).IsEqualTo(original);
-        await Assert.That(packet.OriginalLengthIsLessThanCaptured).IsEqualTo(original < captured);
+        await Assert.That(packet.OriginalLengthIsLessThanCaptured).IsEqualTo(originalIsShorter);
         await Assert.That(Convert.ToHexString(packet.Data.Span)).IsEqualTo(data);
     }
 

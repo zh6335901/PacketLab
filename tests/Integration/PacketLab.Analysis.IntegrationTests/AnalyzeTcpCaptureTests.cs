@@ -12,7 +12,7 @@ public class AnalyzeTcpCaptureTests
     [Test]
     [Arguments("tcp-little", PcapByteOrder.LittleEndian)]
     [Arguments("tcp-big", PcapByteOrder.BigEndian)]
-    public async Task Analysis_preserves_record_order_after_packet_diagnostics(string sample, PcapByteOrder order)
+    public async Task Analysis_reads_all_records_in_order_through_eof_after_packet_diagnostics(string sample, PcapByteOrder order)
     {
         // Arrange
         using var stream = OpenSample(sample);
@@ -20,6 +20,7 @@ public class AnalyzeTcpCaptureTests
 
         // Act
         var packets = Enumerable.Range(0, 16).Select(_ => ReadPacket(reader)).ToArray();
+        var terminal = reader.ReadNext();
 
         // Assert
         await Assert.That(reader.Header.ByteOrder).IsEqualTo(order);
@@ -30,23 +31,7 @@ public class AnalyzeTcpCaptureTests
         await Assert.That(last.IsComplete).IsTrue();
         await Assert.That(last.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
         await Assert.That(Hex(last.Payload)).IsEqualTo("CAFE01");
-    }
-
-    [Test]
-    [Arguments("tcp-little")]
-    [Arguments("tcp-big")]
-    public async Task Analysis_reaches_eof_after_all_records_with_diagnostics(string sample)
-    {
-        // Arrange
-        using var stream = OpenSample(sample);
-        using var reader = OpenReader(stream);
-
-        // Act
-        for (int i = 0; i < 16; i++) ReadPacket(reader);
-        var result = reader.ReadNext();
-
-        // Assert
-        await Assert.That(result is PcapEndOfFile).IsTrue();
+        await Assert.That(terminal is PcapEndOfFile).IsTrue();
     }
 
     [Test]

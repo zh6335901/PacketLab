@@ -24,7 +24,7 @@ public class DecodeUdpTests
         // Assert
         var error = result is UdpParseResult.InvalidLength failure ? failure
             : throw new InvalidOperationException("Expected InvalidLength.");
-        await Assert.That(error.RemainingBytes.Length).IsEqualTo(Math.Min(bytes.Length / 2, declared));
+        await Assert.That(error.RemainingBytes.Length).IsEqualTo((int)declared);
         await Assert.That(result.Checksum.Value).IsEqualTo(new UdpChecksumUnavailable(UdpUnavailableReason.InvalidLength));
     }
 
@@ -40,7 +40,7 @@ public class DecodeUdpTests
         // Assert
         var error = result is UdpParseResult.IpLengthTooShort failure ? failure
             : throw new InvalidOperationException("Expected IpLengthTooShort.");
-        await Assert.That(error.RemainingBytes.Length).IsEqualTo(Math.Min(bytes.Length / 2, declared));
+        await Assert.That(error.RemainingBytes.Length).IsEqualTo((int)declared);
         await Assert.That(result.Checksum.Value).IsEqualTo(new UdpChecksumUnavailable(UdpUnavailableReason.IpLengthTooShort));
     }
 
@@ -186,13 +186,14 @@ public class DecodeUdpTests
     }
 
     [Test]
-    [Arguments(false, "0000123400080173", "")]
-    [Arguments(true, "0000123400089235", "")]
-    [Arguments(false, "00001234000B356ECAFE01", "CAFE01")]
-    [Arguments(true, "00001234000BC630CAFE01", "CAFE01")]
-    [Arguments(false, "00001234000AFFFF016F", "016F")]
-    [Arguments(true, "00001234000AFFFF9231", "9231")]
-    public async Task Fixed_vectors_verify_pseudo_headers_odd_payload_and_wire_negative_zero(bool ipv6, string bytes, string payload)
+    [Arguments(false, "0000123400080173", "", 8u)]
+    [Arguments(true, "0000123400089235", "", 8u)]
+    [Arguments(false, "00001234000B356ECAFE01", "CAFE01", 11u)]
+    [Arguments(true, "00001234000BC630CAFE01", "CAFE01", 11u)]
+    [Arguments(false, "00001234000AFFFF016F", "016F", 10u)]
+    [Arguments(true, "00001234000AFFFF9231", "9231", 10u)]
+    public async Task Fixed_vectors_verify_pseudo_headers_odd_payload_and_wire_negative_zero(
+        bool ipv6, string bytes, string payload, uint effectiveLength)
     {
         // Act
         var udp = Datagram(Decode(ipv6, bytes));
@@ -200,7 +201,7 @@ public class DecodeUdpTests
         // Assert
         await Assert.That(udp.Header.SourcePort).IsEqualTo((ushort)0);
         await Assert.That(udp.Header.DestinationPort).IsEqualTo((ushort)0x1234);
-        await Assert.That(udp.EffectiveLength).IsEqualTo((uint)(bytes.Length / 2));
+        await Assert.That(udp.EffectiveLength).IsEqualTo(effectiveLength);
         await Assert.That(Hex(udp.Payload)).IsEqualTo(payload);
         await Assert.That(udp.IsComplete).IsTrue();
         await Assert.That(udp.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
@@ -345,10 +346,10 @@ public class DecodeUdpTests
     }
 
     [Test]
-    [Arguments(65536, 0x9244)]
-    [Arguments(131073, 0x9341)]
-    [Arguments(200008, 0x84FA)]
-    public async Task Jumbo_checksum_uses_real_32_bit_udp_length_and_does_not_overflow(int length, ushort checksum)
+    [Arguments(65536, 0x9244, 65528)]
+    [Arguments(131073, 0x9341, 131065)]
+    [Arguments(200008, 0x84FA, 200000)]
+    public async Task Jumbo_checksum_uses_real_32_bit_udp_length_and_does_not_overflow(int length, ushort checksum, int payloadLength)
     {
         // Arrange
         var bytes = new byte[length + 8];
@@ -363,7 +364,7 @@ public class DecodeUdpTests
 
         // Assert
         await Assert.That(udp.EffectiveLength).IsEqualTo((uint)length);
-        await Assert.That(udp.Payload.Length).IsEqualTo(length - 8);
+        await Assert.That(udp.Payload.Length).IsEqualTo(payloadLength);
         await Assert.That(udp.IsComplete).IsTrue();
         await Assert.That(udp.DeclaredSurplusLength).IsEqualTo(0u);
         await Assert.That(udp.SurplusArea.IsEmpty).IsTrue();
@@ -484,16 +485,21 @@ public class DecodeUdpTests
         }).Check(Config.QuickThrowOnFailure);
 
     [Test]
-    [Arguments("8100")]
-    [Arguments("88B5")]
-    public async Task Unsupported_ether_types_do_not_expose_udp(string etherType)
+    [Arguments(0x8100)]
+    [Arguments(0x88B5)]
+    public async Task Unsupported_ether_types_preserve_the_opaque_payload(ushort etherType)
     {
+        // Arrange
+        const string payload = "4500001C0000000040110000C0000201C63364020000123400080173";
+        var bytes = Convert.FromHexString($"FFFFFFFFFFFF020000000001{etherType:X4}{payload}");
+
         // Act
-        var result = ProtocolDecoder.Decode(Convert.FromHexString("FFFFFFFFFFFF020000000001" + etherType
-            + "4500001C0000000040110000C0000201C63364020000123400080173"), LinkLayerProtocol.Ethernet);
+        var result = ProtocolDecoder.Decode(bytes, LinkLayerProtocol.Ethernet);
 
         // Assert
-        await Assert.That(Ethernet(result).Payload is UnsupportedEtherType).IsTrue();
+        var unsupported = Ethernet(result).Payload is UnsupportedEtherType other ? other : throw new InvalidOperationException();
+        await Assert.That(unsupported.EtherType).IsEqualTo(etherType);
+        await Assert.That(Hex(unsupported.Bytes)).IsEqualTo(payload);
     }
 
     [Test]

@@ -171,10 +171,10 @@ public class ReadStreamTests
         using var stream = new ProbeStream(bytes);
         var openResult = PcapReader.Open(stream, new PcapReaderOptions(resource ? 1 : 10));
         var reader = openResult is PcapReader opened ? opened : throw new InvalidOperationException();
-        var error = reader.ReadNext() is PcapError initial ? initial : throw new InvalidOperationException();
         PcapError expectedError = resource
             ? new PcapError.PacketLimitExceeded(24, 1, 3, 1)
             : new PcapError.CapturedLengthExceedsSnapLen(24, 1, 3, 1);
+        await reader.ReadNext().ShouldFail(expectedError);
         var calls = stream.ReadCalls;
 
         // Act
@@ -182,7 +182,6 @@ public class ReadStreamTests
 
         // Assert
         var repeated = await repeatedResult.ShouldFail(expectedError);
-        await Assert.That(repeated.Message).IsEqualTo(error.Message);
         await Location(repeated, 32, 1);
         await Assert.That(stream.ReadCalls).IsEqualTo(calls);
         await Assert.That(stream.IsDisposed).IsFalse();
