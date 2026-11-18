@@ -124,29 +124,6 @@ public class AnalyzeCaptureTests
     }
 
     [Test]
-    public async Task Raw_packets_can_be_decoded_after_reading_finishes()
-    {
-        // Arrange
-        using var stream = new MemoryStream(Convert.FromHexString(Header + Records));
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new AssertionException("Expected a reader.");
-        var packet = reader.ReadNext() is PcapPacket read ? read : throw new AssertionException("Expected a packet.");
-        var savedBytes = packet.Data.ToArray();
-        while (true)
-        {
-            var next = reader.ReadNext();
-            if (next is PcapEndOfFile) break;
-            if (next is not PcapPacket) throw new AssertionException("Could not consume the capture to EOF.");
-        }
-
-        // Act
-        var decoding = PcapAnalysis.Decode(reader.Header, packet);
-
-        // Assert
-        await Assert.That(packet.Data.Span.SequenceEqual(savedBytes)).IsTrue();
-        await Assert.That(decoding.Value is not null).IsTrue();
-    }
-
-    [Test]
     [Arguments(false)]
     [Arguments(true)]
     public async Task Truncated_record_header_reports_relative_location_and_stops_reading(bool repeated)

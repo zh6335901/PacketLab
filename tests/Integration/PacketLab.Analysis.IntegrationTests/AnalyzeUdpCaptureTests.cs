@@ -12,7 +12,7 @@ public class AnalyzeUdpCaptureTests
     [Test]
     [Arguments("udp-little", PcapByteOrder.LittleEndian)]
     [Arguments("udp-big", PcapByteOrder.BigEndian)]
-    public async Task Analysis_preserves_record_order_after_packet_diagnostics(string sample, PcapByteOrder order)
+    public async Task Analysis_reads_all_records_in_order_through_eof_after_packet_diagnostics(string sample, PcapByteOrder order)
     {
         // Arrange
         using var stream = OpenSample(sample);
@@ -20,29 +20,14 @@ public class AnalyzeUdpCaptureTests
 
         // Act
         var packets = Enumerable.Range(0, 14).Select(_ => ReadPacket(reader)).ToArray();
+        var terminal = reader.ReadNext();
 
         // Assert
         await Assert.That(reader.Header.ByteOrder).IsEqualTo(order);
         await Assert.That(packets.Select(p => p.RecordNumber).SequenceEqual(Enumerable.Range(1, 14).Select(i => (long)i))).IsTrue();
         var last = Datagram(Udp(IPv6(Ethernet(packets[^1])).Payload));
         await Assert.That(last.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
-    }
-
-    [Test]
-    [Arguments("udp-little")]
-    [Arguments("udp-big")]
-    public async Task Analysis_reaches_eof_after_all_records_with_diagnostics(string sample)
-    {
-        // Arrange
-        using var stream = OpenSample(sample);
-        using var reader = OpenReader(stream);
-
-        // Act
-        for (int i = 0; i < 14; i++) ReadPacket(reader);
-        var result = reader.ReadNext();
-
-        // Assert
-        await Assert.That(result is PcapEndOfFile).IsTrue();
+        await Assert.That(terminal is PcapEndOfFile).IsTrue();
     }
 
     [Test]

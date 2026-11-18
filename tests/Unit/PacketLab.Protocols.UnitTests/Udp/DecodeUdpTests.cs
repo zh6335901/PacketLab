@@ -485,16 +485,21 @@ public class DecodeUdpTests
         }).Check(Config.QuickThrowOnFailure);
 
     [Test]
-    [Arguments("8100")]
-    [Arguments("88B5")]
-    public async Task Unsupported_ether_types_do_not_expose_udp(string etherType)
+    [Arguments(0x8100)]
+    [Arguments(0x88B5)]
+    public async Task Unsupported_ether_types_preserve_the_opaque_payload(ushort etherType)
     {
+        // Arrange
+        const string payload = "4500001C0000000040110000C0000201C63364020000123400080173";
+        var bytes = Convert.FromHexString($"FFFFFFFFFFFF020000000001{etherType:X4}{payload}");
+
         // Act
-        var result = ProtocolDecoder.Decode(Convert.FromHexString("FFFFFFFFFFFF020000000001" + etherType
-            + "4500001C0000000040110000C0000201C63364020000123400080173"), LinkLayerProtocol.Ethernet);
+        var result = ProtocolDecoder.Decode(bytes, LinkLayerProtocol.Ethernet);
 
         // Assert
-        await Assert.That(Ethernet(result).Payload is UnsupportedEtherType).IsTrue();
+        var unsupported = Ethernet(result).Payload is UnsupportedEtherType other ? other : throw new InvalidOperationException();
+        await Assert.That(unsupported.EtherType).IsEqualTo(etherType);
+        await Assert.That(Hex(unsupported.Bytes)).IsEqualTo(payload);
     }
 
     [Test]

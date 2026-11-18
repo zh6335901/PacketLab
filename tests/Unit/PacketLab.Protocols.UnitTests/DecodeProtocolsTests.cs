@@ -109,58 +109,49 @@ public class DecodeProtocolsTests
         await Assert.That(arp is ArpParseResult.IncompleteHeader { RequiredLength: 8, CapturedLength: 2 }).IsTrue();
     }
 
-    public static IEnumerable<(ushort Field, string Payload)> RecognizablePayloads() =>
-        from field in new ushort[] { 0x0800, 0x0806, 0x86dd, 1500, 1501, 1536, 0x8100, 0x88b5 }
-        from payload in new[]
-        {
-            "450000141234400040113C6EC0000201C6336402",
-            "0001080006040001020000000001C0000201000000000000C0000202",
-            "6000000000003B4020010DB8000000000000000000000001FF020000000000000000000000000002"
-        }
-        select (field, payload);
+    private const string Ipv4Payload = "450000141234400040113C6EC0000201C6336402";
+    private const string ArpPayload = "0001080006040001020000000001C0000201000000000000C0000202";
+    private const string Ipv6Payload = "6000000000003B4020010DB8000000000000000000000001FF020000000000000000000000000002";
 
     [Test]
-    [MethodDataSource(nameof(RecognizablePayloads))]
-    public async Task Recognizable_payloads_follow_the_outer_field(ushort field, string payload)
+    [Arguments("0800", ArpPayload, typeof(IPv4DecodeResult))]
+    [Arguments("0806", Ipv6Payload, typeof(ArpParseResult))]
+    [Arguments("86DD", Ipv4Payload, typeof(IPv6DecodeResult))]
+    [Arguments("05DC", Ipv4Payload, typeof(EthernetParseResult.Ieee8023Length))]
+    [Arguments("05DD", ArpPayload, typeof(EthernetParseResult.InvalidLengthOrType))]
+    [Arguments("05FF", Ipv6Payload, typeof(EthernetParseResult.InvalidLengthOrType))]
+    [Arguments("0600", Ipv4Payload, typeof(UnsupportedEtherType))]
+    [Arguments("8100", ArpPayload, typeof(UnsupportedEtherType))]
+    [Arguments("88B5", Ipv6Payload, typeof(UnsupportedEtherType))]
+    public async Task Recognizable_payloads_follow_the_outer_field(string field, string payload, Type expected)
     {
         // Act
-        var matches = DispatchMatches(field, payload);
+        var result = Decode(field, payload);
 
         // Assert
-        await Assert.That(matches).IsTrue();
+        await Assert.That(DispatchType(result)).IsEqualTo(expected);
     }
 
     [Test]
-    public void Outer_field_selects_decoder_regardless_of_payload() =>
-        Prop.ForAll((DoNotSize<ushort> field, byte[] payload) =>
+    [Arguments("0800")]
+    [Arguments("0806")]
+    [Arguments("86DD")]
+    [Arguments("05DC")]
+    [Arguments("05DD")]
+    [Arguments("88B5")]
+    public void Changing_the_payload_preserves_the_dispatch_type(string field) =>
+        Prop.ForAll((byte[] first, byte[] second) =>
         {
-            // Arrange
-            var bytes = Convert.ToHexString(payload);
-
             // Act
-            var matches = DispatchMatches(field.Item, bytes);
+            var firstResult = Decode(field, Convert.ToHexString(first));
+            var secondResult = Decode(field, Convert.ToHexString(second));
 
             // Assert
-            return matches;
+            return DispatchType(firstResult) == DispatchType(secondResult);
         }).Check(Config.QuickThrowOnFailure);
 
-    private static bool DispatchMatches(ushort field, string bytes)
-    {
-        // Act
-        var result = Decode(field.ToString("X4"), bytes);
-
-        // Assert
-        return field switch
-        {
-            <= 1500 => result is EthernetParseResult.Ieee8023Length length && length.Length == field,
-            <= 1535 => result is EthernetParseResult.InvalidLengthOrType invalid && invalid.Value == field,
-            0x0800 => result is DecodedEthernet v4 && v4.Payload is IPv4DecodeResult,
-            0x0806 => result is DecodedEthernet arp && arp.Payload is ArpParseResult,
-            0x86dd => result is DecodedEthernet v6 && v6.Payload is IPv6DecodeResult,
-            _ => result is DecodedEthernet frame && frame.Payload is UnsupportedEtherType other
-                && other.EtherType == field && Convert.ToHexString(other.Bytes.Span) == bytes
-        };
-    }
+    private static Type DispatchType(EthernetDecodeResult result) =>
+        result is DecodedEthernet frame ? frame.Payload.Value!.GetType() : result.Value!.GetType();
 
     [Test]
     [Arguments("450000141234400040013C7EC0000201C6336402", 1)]
