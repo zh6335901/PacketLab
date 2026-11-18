@@ -13,9 +13,9 @@ public sealed class ImplementationCapabilityAnalyzer : DiagnosticAnalyzer
 
     private static readonly DiagnosticDescriptor Rule = new(
         RuleId, "Public capability depends on an internal implementation",
-        "Public member '{0}' exposes '{1}' only when '{2}' is '{3}'; another implementation receives a placeholder or unsupported result. Review which type owns this capability.",
+        "Public member '{0}' exposes '{1}' only when '{2}' is '{3}'; another implementation receives a placeholder or unsupported result. Consider whether '{0}' belongs on a type that guarantees '{1}'.",
         "Design", DiagnosticSeverity.Error, isEnabledByDefault: true,
-        description: "Expose implementation-specific capabilities on the types that support them, or explicitly model capability availability. Moving the condition into a helper or changing fallback syntax does not resolve the public contract. This rule cannot be suppressed or downgraded.",
+        description: "Review whether the public type should own this capability. If callers need to query its availability through this type, express that in its contract. Moving the condition into a helper or changing fallback syntax does not resolve the public contract. This rule cannot be suppressed or downgraded.",
         customTags: [WellKnownDiagnosticTags.NotConfigurable]);
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [Rule];

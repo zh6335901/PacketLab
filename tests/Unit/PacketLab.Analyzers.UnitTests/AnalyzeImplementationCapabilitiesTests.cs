@@ -147,6 +147,45 @@ public class AnalyzeImplementationCapabilitiesTests
     }
 
     [Test]
+    [Arguments("reader is Special s ? s.Sections : []")]
+    [Arguments("reader switch { Special s => s.Sections, _ => [] }")]
+    public async Task Only_a_count_derived_from_implementation_specific_sections_reports_a_diagnostic(string expression)
+    {
+        // Arrange
+        var source = $$"""
+            using System;
+            public interface IReader { }
+            public class Special(string[] sections) : IReader
+            {
+                public string[] Sections => sections;
+            }
+            public class Wrapper(IReader reader)
+            {
+                public int InternalOnly()
+                {
+                    string[] sections = {{expression}};
+                    GC.KeepAlive(sections);
+                    return 1;
+                }
+
+                public int ExposedCount()
+                {
+                    string[] sections = {{expression}};
+                    GC.KeepAlive(sections);
+                    return sections.Length;
+                }
+            }
+            """;
+
+        // Act
+        var diagnostics = await Analyze(source);
+
+        // Assert
+        var reported = diagnostics.Select(d => (d.Id, d.Location.SourceTree!.GetText().ToString(d.Location.SourceSpan)));
+        await Assert.That(reported.ToArray()).IsEquivalentTo([("PL0013", "ExposedCount")]);
+    }
+
+    [Test]
     [Arguments("s = new Special(); return s?.Sections ?? [];")]
     [Arguments("if (reader is Other) s = new Special(); return s?.Sections ?? [];")]
     [Arguments("ref Special? alias = ref s; alias = new Special(); return s?.Sections ?? [];")]
