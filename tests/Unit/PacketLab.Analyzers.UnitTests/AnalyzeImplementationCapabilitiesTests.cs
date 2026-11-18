@@ -209,6 +209,28 @@ public class AnalyzeImplementationCapabilitiesTests
     }
 
     [Test]
+    public async Task A_generic_reader_reports_only_capabilities_requiring_an_additional_interface()
+    {
+        // Arrange
+        const string source = """
+            public interface IReader<out T> { T[] Read(); }
+            public class Wrapper(IReader<string> reader)
+            {
+                public int[] Numbers => reader is IReader<int> numbers ? numbers.Read() : [];
+                public object[] Objects => reader is IReader<object> objects ? objects.Read() : [];
+            }
+            """;
+
+        // Act
+        var diagnostics = await Analyze(source);
+
+        // Assert
+        var diagnostic = diagnostics.Single();
+        await Assert.That(diagnostic.Id).IsEqualTo("PL0013");
+        await Assert.That(diagnostic.Location.SourceTree!.GetText().ToString(diagnostic.Location.SourceSpan)).IsEqualTo("Numbers");
+    }
+
+    [Test]
     public async Task Members_already_available_on_the_internal_interface_are_not_specific_capabilities()
     {
         // Arrange

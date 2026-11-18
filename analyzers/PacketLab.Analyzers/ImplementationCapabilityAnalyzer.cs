@@ -329,7 +329,11 @@ public sealed class ImplementationCapabilityAnalyzer : DiagnosticAnalyzer
         var type = context.SemanticModel.GetTypeInfo(typeSyntax, context.CancellationToken).Type;
         var contract = context.SemanticModel.GetTypeInfo(receiver, context.CancellationToken).Type;
         if (type is not INamedTypeSymbol { TypeKind: TypeKind.Class or TypeKind.Struct or TypeKind.Interface } || contract is null || contract.IsValueType ||
-            SymbolEqualityComparer.Default.Equals(type, contract) || !IsInternalReceiver(context, member, receiver))
+            !IsInternalReceiver(context, member, receiver))
+            return null;
+
+        var conversion = context.SemanticModel.Compilation.ClassifyConversion(contract, type);
+        if (conversion.IsIdentity || (conversion.IsImplicit && conversion.IsReference))
             return null;
 
         return new(receiver, type, contract, alias, negated, member is IMethodSymbol { ReturnsVoid: true });
@@ -443,13 +447,8 @@ public sealed class ImplementationCapabilityAnalyzer : DiagnosticAnalyzer
             if (contract.TypeKind == TypeKind.Interface && implementation is INamedTypeSymbol named &&
                 SymbolEqualityComparer.Default.Equals(named.FindImplementationForInterfaceMember(member), definition))
                 return true;
-            for (ISymbol? current = capability; current is not null; current = current switch
-            {
-                IPropertySymbol property => property.OverriddenProperty,
-                IMethodSymbol method => method.OverriddenMethod,
-                _ => null
-            })
-                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, member.OriginalDefinition))
+            for (ISymbol? current = definition; current is not null; current = OverriddenMember(current))
+                if (SymbolEqualityComparer.Default.Equals(current, member))
                     return true;
         }
 
