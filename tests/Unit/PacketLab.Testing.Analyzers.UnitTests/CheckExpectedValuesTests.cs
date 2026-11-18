@@ -20,6 +20,9 @@ public class CheckExpectedValuesTests
     [Arguments("result.Calculated", 1)]
     [Arguments("new Box { Items = [(n / 2, flag)] }", 1)]
     [Arguments("flag ? n : 3", 1)]
+    [Arguments("System.IO.File.ReadAllText(System.IO.Path.Combine(System.AppContext.BaseDirectory, name + \".txt\")).ReplaceLineEndings(\"\\n\")", 0)]
+    [Arguments("System.IO.File.ReadAllText(flag ? \"one\" : \"two\")", 1)]
+    [Arguments("System.IO.File.ReadAllText(name).Length * 8", 1)]
     [Arguments("alias", 1)]
     [Arguments("incremented", 1)]
     [Arguments("rewritten", 1)]
@@ -34,6 +37,21 @@ public class CheckExpectedValuesTests
 
         await Assert.That(diagnostics.Length).IsEqualTo(expectedCount);
         await Assert.That(diagnostics.All(d => d.Id == "PL0014" && d.Severity == DiagnosticSeverity.Warning)).IsTrue();
+    }
+
+    [Test]
+    [Arguments("counter.Value", "baseline", false, 0)]
+    [Arguments("other.Value", "baseline", false, 1)]
+    [Arguments("counter.Value", "baseline", true, 1)]
+    [Arguments("counter.Double", "derived", false, 1)]
+    public async Task Before_after_comparisons_require_the_same_stored_property(
+        string observed, string expected, bool replaceCounter, int expectedCount)
+    {
+        var compilation = Compile(expected, actual: observed, replaceCounter: replaceCounter);
+        var diagnostics = await compilation.WithAnalyzers([new ExplicitExpectationAnalyzer()]).GetAnalyzerDiagnosticsAsync();
+
+        await Assert.That(diagnostics.Length).IsEqualTo(expectedCount);
+        await Assert.That(diagnostics.All(d => d.Id == "PL0014")).IsTrue();
     }
 
     [Test]
@@ -52,7 +70,8 @@ public class CheckExpectedValuesTests
         await Assert.That(output.GetDiagnostics().Single(d => d.Severity == DiagnosticSeverity.Error).Id).IsEqualTo("CS1029");
     }
 
-    private static CSharpCompilation Compile(string expression, string suppression = "")
+    private static CSharpCompilation Compile(string expression, string suppression = "", string? actual = null,
+        bool replaceCounter = false)
     {
         var source = $$"""
             using TUnit.Assertions;
@@ -62,13 +81,14 @@ public class CheckExpectedValuesTests
                 public int Calculated => Length * 8;
                 public int Compute() => Length / 2;
             }
+            public class Counter { public int Value { get; set; } public int Double => Value * 2; }
             public class Box { public (int, bool)[] Items { get; init; } }
             public class Cases
             {
                 static int Identity(int value) => value;
                 {{suppression}}
-                [TUnit.Core.Test, TUnit.Core.Arguments(2, false)]
-                public async System.Threading.Tasks.Task Example(int n, bool flag)
+                [TUnit.Core.Test, TUnit.Core.Arguments(2, false, "fixture")]
+                public async System.Threading.Tasks.Task Example(int n, bool flag, string name)
                 {
                     var result = new Result(n, flag);
                     var calculated = n * 8;
@@ -80,7 +100,12 @@ public class CheckExpectedValuesTests
                     int copied = n * 8;
                     copied = n;
                     object actual = new object();
-                    await Assert.That(actual).IsEqualTo((object)({{expression}}));
+                    var counter = new Counter();
+                    var other = new Counter();
+                    var baseline = counter.Value;
+                    var derived = counter.Double;
+                    {{(replaceCounter ? "counter = other;" : "")}}
+                    await Assert.That({{actual ?? "actual"}}).IsEqualTo({{(actual is null ? $"(object)({expression})" : expression)}});
                 }
             }
             """;

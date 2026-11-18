@@ -86,9 +86,9 @@ public class AnalyzeCaptureTests
     }
 
     [Test]
-    [Arguments(0)]
-    [Arguments(1)]
-    public async Task Unknown_link_type_does_not_prevent_analysis_of_a_record(int preceding)
+    [Arguments(0, 1L)]
+    [Arguments(1, 2L)]
+    public async Task Unknown_link_type_does_not_prevent_analysis_of_a_record(int preceding, long recordNumber)
     {
         // Arrange
         var bytes = Convert.FromHexString(Header + Records);
@@ -101,7 +101,7 @@ public class AnalyzeCaptureTests
         var analyzed = Read(reader);
 
         // Assert
-        await Assert.That(analyzed.RecordNumber).IsEqualTo(preceding + 1L);
+        await Assert.That(analyzed.RecordNumber).IsEqualTo(recordNumber);
         await Assert.That(analyzed.Decoding is ProtocolDecodeResult.UnsupportedLinkLayer result &&
             result.RemainingBytes.Equals(analyzed.Packet.Data)).IsTrue();
     }

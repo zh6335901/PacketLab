@@ -49,11 +49,45 @@ public sealed class ExplicitExpectationAnalyzer : DiagnosticAnalyzer
         if (argument is null)
             return null;
 
-        return new ExpectationTrace(token).FindCalculation(argument.Value);
+        var evidence = new ExpectationTrace(token).FindCalculation(argument.Value);
+        if (evidence is IPropertyReferenceOperation prior && IsStoredObservation(call, argument.Value, prior, token))
+            return null;
+        return evidence;
+    }
+
+    private static bool IsStoredObservation(IInvocationOperation call, IOperation expected, IPropertyReferenceOperation prior,
+        CancellationToken token)
+    {
+        if (expected is not ILocalReferenceOperation snapshot || prior.Instance is not ILocalReferenceOperation original ||
+            prior.Property.IsVirtual || prior.Property.IsOverride || prior.Property.IsAbstract ||
+            prior.Property.GetMethod?.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(token) is not
+                AccessorDeclarationSyntax { Body: null, ExpressionBody: null } ||
+            snapshot.Local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(token) is not VariableDeclaratorSyntax declaration ||
+            declaration.Initializer?.Value.Span != prior.Syntax.Span)
+            return false;
+
+        var source = call.Instance ?? call.Arguments.FirstOrDefault()?.Value;
+        while (source is IConversionOperation conversion) source = conversion.Operand;
+        if (source is not IInvocationOperation { TargetMethod.Name: "That" } assertion ||
+            assertion.TargetMethod.ContainingType.ToDisplayString() != "TUnit.Assertions.Assert" ||
+            assertion.Arguments.FirstOrDefault()?.Value is not IPropertyReferenceOperation
+                { Instance: ILocalReferenceOperation current } property)
+            return false;
+
+        if (!SymbolEqualityComparer.Default.Equals(property.Property, prior.Property) ||
+            !SymbolEqualityComparer.Default.Equals(current.Local, original.Local) ||
+            declaration.FirstAncestorOrSelf<LocalDeclarationStatementSyntax>() is not { } capture ||
+            call.Syntax.FirstAncestorOrSelf<ExpressionStatementSyntax>() is not { } check ||
+            capture.Parent != check.Parent || call.SemanticModel is not { } model)
+            return false;
+
+        var flow = model.AnalyzeDataFlow(capture, check);
+        return flow is { Succeeded: true } && !flow.WrittenInside.Contains(original.Local, SymbolEqualityComparer.Default);
     }
 
     private sealed class ExpectationTrace(CancellationToken token)
     {
+        private bool tracingPath;
         private readonly HashSet<ISymbol> visited = new(SymbolEqualityComparer.Default);
         private readonly Dictionary<ISymbol, IOperation> arguments = new(SymbolEqualityComparer.Default);
 
@@ -65,6 +99,14 @@ public sealed class ExplicitExpectationAnalyzer : DiagnosticAnalyzer
 
             switch (operation)
             {
+                case IBinaryOperation { OperatorKind: BinaryOperatorKind.Add, Type.SpecialType: SpecialType.System_String } join when tracingPath:
+                    return FindCalculation(join.LeftOperand) ?? FindCalculation(join.RightOperand);
+                case IInvocationOperation join when tracingPath && join.TargetMethod.Name == "Combine" &&
+                    join.TargetMethod.ContainingType.ToDisplayString() == "System.IO.Path":
+                    return join.Arguments.Select(a => FindCalculation(a.Value)).FirstOrDefault(evidence => evidence is not null);
+                case IPropertyReferenceOperation directory when tracingPath && directory.Property.Name == "BaseDirectory" &&
+                    directory.Property.ContainingType.ToDisplayString() == "System.AppContext":
+                    return null;
                 case IParameterReferenceOperation parameter:
                     return TraceParameter(parameter);
                 case IDefaultValueOperation or ITypeOfOperation:
@@ -92,10 +134,25 @@ public sealed class ExplicitExpectationAnalyzer : DiagnosticAnalyzer
                 case IArrayCreationOperation { Initializer: { } items }:
                     return FindCalculation(items);
                 case IInvocationOperation call:
+                    if (call.TargetMethod is { Name: "ReadAllText", IsStatic: true } read &&
+                        read.ContainingType.ToDisplayString() == "System.IO.File" && call.Arguments.Length == 1)
+                        return TraceFixturePath(call.Arguments[0].Value);
+                    if (call.TargetMethod.Name == "ReplaceLineEndings" &&
+                        call.TargetMethod.ContainingType.SpecialType == SpecialType.System_String &&
+                        call.Instance is { } text && call.Arguments.All(a => a.Value.ConstantValue.HasValue))
+                        return FindCalculation(text);
                     return TraceReturn(call);
                 default:
                     return operation;
             }
+        }
+
+        private IOperation? TraceFixturePath(IOperation path)
+        {
+            bool wasTracingPath = tracingPath;
+            tracingPath = true;
+            try { return FindCalculation(path); }
+            finally { tracingPath = wasTracingPath; }
         }
 
         private IOperation? TraceReturn(IInvocationOperation call)

@@ -264,15 +264,16 @@ public class DecodeTcpTests
     }
 
     [Test]
-    [Arguments(false, V4, "CAFE01")]
-    [Arguments(true, V6, "CAFE01")]
-    [Arguments(false, "ABCDFEDC81234567FEDCBA985BDB89AB358CCDEF", "")]
-    [Arguments(true, "ABCDFEDC81234567FEDCBA985BDB89ABC64ECDEF", "")]
-    [Arguments(false, "ABCDFEDC81234567FEDCBA985BDB89AB6987CDEFCAFE0102", "CAFE0102")]
-    [Arguments(true, "ABCDFEDC81234567FEDCBA985BDB89ABFA49CDEFCAFE0102", "CAFE0102")]
-    [Arguments(false, "ABCDFEDC81234567FEDCBA985BDB89AB0000CDEF358A", "358A")]
-    [Arguments(true, "ABCDFEDC81234567FEDCBA985BDB89AB0000CDEFC64C", "C64C")]
-    public async Task Independent_vectors_cover_fields_odd_lengths_and_valid_zero_checksum(bool ipv6, string wire, string payload)
+    [Arguments(false, V4, "CAFE01", 0x698a, 23u)]
+    [Arguments(true, V6, "CAFE01", 0xfa4c, 23u)]
+    [Arguments(false, "ABCDFEDC81234567FEDCBA985BDB89AB358CCDEF", "", 0x358c, 20u)]
+    [Arguments(true, "ABCDFEDC81234567FEDCBA985BDB89ABC64ECDEF", "", 0xc64e, 20u)]
+    [Arguments(false, "ABCDFEDC81234567FEDCBA985BDB89AB6987CDEFCAFE0102", "CAFE0102", 0x6987, 24u)]
+    [Arguments(true, "ABCDFEDC81234567FEDCBA985BDB89ABFA49CDEFCAFE0102", "CAFE0102", 0xfa49, 24u)]
+    [Arguments(false, "ABCDFEDC81234567FEDCBA985BDB89AB0000CDEF358A", "358A", 0, 22u)]
+    [Arguments(true, "ABCDFEDC81234567FEDCBA985BDB89AB0000CDEFC64C", "C64C", 0, 22u)]
+    public async Task Independent_vectors_cover_fields_odd_lengths_and_valid_zero_checksum(
+        bool ipv6, string wire, string payload, ushort checksum, uint declaredLength)
     {
         // Act
         var segment = Segment(Decode(ipv6, wire));
@@ -280,9 +281,9 @@ public class DecodeTcpTests
         // Assert
         await Assert.That(segment.Header).IsEqualTo(new TcpHeader(0xabcd, 0xfedc, 0x81234567, 0xfedcba98,
             5, 5, TcpFlags.AE | TcpFlags.CWR | TcpFlags.ECE | TcpFlags.ACK | TcpFlags.PSH | TcpFlags.SYN | TcpFlags.FIN,
-            0x89ab, Convert.ToUInt16(wire.Substring(32, 4), 16), 0xcdef));
+            0x89ab, checksum, 0xcdef));
         await Assert.That(Hex(segment.Payload)).IsEqualTo(payload);
-        await Assert.That(segment.DeclaredLength).IsEqualTo((uint)(wire.Length / 2));
+        await Assert.That(segment.DeclaredLength).IsEqualTo(declaredLength);
         await Assert.That(segment.IsComplete).IsTrue();
         await Assert.That(segment.Options.RawBytes.IsEmpty).IsTrue();
         await Assert.That(segment.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
@@ -432,10 +433,10 @@ public class DecodeTcpTests
     }
 
     [Test]
-    [Arguments(65536, 0xc661)]
-    [Arguments(131073, 0xc75e)]
-    [Arguments(200008, 0xb917)]
-    public async Task Jumbo_checksum_uses_full_32_bit_segment_length(int length, ushort checksum)
+    [Arguments(65536, 0xc661, 65516)]
+    [Arguments(131073, 0xc75e, 131053)]
+    [Arguments(200008, 0xb917, 199988)]
+    public async Task Jumbo_checksum_uses_full_32_bit_segment_length(int length, ushort checksum, int payloadLength)
     {
         // Arrange
         var wire = new byte[length + 8];
@@ -450,7 +451,7 @@ public class DecodeTcpTests
 
         // Assert
         await Assert.That(segment.DeclaredLength).IsEqualTo((uint)length);
-        await Assert.That(segment.Payload.Length).IsEqualTo(length - 20);
+        await Assert.That(segment.Payload.Length).IsEqualTo(payloadLength);
         await Assert.That(segment.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
     }
 

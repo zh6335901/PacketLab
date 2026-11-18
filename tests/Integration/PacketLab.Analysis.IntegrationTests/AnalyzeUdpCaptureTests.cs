@@ -61,7 +61,6 @@ public class AnalyzeUdpCaptureTests
         // Assert
         await Assert.That(udp.Header).IsEqualTo(new UdpHeader(0, 4660, length, checksum));
         await Assert.That(udp.EffectiveLength).IsEqualTo(effectiveLength);
-        await Assert.That(udp.Payload.Length).IsEqualTo(payload.Length / 2);
         await Assert.That(Hex(udp.Payload)).IsEqualTo(payload);
         await Assert.That(udp.DeclaredSurplusLength).IsEqualTo(surplusLength);
         await Assert.That(Hex(udp.SurplusArea)).IsEqualTo(surplus);
@@ -90,7 +89,6 @@ public class AnalyzeUdpCaptureTests
         // Assert
         await Assert.That(udp.Header).IsEqualTo(new UdpHeader(0, 4660, length, checksum));
         await Assert.That(udp.EffectiveLength).IsEqualTo(effectiveLength);
-        await Assert.That(udp.Payload.Length).IsEqualTo(payload.Length / 2);
         await Assert.That(Hex(udp.Payload)).IsEqualTo(payload);
         await Assert.That(udp.DeclaredSurplusLength).IsEqualTo(surplusLength);
         await Assert.That(Hex(udp.SurplusArea)).IsEqualTo(surplus);
