@@ -129,6 +129,9 @@ public sealed class ImplementationCapabilityAnalyzer : DiagnosticAnalyzer
             };
             if (evidence is null)
                 continue;
+            if (node is ExpressionSyntax value && evidence.Fallback is not (ThrowStatementSyntax or ThrowExpressionSyntax) &&
+                !ContributesToPublicValue(context, member, body, value, []))
+                continue;
 
             var location = member.Locations.First(location => location.IsInSource);
             context.ReportDiagnostic(Diagnostic.Create(Rule, location,
@@ -139,6 +142,63 @@ public sealed class ImplementationCapabilityAnalyzer : DiagnosticAnalyzer
     }
 
     private static bool EnterExecutableCode(SyntaxNode node) => node is not (AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax);
+
+    private static bool ContributesToPublicValue(SyntaxNodeAnalysisContext context, ISymbol member, SyntaxNode body,
+        ExpressionSyntax expression, HashSet<SyntaxNode> visited)
+    {
+        if (!visited.Add(expression))
+            return false;
+
+        for (SyntaxNode? node = expression; node is not null; node = node.Parent)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            if (node == body)
+                return member is not IMethodSymbol { ReturnsVoid: true };
+            if (node is StatementSyntax)
+                return node is ReturnStatementSyntax or YieldStatementSyntax;
+
+            if (node is VariableDeclaratorSyntax declaration &&
+                context.SemanticModel.GetDeclaredSymbol(declaration, context.CancellationToken) is ILocalSymbol local)
+                return LocalContributesToPublicValue(context, member, body, local, declaration, visited);
+
+            if (node.Parent is AssignmentExpressionSyntax assignment)
+            {
+                if (node == assignment.Left)
+                    return false;
+
+                var target = context.SemanticModel.GetSymbolInfo(assignment.Left, context.CancellationToken).Symbol;
+                if (target is IParameterSymbol { RefKind: RefKind.Out or RefKind.Ref })
+                    return true;
+                if (target is IFieldSymbol or IPropertySymbol && OwnsPublicContract(target) &&
+                    (target.IsStatic || assignment.Left is IdentifierNameSyntax or MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax or BaseExpressionSyntax }))
+                    return true;
+                if (target is ILocalSymbol assigned && LocalContributesToPublicValue(context, member, body, assigned, assignment, visited))
+                    return true;
+                // An assignment expression can itself be returned or used to compute the result.
+            }
+        }
+
+        return false;
+    }
+
+    private static bool LocalContributesToPublicValue(SyntaxNodeAnalysisContext context, ISymbol member, SyntaxNode body,
+        ILocalSymbol local, SyntaxNode write, HashSet<SyntaxNode> visited)
+    {
+        var statement = write.FirstAncestorOrSelf<StatementSyntax>();
+        if (statement?.Parent is not BlockSyntax block)
+            return false;
+
+        foreach (var name in block.DescendantNodes(EnterExecutableCode).OfType<IdentifierNameSyntax>())
+        {
+            if (name.SpanStart <= write.Span.End || name.Identifier.ValueText != local.Name ||
+                !SymbolEqualityComparer.Default.Equals(context.SemanticModel.GetSymbolInfo(name, context.CancellationToken).Symbol, local))
+                continue;
+            if (LocalValueIsUnchanged(context, local, statement, name) && ContributesToPublicValue(context, member, body, name, visited))
+                return true;
+        }
+
+        return false;
+    }
 
     private static Evidence? CheckConditional(SyntaxNodeAnalysisContext context, ISymbol member, ConditionalExpressionSyntax conditional)
     {
@@ -254,6 +314,12 @@ public sealed class ImplementationCapabilityAnalyzer : DiagnosticAnalyzer
         if (declaration.Parent is not VariableDeclarationSyntax { Variables.Count: 1, Parent: LocalDeclarationStatementSyntax statement })
             return false;
 
+        return LocalValueIsUnchanged(context, local, statement, access);
+    }
+
+    private static bool LocalValueIsUnchanged(SyntaxNodeAnalysisContext context, ILocalSymbol local,
+        StatementSyntax statement, ExpressionSyntax access)
+    {
         var model = context.SemanticModel;
         var initializerFlow = model.AnalyzeDataFlow(statement);
         if (initializerFlow is not { Succeeded: true })
