@@ -1,6 +1,6 @@
 using FsCheck;
 using FsCheck.Fluent;
-using System.Numerics;
+using System.Globalization;
 using PacketLab.Testing;
 using static PacketLab.Testing.PcapNgSamples;
 
@@ -148,15 +148,16 @@ public class ReadPcapNgTests
     }
 
     [Test]
-    [Arguments(ulong.MaxValue, 0, long.MaxValue)]
-    [Arguments(0UL, 0, -1L)]
-    [Arguments(1UL, 127, -1L)]
-    public async Task Timestamps_outside_reassembly_range_are_not_wrapped(ulong ticks, int resolution, long offset)
+    [Arguments(ulong.MaxValue, 0, long.MaxValue, "27670116110564327422")]
+    [Arguments(0UL, 0, -1L, "-1")]
+    [Arguments(1UL, 127, -1L,
+        "-9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999")]
+    public async Task Timestamps_outside_reassembly_range_are_not_wrapped(ulong ticks, int resolution, long offset, string expectedNumerator)
     {
         var timestamp = new PcapNgTimestamp(ticks, (byte)resolution, offset);
 
         await Assert.That(timestamp.GetNanoseconds()).IsNull();
-        await Assert.That(timestamp.UnixTimeNumerator).IsEqualTo((BigInteger)ticks + (BigInteger)offset * timestamp.UnitsPerSecond);
+        await Assert.That(timestamp.UnixTimeNumerator.ToString(CultureInfo.InvariantCulture)).IsEqualTo(expectedNumerator);
     }
 
     [Test]

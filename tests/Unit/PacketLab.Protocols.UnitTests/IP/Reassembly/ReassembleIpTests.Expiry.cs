@@ -5,30 +5,27 @@ namespace PacketLab.Protocols.UnitTests.IP.Reassembly;
 public partial class ReassembleIpTests
 {
     [Test]
-    [Arguments(30, false)]
-    [Arguments(60, true)]
-    public async Task Timeout_deadline_is_respected_near_the_maximum_timestamp(int elapsedSeconds, bool expired)
+    [Arguments(30, 0)]
+    [Arguments(60, 1)]
+    public async Task Timeout_deadline_is_respected_near_the_maximum_timestamp(int elapsedSeconds, int expiredCount)
     {
         // Arrange
         using var reassembler = new IpFragmentReassembler();
         reassembler.AdvanceTime(ulong.MaxValue - (ulong)elapsedSeconds * 1_000_000_000UL);
         reassembler.Expire();
         var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
-        long[] expected = expired ? [pending.DatagramId] : [];
 
         // Act
         reassembler.AdvanceTime(ulong.MaxValue);
         var updates = reassembler.Expire();
 
         // Assert
-        await Assert.That(updates.Select(x => x.DatagramId).ToArray()).IsEquivalentTo(expected);
+        await Assert.That(updates.Length).IsEqualTo(expiredCount);
+        await Assert.That(updates.All(x => x.DatagramId == pending.DatagramId)).IsTrue();
     }
 
     [Test]
-    [Arguments(60_000_000_000UL, false)]
-    [Arguments(89_999_999_999UL, false)]
-    [Arguments(90_000_000_000UL, true)]
-    public async Task A_remaining_datagram_expires_at_its_own_deadline_after_the_oldest_is_removed(ulong time, bool expired)
+    public async Task A_remaining_datagram_expires_at_its_own_deadline_after_the_oldest_is_removed()
     {
         // Arrange
         using var reassembler = new IpFragmentReassembler();
@@ -37,14 +34,19 @@ public partial class ReassembleIpTests
         reassembler.Expire();
         var younger = reassembler.Process(Fragment(4, 0, true, Payload[..16], 2))!;
         reassembler.Expire(oldest.DatagramId);
-        long[] expected = expired ? [younger.DatagramId] : [];
 
         // Act
-        reassembler.AdvanceTime(time);
-        var updates = reassembler.Expire();
+        reassembler.AdvanceTime(60_000_000_000UL);
+        var oldestDeadline = reassembler.Expire();
+        reassembler.AdvanceTime(89_999_999_999UL);
+        var before = reassembler.Expire();
+        reassembler.AdvanceTime(90_000_000_000UL);
+        var atDeadline = reassembler.Expire();
 
         // Assert
-        await Assert.That(updates.Select(x => x.DatagramId).ToArray()).IsEquivalentTo(expected);
+        await Assert.That(oldestDeadline.IsEmpty).IsTrue();
+        await Assert.That(before.IsEmpty).IsTrue();
+        await Assert.That(atDeadline.Single().DatagramId).IsEqualTo(younger.DatagramId);
     }
 
     [Test]

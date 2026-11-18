@@ -13,7 +13,7 @@ public class AnalyzeTcpCaptureTests
     [Test]
     [Arguments("tcp-little", PcapByteOrder.LittleEndian)]
     [Arguments("tcp-big", PcapByteOrder.BigEndian)]
-    public async Task Analysis_preserves_record_order_after_packet_diagnostics(string sample, PcapByteOrder order)
+    public async Task Analysis_reads_all_records_in_order_through_eof_after_packet_diagnostics(string sample, PcapByteOrder order)
     {
         // Arrange
         using var stream = OpenSample(sample);
@@ -21,16 +21,18 @@ public class AnalyzeTcpCaptureTests
 
         // Act
         var packets = Enumerable.Range(0, 16).Select(_ => ReadPacket(reader)).ToArray();
+        var terminal = reader.ReadNext();
 
         // Assert
         await Assert.That(reader.Header.ByteOrder).IsEqualTo(order);
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
+        await Assert.That(packets.Select(p => (int)p.Timestamp.Seconds).SequenceEqual(Enumerable.Range(1, 16))).IsTrue();
         await Assert.That(packets.All(p => p.OriginalLength == 70000u)).IsTrue();
         await Assert.That(packets.All(p => Ethernet(PcapAnalysis.Decode(reader.Header, p)).Frame.Source.ToString() == "02:00:00:00:00:01")).IsTrue();
         var last = Segment(Tcp(IPv6(Ethernet(PcapAnalysis.Decode(reader.Header, packets[^1]))).Payload));
         await Assert.That(last.IsComplete).IsTrue();
         await Assert.That(last.Checksum.Value).IsEqualTo(TcpChecksumStatus.Match);
         await Assert.That(Hex(last.Payload)).IsEqualTo("CAFE01");
+        await Assert.That(terminal is PcapEndOfFile).IsTrue();
     }
 
     [Test]

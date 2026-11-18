@@ -22,4 +22,5 @@ PacketLab is a lightweight, local-first network protocol analysis and experiment
 - Measure before optimizing.
 - Sequence work into verifiable units; verify each before proceeding.
 - Write documentation only when explicitly requested.
+- Edit AGENTS.md only when the user explicitly asks you to change this file.
 - Add comments only to explain non-obvious special handling.

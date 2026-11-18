@@ -13,7 +13,7 @@ public class AnalyzeUdpCaptureTests
     [Test]
     [Arguments("udp-little", PcapByteOrder.LittleEndian)]
     [Arguments("udp-big", PcapByteOrder.BigEndian)]
-    public async Task Analysis_preserves_record_order_after_packet_diagnostics(string sample, PcapByteOrder order)
+    public async Task Analysis_reads_all_records_in_order_through_eof_after_packet_diagnostics(string sample, PcapByteOrder order)
     {
         // Arrange
         using var stream = OpenSample(sample);
@@ -21,12 +21,14 @@ public class AnalyzeUdpCaptureTests
 
         // Act
         var packets = Enumerable.Range(0, 14).Select(_ => ReadPacket(reader)).ToArray();
+        var terminal = reader.ReadNext();
 
         // Assert
         await Assert.That(reader.Header.ByteOrder).IsEqualTo(order);
-        await Assert.That(reader.ReadNext() is PcapEndOfFile).IsTrue();
+        await Assert.That(packets.Select(p => (int)p.Timestamp.Seconds).SequenceEqual(Enumerable.Range(1, 14))).IsTrue();
         var last = Datagram(Udp(IPv6(Ethernet(PcapAnalysis.Decode(reader.Header, packets[^1]))).Payload));
         await Assert.That(last.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
+        await Assert.That(terminal is PcapEndOfFile).IsTrue();
     }
 
     [Test]
@@ -45,7 +47,6 @@ public class AnalyzeUdpCaptureTests
         // Assert
         await Assert.That(udp.Header).IsEqualTo(new UdpHeader(0, 4660, length, checksum));
         await Assert.That(udp.EffectiveLength).IsEqualTo(effectiveLength);
-        await Assert.That(udp.Payload.Length).IsEqualTo(payload.Length / 2);
         await Assert.That(Hex(udp.Payload)).IsEqualTo(payload);
         await Assert.That(udp.DeclaredSurplusLength).IsEqualTo(surplusLength);
         await Assert.That(Hex(udp.SurplusArea)).IsEqualTo(surplus);
@@ -74,7 +75,6 @@ public class AnalyzeUdpCaptureTests
         // Assert
         await Assert.That(udp.Header).IsEqualTo(new UdpHeader(0, 4660, length, checksum));
         await Assert.That(udp.EffectiveLength).IsEqualTo(effectiveLength);
-        await Assert.That(udp.Payload.Length).IsEqualTo(payload.Length / 2);
         await Assert.That(Hex(udp.Payload)).IsEqualTo(payload);
         await Assert.That(udp.DeclaredSurplusLength).IsEqualTo(surplusLength);
         await Assert.That(Hex(udp.SurplusArea)).IsEqualTo(surplus);

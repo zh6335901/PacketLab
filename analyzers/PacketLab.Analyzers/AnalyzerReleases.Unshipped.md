@@ -15,3 +15,4 @@ PL0009 | Readability | Warning | Single-statement body shares the control header
 PL0010 | Readability | Warning | Separate a return from the preceding statement
 PL0011 | Readability | Warning | Separate guard clauses from the following statements
 PL0012 | Readability | Warning | Separate switch sections
+PL0013 | Design | Error | Public capability depends on an internal implementation; non-configurable

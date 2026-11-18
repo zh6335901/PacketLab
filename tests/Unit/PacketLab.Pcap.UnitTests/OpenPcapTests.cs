@@ -83,12 +83,12 @@ public class OpenPcapTests
     }
 
     [Test]
-    [Arguments("01000000", false, 0, -1)]
-    [Arguments("010000F0", false, 15, -1)]
+    [Arguments("01000000", false, 0, null)]
+    [Arguments("010000F0", false, 15, null)]
     [Arguments("01000004", true, 0, 0)]
     [Arguments("01000024", true, 2, 4)]
     [Arguments("010000F4", true, 15, 30)]
-    public async Task Header_exposes_fcs_length_in_bytes_only_when_presence_bit_is_set(string link, bool present, int words, int length)
+    public async Task Header_exposes_fcs_length_in_bytes_only_when_presence_bit_is_set(string link, bool present, int words, int? length)
     {
         // Arrange
         // §4: P controls presence; even a nonzero raw FCS field is unspecified without P.
@@ -101,7 +101,7 @@ public class OpenPcapTests
         var reader = await openResult.ShouldSucceed();
         await Assert.That(reader.Header.HasFcsLength).IsEqualTo(present);
         await Assert.That((int)reader.Header.RawFcsLengthWords).IsEqualTo(words);
-        await Assert.That(reader.Header.FcsLengthBytes).IsEqualTo(length < 0 ? (int?)null : length);
+        await Assert.That(reader.Header.FcsLengthBytes).IsEqualTo(length);
     }
 
     [Test]
@@ -242,14 +242,12 @@ public class OpenPcapTests
         await Assert.That(act).Throws<ArgumentOutOfRangeException>();
     }
 
-    [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task Options_accept_minimum_and_maximum_supported_limits(bool maximum)
-    {
-        // Arrange
-        int limit = maximum ? Array.MaxLength : 1;
+    public static IEnumerable<int> SupportedLimitBoundaries() => [1, Array.MaxLength];
 
+    [Test]
+    [MethodDataSource(nameof(SupportedLimitBoundaries))]
+    public async Task Options_accept_minimum_and_maximum_supported_limits(int limit)
+    {
         // Act
         var options = new PcapReaderOptions(limit);
 
