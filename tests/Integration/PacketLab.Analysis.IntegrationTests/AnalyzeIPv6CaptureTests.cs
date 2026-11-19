@@ -19,19 +19,19 @@ public class AnalyzeIPv6CaptureTests
     {
         // Arrange
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
-        var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened
-            : throw new InvalidOperationException($"Expected an analysis reader for {sample}.");
+        var reader = PcapReader.Open(stream) is PcapReader opened ? opened
+            : throw new InvalidOperationException($"Expected a PCAP reader for {sample}.");
         var snapshots = new List<RecordSnapshot>();
 
         // Act
-        foreach (var expected in ExpectedRecords)
+        for (int recordIndex = 0; recordIndex < ExpectedRecords.Length; recordIndex++)
         {
-            var context = $"{sample}, record {expected.RecordNumber}";
-            var analyzed = reader.ReadNext() is AnalyzedPacket read ? read
+            var context = $"{sample}, record {recordIndex + 1}";
+            var analyzed = reader.ReadNext() is PcapPacket read ? read
                 : throw new InvalidOperationException($"Expected {context}.");
-            var decoding = analyzed.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame ? frame
+            var decoding = PcapAnalysis.Decode(reader.Header, analyzed) is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame ? frame
                 : throw new InvalidOperationException($"Expected IPv6 dispatch for {context}.");
-            var actual = new RecordSnapshot(analyzed.RecordNumber, analyzed.Packet.CapturedLength, analyzed.Packet.OriginalLength,
+            var actual = new RecordSnapshot(analyzed.CapturedLength, analyzed.OriginalLength,
                 decoding.Frame.Source.ToString(), decoding.Frame.Destination.ToString(), decoding.Frame.EtherType,
                 Snapshot(decoding.Payload is IPv6DecodeResult ip ? ip : throw new InvalidOperationException()));
             snapshots.Add(actual);
@@ -51,18 +51,18 @@ public class AnalyzeIPv6CaptureTests
     {
         // Arrange
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", $"ipv6-extensions-{order}.pcap"));
-        var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened
+        var reader = PcapReader.Open(stream) is PcapReader opened ? opened
             : throw new InvalidOperationException("Expected PCAP reader.");
         var snapshots = new List<ExtensionSnapshot>();
-        var packets = new List<AnalyzedPacket>();
+        var packets = new List<PcapPacket>();
 
         // Act
         for (var i = 0; i < ExpectedExtensionRecords.Length; i++)
         {
-            var record = reader.ReadNext() is AnalyzedPacket analyzed ? analyzed
+            var record = reader.ReadNext() is PcapPacket analyzed ? analyzed
                 : throw new InvalidOperationException($"Expected record {i + 1}.");
             packets.Add(record);
-            var frame = record.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet decoded
+            var frame = PcapAnalysis.Decode(reader.Header, record) is EthernetDecodeResult ethernet && ethernet is DecodedEthernet decoded
                 ? decoded : throw new InvalidOperationException("Expected Ethernet frame.");
             var ip = frame.Payload is IPv6DecodeResult result && result is DecodedIPv6 parsed
                 ? parsed : throw new InvalidOperationException("Expected IPv6 packet.");
@@ -86,13 +86,12 @@ public class AnalyzeIPv6CaptureTests
 
         // Assert
         await Assert.That(reader.Header.ByteOrder).IsEqualTo(expectedOrder);
-        await Assert.That(packets.Select(p => p.RecordNumber).SequenceEqual(Enumerable.Range(1, packets.Count).Select(i => (long)i))).IsTrue();
-        await Assert.That(packets.All(p => p.Packet.OriginalLength == 70000u)).IsTrue();
+        await Assert.That(packets.All(p => p.OriginalLength == 70000u)).IsTrue();
         await Assert.That(snapshots.SequenceEqual(ExpectedExtensionRecords)).IsTrue();
         await Assert.That(terminal is PcapEndOfFile).IsTrue();
     }
 
-    private sealed record RecordSnapshot(long RecordNumber, uint CapturedLength, uint OriginalLength,
+    private sealed record RecordSnapshot(uint CapturedLength, uint OriginalLength,
         string Source, string Destination, ushort EtherType, IPv6Snapshot IPv6);
     [TransportModel]
     private sealed record IPv6Snapshot(string Kind, IPv6Header? Header = null, PayloadSnapshot? Payload = null,
@@ -121,29 +120,29 @@ public class AnalyzeIPv6CaptureTests
 
     private static readonly RecordSnapshot[] ExpectedRecords =
     [
-        new(1, 53, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
+        new(53, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
             new("IncompleteHeader", RequiredLength: 40, CapturedLength: 39,
                 RemainingBytes: "6ABCDEF00004FD7F20010DB8000000000000000000000001FF0200000000000000000000000000")),
-        new(2, 54, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
+        new(54, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
             new("InvalidVersion", InvalidVersion: 4,
                 RemainingBytes: "4ABCDEF00004FD7F20010DB8000000000000000000000001FF020000000000000000000000000002")),
-        new(3, 56, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
+        new(56, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
             new("Packet", new IPv6Header(6, 0xab, 0xcdef0, 4, 253, 127,
                     new IPv6Address(0x20010db800000000, 1), new IPv6Address(0xff02000000000000, 2)),
                 new("KnownLength", "CAFE", "", DeclaredLength: 4, DeclaredDatagramLength: 44, IsDatagramComplete: false))),
-        new(4, 62, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
+        new(62, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
             new("Packet", new IPv6Header(6, 0xab, 0xcdef0, 4, 253, 127,
                     new IPv6Address(0x20010db800000000, 1), new IPv6Address(0xff02000000000000, 2)),
                 new("KnownLength", "CAFE0102", "DEADBEEF", DeclaredLength: 4, DeclaredDatagramLength: 44, IsDatagramComplete: true))),
-        new(5, 56, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
+        new(56, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
             new("Packet", new IPv6Header(6, 0, 0, 0, 59, 64,
                     new IPv6Address(0x20010db800000000, 1), new IPv6Address(0xff02000000000000, 2)),
                 new("KnownLength", "", "AABB", DeclaredLength: 0, DeclaredDatagramLength: 40, IsDatagramComplete: true))),
-        new(6, 62, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
+        new(62, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
             new("Packet", new IPv6Header(6, 0xab, 0xcdef0, 0, 0, 127,
                     new IPv6Address(0x20010db800000000, 1), new IPv6Address(0xff02000000000000, 2)),
                 new("KnownLength", "1100C20400010000", "", DeclaredLength: 65536, DeclaredDatagramLength: 65576, IsDatagramComplete: false))),
-        new(7, 58, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
+        new(58, 70000, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x86dd,
             new("Packet", new IPv6Header(6, 0, 0, 4, 43, 64,
                     new IPv6Address(0x20010db800000000, 1), new IPv6Address(0xff02000000000000, 2)),
                 new("KnownLength", "FFFFFFFF", "", DeclaredLength: 4, DeclaredDatagramLength: 44, IsDatagramComplete: true)))

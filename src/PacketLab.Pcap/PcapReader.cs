@@ -27,10 +27,16 @@ public sealed class PcapReader
             throw new ArgumentException("The stream must be readable.", nameof(stream));
 
         var input = new PcapInput(stream);
-        var settings = options ?? PcapReaderOptions.Default;
-        Span<byte> bytes = stackalloc byte[24];
 
-        return input.ReadBlock(bytes) switch
+        return Open(input, options ?? PcapReaderOptions.Default, []);
+    }
+
+    internal static PcapOpenResult Open(PcapInput input, PcapReaderOptions settings, ReadOnlySpan<byte> prefix)
+    {
+        Span<byte> bytes = stackalloc byte[24];
+        prefix.CopyTo(bytes);
+
+        return input.ReadBlock(bytes[prefix.Length..]) switch
         {
             BlockReadResult.Complete => PcapParser.ParseHeader(bytes) switch
             {
@@ -38,9 +44,32 @@ public sealed class PcapReader
                 PcapError error => error,
                 null => throw new InvalidOperationException("Uninitialized header parse result.")
             },
-            BlockReadResult.Incomplete partial => (PcapError)new PcapError.IncompleteFileHeader(partial.ReadBytes),
+            BlockReadResult.Incomplete partial => (PcapError)new PcapError.IncompleteFileHeader(prefix.Length + partial.ReadBytes),
             null => throw new InvalidOperationException("Uninitialized block read result.")
         };
+    }
+
+    public IEnumerable<PcapPacketResult> ReadPackets()
+    {
+        while (true)
+        {
+            switch (ReadNext())
+            {
+                case PcapPacket packet:
+                    yield return packet;
+                    break;
+
+                case PcapError error:
+                    yield return error;
+                    yield break;
+
+                case PcapEndOfFile:
+                    yield break;
+
+                default:
+                    throw new InvalidOperationException("Uninitialized read result.");
+            }
+        }
     }
 
     public PcapReadResult ReadNext()

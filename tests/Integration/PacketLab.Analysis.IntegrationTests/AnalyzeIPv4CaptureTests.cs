@@ -15,19 +15,19 @@ public class AnalyzeIPv4CaptureTests
         // Arrange
         const string sample = "ipv4-mixed";
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
-        var reader = PcapAnalysisReader.Open(stream) is PcapAnalysisReader opened ? opened
-            : throw new InvalidOperationException($"Expected an analysis reader for {sample}.");
+        var reader = PcapReader.Open(stream) is PcapReader opened ? opened
+            : throw new InvalidOperationException($"Expected a PCAP reader for {sample}.");
         var snapshots = new List<RecordSnapshot>();
 
         // Act
-        foreach (var expected in ExpectedRecords)
+        for (int recordIndex = 0; recordIndex < ExpectedRecords.Length; recordIndex++)
         {
-            var context = $"{sample}, record {expected.RecordNumber}";
-            var packet = reader.ReadNext() is AnalyzedPacket read ? read
+            var context = $"{sample}, record {recordIndex + 1}";
+            var packet = reader.ReadNext() is PcapPacket read ? read
                 : throw new InvalidOperationException($"Expected {context}.");
-            var decoding = packet.Decoding is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame ? frame
+            var decoding = PcapAnalysis.Decode(reader.Header, packet) is EthernetDecodeResult ethernet && ethernet is DecodedEthernet frame ? frame
                 : throw new InvalidOperationException($"Expected IPv4 dispatch for {context}.");
-            var actual = new RecordSnapshot(packet.RecordNumber, packet.Packet.CapturedLength, packet.Packet.OriginalLength,
+            var actual = new RecordSnapshot(packet.CapturedLength, packet.OriginalLength,
                 decoding.Frame.Source.ToString(), decoding.Frame.Destination.ToString(), decoding.Frame.EtherType,
                 Snapshot(decoding.Payload is IPv4DecodeResult ip ? ip : throw new InvalidOperationException()));
             snapshots.Add(actual);
@@ -40,7 +40,7 @@ public class AnalyzeIPv4CaptureTests
         await Assert.That(terminal is PcapEndOfFile).IsTrue().Because($"{sample} must end after the expected records");
     }
 
-    private sealed record RecordSnapshot(long RecordNumber, uint CapturedLength, uint OriginalLength,
+    private sealed record RecordSnapshot(uint CapturedLength, uint OriginalLength,
         string Source, string Destination, ushort EtherType, IPv4Snapshot IPv4);
     private sealed record HeaderSnapshot(byte Version, byte Ihl, byte Dscp, byte Ecn, ushort TotalLength,
         ushort Identification, byte Flags, ushort FragmentOffset, byte Ttl, byte Protocol, ushort HeaderChecksum,
@@ -70,28 +70,28 @@ public class AnalyzeIPv4CaptureTests
 
     private static readonly RecordSnapshot[] ExpectedRecords =
     [
-        new(1, 46, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
+        new(46, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
             new("Packet", IPv4ChecksumStatus.Match,
                 new(4, 6, 42, 3, 28, 0xbeef, 5, 291, 127, 253, 0xebee,
                     new IPv4Address(192, 0, 2, 1), new IPv4Address(198, 51, 100, 2), "01010000"),
                 Payload: "CAFE0102", TrailingBytes: "DEADBEEF", IsDatagramComplete: true, CapturedLength: 32)),
-        new(2, 36, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
+        new(36, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
             new("IncompleteHeader", IPv4ChecksumStatus.Unavailable, RequiredLength: 24, CapturedLength: 22,
                 RemainingBytes: "46AB001CBEEFA1237FFDEBEEC0000201C63364020101")),
-        new(3, 34, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
+        new(34, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
             new("InvalidTotalLength", IPv4ChecksumStatus.Unavailable, InvalidTotalLength: 19, HeaderLength: 20,
                 RemainingBytes: "45AB0013BEEFA1237FFDEDF3C0000201C6336402")),
-        new(4, 38, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
+        new(38, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
             new("Packet", IPv4ChecksumStatus.Mismatch,
                 new(4, 5, 42, 3, 24, 0xbeef, 5, 291, 127, 253, 0xecf3,
                     new IPv4Address(192, 0, 2, 1), new IPv4Address(198, 51, 100, 2), ""),
                 Payload: "CAFE0102", TrailingBytes: "", IsDatagramComplete: true, CapturedLength: 24)),
-        new(5, 36, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
+        new(36, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
             new("Packet", IPv4ChecksumStatus.Match,
                 new(4, 5, 42, 3, 24, 0xbeef, 5, 291, 127, 253, 0xedf3,
                     new IPv4Address(192, 0, 2, 1), new IPv4Address(198, 51, 100, 2), ""),
                 Payload: "CAFE", TrailingBytes: "", IsDatagramComplete: false, CapturedLength: 22)),
-        new(6, 34, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
+        new(34, 90, "02:00:00:00:00:01", "FF:FF:FF:FF:FF:FF", 0x0800,
             new("Packet", IPv4ChecksumStatus.Match,
                 new(4, 5, 0, 0, 20, 0x1234, 2, 0, 64, 17, 0x3c6e,
                     new IPv4Address(192, 0, 2, 1), new IPv4Address(198, 51, 100, 2), ""),

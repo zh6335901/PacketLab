@@ -12,10 +12,12 @@ public partial class ReassembleIpTests
         // Arrange
         using var reassembler = new IpFragmentReassembler();
         reassembler.AdvanceTime(ulong.MaxValue - (ulong)elapsedSeconds * 1_000_000_000UL);
+        reassembler.Expire();
         var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
 
         // Act
-        var updates = reassembler.AdvanceTime(ulong.MaxValue);
+        reassembler.AdvanceTime(ulong.MaxValue);
+        var updates = reassembler.Expire();
 
         // Assert
         await Assert.That(updates.Length).IsEqualTo(expiredCount);
@@ -29,13 +31,17 @@ public partial class ReassembleIpTests
         using var reassembler = new IpFragmentReassembler();
         var oldest = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         reassembler.AdvanceTime(30_000_000_000);
+        reassembler.Expire();
         var younger = reassembler.Process(Fragment(4, 0, true, Payload[..16], 2))!;
         reassembler.Expire(oldest.DatagramId);
 
         // Act
-        var oldestDeadline = reassembler.AdvanceTime(60_000_000_000UL);
-        var before = reassembler.AdvanceTime(89_999_999_999UL);
-        var atDeadline = reassembler.AdvanceTime(90_000_000_000UL);
+        reassembler.AdvanceTime(60_000_000_000UL);
+        var oldestDeadline = reassembler.Expire();
+        reassembler.AdvanceTime(89_999_999_999UL);
+        var before = reassembler.Expire();
+        reassembler.AdvanceTime(90_000_000_000UL);
+        var atDeadline = reassembler.Expire();
 
         // Assert
         await Assert.That(oldestDeadline.IsEmpty).IsTrue();
@@ -50,6 +56,7 @@ public partial class ReassembleIpTests
         using var reassembler = new IpFragmentReassembler(new(maxDatagrams: 1));
         reassembler.Process(Fragment(4, 0, true, Payload[..16]));
         reassembler.AdvanceTime(60_000_000_000);
+        reassembler.Expire();
 
         // Act
         var result = reassembler.Process(Fragment(4, 0, true, Payload[..16], 2))!;
@@ -65,10 +72,12 @@ public partial class ReassembleIpTests
         using var reassembler = new IpFragmentReassembler();
         var older = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         reassembler.AdvanceTime(30_000_000_000);
+        reassembler.Expire();
         reassembler.Process(Fragment(4, 0, true, Payload[..16], 2));
 
         // Act
-        var updates = reassembler.AdvanceTime(60_000_000_000);
+        reassembler.AdvanceTime(60_000_000_000);
+        var updates = reassembler.Expire();
 
         // Assert
         await Assert.That(updates.Select(x => x.DatagramId).ToArray()).IsEquivalentTo([older.DatagramId]);

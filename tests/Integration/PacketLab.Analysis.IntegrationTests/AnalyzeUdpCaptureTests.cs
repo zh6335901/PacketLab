@@ -1,5 +1,6 @@
 using PacketLab.Analysis.Pcap;
 using PacketLab.Pcap;
+using PacketLab.Protocols;
 using PacketLab.Protocols.Udp;
 using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.IP.IPv4;
@@ -16,7 +17,7 @@ public class AnalyzeUdpCaptureTests
     {
         // Arrange
         using var stream = OpenSample(sample);
-        using var reader = OpenReader(stream);
+        var reader = OpenReader(stream);
 
         // Act
         var packets = Enumerable.Range(0, 14).Select(_ => ReadPacket(reader)).ToArray();
@@ -24,8 +25,8 @@ public class AnalyzeUdpCaptureTests
 
         // Assert
         await Assert.That(reader.Header.ByteOrder).IsEqualTo(order);
-        await Assert.That(packets.Select(p => p.RecordNumber).SequenceEqual(Enumerable.Range(1, 14).Select(i => (long)i))).IsTrue();
-        var last = Datagram(Udp(IPv6(Ethernet(packets[^1])).Payload));
+        await Assert.That(packets.Select(p => (int)p.Timestamp.Seconds).SequenceEqual(Enumerable.Range(1, 14))).IsTrue();
+        var last = Datagram(Udp(IPv6(Ethernet(PcapAnalysis.Decode(reader.Header, packets[^1]))).Payload));
         await Assert.That(last.Checksum.Value).IsEqualTo(UdpChecksumStatus.Match);
         await Assert.That(terminal is PcapEndOfFile).IsTrue();
     }
@@ -204,20 +205,20 @@ public class AnalyzeUdpCaptureTests
 
     private static FileStream OpenSample(string sample) =>
         File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
-    private static PcapAnalysisReader OpenReader(Stream stream) =>
-        PcapAnalysisReader.Open(stream) is PcapAnalysisReader reader ? reader : throw new InvalidOperationException("Expected a readable PCAP.");
-    private static AnalyzedPacket ReadPacket(PcapAnalysisReader reader) =>
-        reader.ReadNext() is AnalyzedPacket packet ? packet : throw new InvalidOperationException("Expected another analyzed packet.");
+    private static PcapReader OpenReader(Stream stream) =>
+        PcapReader.Open(stream) is PcapReader reader ? reader : throw new InvalidOperationException("Expected a readable PCAP.");
+    private static PcapPacket ReadPacket(PcapReader reader) =>
+        reader.ReadNext() is PcapPacket packet ? packet : throw new InvalidOperationException("Expected another packet.");
     private static DecodedEthernet ReadRecord(string sample, SampleRecord record)
     {
         using var stream = OpenSample(sample);
         var reader = OpenReader(stream);
         for (var number = 1; number < (int)record; number++) ReadPacket(reader);
-        return Ethernet(ReadPacket(reader));
+        return Ethernet(PcapAnalysis.Decode(reader.Header, ReadPacket(reader)));
     }
-    private static DecodedEthernet Ethernet(AnalyzedPacket packet) =>
-        packet.Decoding is EthernetDecodeResult result && result is DecodedEthernet frame
-            ? frame : throw new InvalidOperationException($"Expected Ethernet in record {packet.RecordNumber}.");
+    private static DecodedEthernet Ethernet(ProtocolDecodeResult decoding) =>
+        decoding is EthernetDecodeResult result && result is DecodedEthernet frame
+            ? frame : throw new InvalidOperationException("Expected Ethernet.");
     private static DecodedIPv4 IPv4(DecodedEthernet frame) =>
         frame.Payload is IPv4DecodeResult result && result is DecodedIPv4 ip ? ip : throw new InvalidOperationException("Expected IPv4.");
     private static DecodedIPv6 IPv6(DecodedEthernet frame) =>

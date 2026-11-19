@@ -28,11 +28,35 @@ public sealed class IpFragmentReassembler : IDisposable
         return Accept(fragment, ++nextId);
     }
 
+    public IpReassemblyUpdate AddIPv4Fragment(ReadOnlyMemory<byte> bytes, DecodedIPv4 packet,
+        IPv4FragmentPayload fragment)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        var input = ExtractIPv4(bytes, packet, fragment);
+
+        return Accept(input, ++nextId);
+    }
+
+    public IpReassemblyUpdate AddIPv6Fragment(ReadOnlyMemory<byte> bytes, DecodedIPv6 packet,
+        IPv6ExtensionHeader extension, IPv6Fragment fragment)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        var input = ExtractIPv6(bytes, packet, extension, fragment)
+            ?? throw new ArgumentException("The fragment must have a known, valid payload length.", nameof(packet));
+
+        return Accept(input, ++nextId);
+    }
+
     // A monotonic high-water mark makes reordered input timestamps safe.
-    public ImmutableArray<IpReassemblyUpdate> AdvanceTime(ulong nanoseconds)
+    public void AdvanceTime(ulong nanoseconds)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         clock = Math.Max(clock, nanoseconds);
+    }
+
+    public ImmutableArray<IpReassemblyUpdate> Expire()
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
         if (datagrams.Count == 0)
             return [];
 
@@ -98,6 +122,22 @@ public sealed class IpFragmentReassembler : IDisposable
 
         return Extract(ipPacket) is { Atomic: false } fragment && datagrams.TryGetValue(fragment.Key, out var state)
             ? state.Id : null;
+    }
+
+    public long? FindDatagram(DecodedIPv4 packet, IPv4FragmentPayload fragment)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        var key = GetKey(packet, fragment);
+
+        return datagrams.TryGetValue(key, out var state) ? state.Id : null;
+    }
+
+    public long? FindDatagram(DecodedIPv6 packet, IPv6Fragment fragment)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        var key = new Key(6, packet.Header.Source, packet.Header.Destination, fragment.Identification, 0);
+
+        return !fragment.IsAtomic && datagrams.TryGetValue(key, out var state) ? state.Id : null;
     }
 
     public bool IsRetained(long datagramId) => datagrams.Values.Any(x => x.Id == datagramId);
@@ -364,10 +404,13 @@ public sealed class IpFragmentReassembler : IDisposable
         if (DecodedIPv4.Decode(bytes) is not DecodedIPv4 packet || packet.Payload is not IPv4FragmentPayload payload)
             return null;
 
+        return ExtractIPv4(bytes, packet, payload);
+    }
+
+    private static Fragment ExtractIPv4(ReadOnlyMemory<byte> bytes, DecodedIPv4 packet, IPv4FragmentPayload payload)
+    {
         var header = packet.Packet.Header;
-        var source = new IPv6Address(0, BinaryPrimitives.ReadUInt32BigEndian(bytes.Span[12..]));
-        var destination = new IPv6Address(0, BinaryPrimitives.ReadUInt32BigEndian(bytes.Span[16..]));
-        var key = new Key(4, source, destination, payload.Identification, payload.Protocol);
+        var key = GetKey(packet, payload);
         FragmentValidity validity = header.DontFragment || header.ReservedFlag
             ? new InvalidFragment("invalid IPv4 fragmentation flags")
             : new ValidFragment();
@@ -385,13 +428,35 @@ public sealed class IpFragmentReassembler : IDisposable
             Validity: validity);
     }
 
+    private static Key GetKey(DecodedIPv4 packet, IPv4FragmentPayload fragment)
+    {
+        var source = ExtendAddress(packet.Packet.Header.Source);
+        var destination = ExtendAddress(packet.Packet.Header.Destination);
+
+        return new Key(4, source, destination, fragment.Identification, fragment.Protocol);
+    }
+
+    private static IPv6Address ExtendAddress(IPv4Address address)
+    {
+        uint value = (uint)address.Octet0 << 24 | (uint)address.Octet1 << 16 | (uint)address.Octet2 << 8 | address.Octet3;
+
+        return new IPv6Address(0, value);
+    }
+
     private static Fragment? ExtractIPv6(ReadOnlyMemory<byte> bytes)
     {
         if (DecodedIPv6.Decode(bytes) is not DecodedIPv6 packet)
             return null;
 
         var extension = packet.Extensions.FirstOrDefault(x => x.Fragment is not null);
-        if (extension?.Fragment is not { } header || packet.Capture is not IPv6Payload.KnownLength capture)
+
+        return extension?.Fragment is { } header ? ExtractIPv6(bytes, packet, extension, header) : null;
+    }
+
+    private static Fragment? ExtractIPv6(ReadOnlyMemory<byte> bytes, DecodedIPv6 packet,
+        IPv6ExtensionHeader extension, IPv6Fragment header)
+    {
+        if (packet.Capture is not IPv6Payload.KnownLength capture)
             return null;
 
         var offset = extension.Offset + 8;

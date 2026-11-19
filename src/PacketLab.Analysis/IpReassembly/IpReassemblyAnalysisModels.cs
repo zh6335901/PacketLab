@@ -3,7 +3,7 @@ using PacketLab.Protocols.IP.Reassembly;
 
 namespace PacketLab.Analysis.IpReassembly;
 
-public enum IpReassemblyAnalysisReason { Protocol, EndOfCapture, Aborted, RecordAgeLimit, RecordAssociationLimit }
+public enum IpReassemblyAnalysisReason { Protocol, EndOfCapture, Aborted, RecordAgeLimit, RecordAssociationLimit, EndOfSection }
 
 // Protocol outcomes are preserved; capture-specific reasons and record associations are added here.
 public sealed record IpReassemblyEvent(long DatagramNumber, ImmutableArray<long> RecordNumbers,
