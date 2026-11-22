@@ -1,2 +1,5 @@
 [src/**/*.cs]
 dotnet_diagnostic.CA1502.severity = warning
+
+# IDE0250: Make struct 'readonly'
+csharp_style_prefer_readonly_struct = false
