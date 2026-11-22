@@ -140,7 +140,7 @@ public sealed class PcapReader
     {
         recordNumber++;
 
-        return new PcapPacket(packet.Timestamp, packet.OriginalLength, data);
+        return new PcapPacket(packet.Timestamp, packet.OriginalLength, data, input.Offset - data.Length);
     }
 
     private PcapReadResult Fail(PcapError error)

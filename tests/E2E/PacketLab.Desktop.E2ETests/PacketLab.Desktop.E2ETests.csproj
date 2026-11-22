@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" Version="12.1.6" />
+    <None Update="Fixtures/*.pcapng" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../TestData/Pcap/record-truncated.pcap" Link="Fixtures/record-truncated.pcap"
+          CopyToOutputDirectory="PreserveNewest" />
+    <ProjectReference Include="../../../src/PacketLab.Desktop/PacketLab.Desktop.csproj" />
+  </ItemGroup>
+</Project>

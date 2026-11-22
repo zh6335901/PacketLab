@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+    <IsAotCompatible>true</IsAotCompatible>
+    <PublishAot>true</PublishAot>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
+    <ProjectReference Include="../PacketLab.Analysis/PacketLab.Analysis.csproj" />
+    <ProjectReference Include="../../analyzers/PacketLab.Analyzers.Annotations/PacketLab.Analyzers.Annotations.csproj" />
+    <InternalsVisibleTo Include="PacketLab.Desktop.E2ETests" />
+  </ItemGroup>
+</Project>

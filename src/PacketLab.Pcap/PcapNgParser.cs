@@ -171,9 +171,10 @@ internal static class PcapNgParser
                 ? new PcapNgPacketDetails.Obsolete(timestamp, block.UInt16(2))
                 : new PcapNgPacketDetails.Enhanced(timestamp);
         }
-        var data = block.Body.Slice(block.Type == 3 ? 4 : 20, (int)captured);
+        var bodyOffset = block.Type == 3 ? 4 : 20;
+        var data = block.Body.Slice(bodyOffset, (int)captured);
 
-        return new PcapNgPacket(captureInterface, original, data, options, details);
+        return new PcapNgPacket(captureInterface, original, data, options, details, block.Offset + 8 + bodyOffset);
     }
 
     private static OptionsResult Options(PcapNgBlock block, int start, int maxOptions)
