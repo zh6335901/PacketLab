@@ -47,6 +47,20 @@ public sealed class ExploreCaptureTests
     }
 
     [Test]
+    public async Task Control_O_opens_the_file_selected_by_the_picker()
+    {
+        var result = await WithExplorer(async window =>
+        {
+            window.KeyPress(Key.O, RawInputModifiers.Control, PhysicalKey.O, null);
+            await WaitFor(() => Text(window, "RECORD #001"));
+
+            return Find<ListBox>(window)!.ItemCount;
+        }, file: null, chooseFile: _ => Task.FromResult<string?>(Fixture("record-workbench.pcapng")));
+
+        await Assert.That(result).IsEqualTo(16);
+    }
+
+    [Test]
     public async Task An_empty_capture_returns_to_the_file_prompt()
     {
         var file = Path.Combine(Path.GetTempPath(), $"packetlab-empty-{Guid.NewGuid():N}.pcap");
@@ -162,7 +176,8 @@ public sealed class ExploreCaptureTests
             await WaitFor(() => Text(window, "IPv4 / 标识符"));
             Click(window, ButtonNamed(window, "捕获元数据"));
             SaveFrame(window, "app-metadata");
-            Click(window, ButtonNamed(window, "关闭"));
+            window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            await WaitFor(() => FindButton(window, "关闭") is null);
             Click(window, FindRow(window, "#013")!);
             await WaitFor(() => Text(window, "RECORD #013"));
             Click(window, ButtonNamed(window, "捕获元数据"));

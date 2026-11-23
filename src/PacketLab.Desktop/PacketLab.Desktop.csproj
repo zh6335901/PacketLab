@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
     <ProjectReference Include="../PacketLab.Analysis/PacketLab.Analysis.csproj" />
     <ProjectReference Include="../../analyzers/PacketLab.Analyzers.Annotations/PacketLab.Analyzers.Annotations.csproj" />
     <InternalsVisibleTo Include="PacketLab.Desktop.E2ETests" />

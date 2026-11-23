@@ -1,32 +1,30 @@
 using PacketLab.Analysis.IpReassembly;
 using System.Collections;
-using Avalonia.Controls;
-using Avalonia.Layout;
-using Avalonia.Media;
 using PacketLab.Protocols.IP.Reassembly;
-using static PacketLab.Desktop.ViewStyle;
 
 namespace PacketLab.Desktop;
 
 internal enum RecordFilter { All, Diagnostics, Fragments }
 
-internal readonly record struct RecordStatus(string Label, IBrush Foreground, IBrush Background)
+internal enum RecordTone { Good, Bad, Warn, Blue, Neutral }
+
+internal readonly record struct RecordStatus(string Label, RecordTone Tone)
 {
     internal static RecordStatus ForGroup(FragmentGroup group) => group.Status switch
     {
-        IpReassemblyStatus.Complete => new("✓ 已重组", Good, GoodBackground),
-        IpReassemblyStatus.Atomic => new("✓ 原子分片", Good, GoodBackground),
-        IpReassemblyStatus.Conflict => new("× 冲突", Bad, BadBackground),
+        IpReassemblyStatus.Complete => new("✓ 已重组", RecordTone.Good),
+        IpReassemblyStatus.Atomic => new("✓ 原子分片", RecordTone.Good),
+        IpReassemblyStatus.Conflict => new("× 冲突", RecordTone.Bad),
         IpReassemblyStatus.Discarded when group.Reason == IpReassemblyAnalysisReason.RecordAssociationLimit =>
-            new("! 资源限制", Warn, WarnBackground),
-        IpReassemblyStatus.Discarded => new("× 已丢弃", Bad, BadBackground),
-        IpReassemblyStatus.Invalid => new("× 无效字段", Bad, BadBackground),
-        IpReassemblyStatus.Truncated => new("! 截断", Warn, WarnBackground),
-        IpReassemblyStatus.ResourceLimit => new("! 资源限制", Warn, WarnBackground),
-        IpReassemblyStatus.Incomplete => new("! 缺片", Warn, WarnBackground),
-        IpReassemblyStatus.Expired => new("! 重组超时", Warn, WarnBackground),
-        IpReassemblyStatus.Duplicate => new("↳ 重复分片", Blue, BlueBackground),
-        _ => new("↳ 分片", Blue, BlueBackground)
+            new("! 资源限制", RecordTone.Warn),
+        IpReassemblyStatus.Discarded => new("× 已丢弃", RecordTone.Bad),
+        IpReassemblyStatus.Invalid => new("× 无效字段", RecordTone.Bad),
+        IpReassemblyStatus.Truncated => new("! 截断", RecordTone.Warn),
+        IpReassemblyStatus.ResourceLimit => new("! 资源限制", RecordTone.Warn),
+        IpReassemblyStatus.Incomplete => new("! 缺片", RecordTone.Warn),
+        IpReassemblyStatus.Expired => new("! 重组超时", RecordTone.Warn),
+        IpReassemblyStatus.Duplicate => new("↳ 重复分片", RecordTone.Blue),
+        _ => new("↳ 分片", RecordTone.Blue)
     };
 
     internal static RecordStatus ForRecord(CaptureRecord record, FragmentGroup? group, int index)
@@ -35,21 +33,21 @@ internal readonly record struct RecordStatus(string Label, IBrush Foreground, IB
         if (group is not null && IsOutcome(group, index))
             return ForGroup(group);
         if ((issue & (PacketIssue.Invalid | PacketIssue.InvalidCaptureLength | PacketIssue.InvalidTime)) != 0)
-            return new("× 无效字段", Bad, BadBackground);
+            return new("× 无效字段", RecordTone.Bad);
         if (issue.HasFlag(PacketIssue.Truncated))
-            return new("! 截断", Warn, WarnBackground);
+            return new("! 截断", RecordTone.Warn);
         if (issue.HasFlag(PacketIssue.Mismatch))
-            return new("! 不匹配", Warn, WarnBackground);
+            return new("! 不匹配", RecordTone.Warn);
         if (issue.HasFlag(PacketIssue.Unsupported))
-            return new("· 未支持", Neutral, NeutralBackground);
+            return new("· 未支持", RecordTone.Neutral);
         if (issue.HasFlag(PacketIssue.NoTime))
-            return new("· 无时间戳", Neutral, NeutralBackground);
+            return new("· 无时间戳", RecordTone.Neutral);
         if (issue.HasFlag(PacketIssue.Unknown))
-            return new("· 含未知项", Neutral, NeutralBackground);
+            return new("· 含未知项", RecordTone.Neutral);
         if (issue.HasFlag(PacketIssue.ChecksumUnavailable))
-            return new("· 校验不可用", Neutral, NeutralBackground);
+            return new("· 校验不可用", RecordTone.Neutral);
 
-        return record.Fragment is null ? new("✓ 正常", Good, GoodBackground) : new("↳ 分片", Blue, BlueBackground);
+        return record.Fragment is null ? new("✓ 正常", RecordTone.Good) : new("↳ 分片", RecordTone.Blue);
     }
 
     private static bool IsOutcome(FragmentGroup group, int index) => group.Status switch
@@ -256,82 +254,5 @@ internal sealed class RecordItems(int count, int[]? filtered = null) : IList
 
         return text.Contains(query, StringComparison.OrdinalIgnoreCase) ||
             (query.Contains(':') && record.Time.Format().Contains(query, StringComparison.OrdinalIgnoreCase));
-    }
-}
-
-internal sealed class RecordRow : Border
-{
-    private readonly Border edge = new() { Width = 3, HorizontalAlignment = HorizontalAlignment.Left, Background = Accent };
-    private readonly TextBlock number;
-    private readonly TextBlock fragment;
-    private readonly TextBlock time;
-    private readonly TextBlock route;
-    private readonly int index;
-    private readonly CaptureRecord record;
-    private readonly FragmentGroup? group;
-
-    internal RecordRow(CaptureIndex capture, int index, int selected, FragmentGroup? selectedGroup)
-    {
-        this.index = index;
-        record = capture.ReadRecord(index);
-        group = capture.Group(index);
-        var summary = record.Summary;
-        var title = RecordStatus.Title(record, group, index);
-        var status = RecordStatus.ForRecord(record, group, index);
-        var timeText = record.Time.Format();
-        number = Label(RecordStatus.Number(index), 11, mono: true, weight: Demi);
-        var protocol = Label(summary.Name, 11, ProtocolBrush(summary.Protocol), mono: true, weight: Demi);
-        time = Label(timeText, 10, Muted, mono: true);
-        time.MaxWidth = 148;
-        var headline = LayoutGrid("Auto,*,Auto", number, protocol, time);
-        headline.ColumnSpacing = 6;
-        fragment = Label("◈", 11, Muted);
-        fragment.IsVisible = record.Fragment.HasValue;
-        fragment.VerticalAlignment = VerticalAlignment.Top;
-        fragment.HorizontalAlignment = HorizontalAlignment.Left;
-        fragment.Margin = new Avalonia.Thickness(6, 3, 0, 0);
-        var subtitle = Label(title, 12, weight: Demi);
-        route = Label($"{summary.SourceAddress} → {summary.DestinationAddress}", 10, Muted, mono: true);
-        route.MaxWidth = 190;
-        var tag = Badge(status.Label, status.Foreground, status.Background, 10);
-        tag.IsVisible = status.Label is not ("✓ 正常" or "↳ 分片");
-        var bottom = LayoutGrid("*,Auto,Auto", subtitle, route, tag);
-        bottom.ColumnSpacing = 5;
-        var text = Vertical(0, headline, bottom);
-        text.Margin = new Avalonia.Thickness(23, 2, 10, 2);
-        text.VerticalAlignment = VerticalAlignment.Center;
-        var layer = new Grid();
-        layer.Children.Add(edge);
-        layer.Children.Add(fragment);
-        layer.Children.Add(text);
-        Child = layer;
-        Height = 40;
-        BorderBrush = Line;
-        BorderThickness = new Avalonia.Thickness(0, 0, 0, 1);
-        var tooltip = $"{number.Text} · {summary.Name} · {title} · {status.Label}\n{timeText} · {record.Context}\n{route.Text}\n捕获 {record.Length} B / 原始 {record.OriginalLength} B";
-        ToolTip.SetTip(this, tooltip);
-        Avalonia.Automation.AutomationProperties.SetName(this, tooltip);
-        Refresh(selected, selectedGroup);
-        SizeChanged += (_, _) =>
-        {
-            time.IsVisible = Bounds.Width > 236;
-            route.IsVisible = Bounds.Width >= 440;
-        };
-    }
-
-    internal void Refresh(int selected, FragmentGroup? selectedGroup)
-    {
-        var isSelected = index == selected;
-        var linked = record.Fragment.HasValue && group is not null && group == selectedGroup;
-        var parentBackground = (isSelected, linked) switch
-        {
-            (true, _) => Selected,
-            (false, true) => PeerBackground,
-            _ => null
-        };
-        Background = parentBackground;
-        edge.IsVisible = isSelected;
-        number.Foreground = isSelected ? Accent : Text;
-        fragment.Foreground = linked ? Accent : Muted;
     }
 }

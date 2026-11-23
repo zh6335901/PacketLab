@@ -1,0 +1,203 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:PacketLab.Desktop"
+        x:Class="PacketLab.Desktop.ExplorerWindow"
+        x:DataType="local:ExplorerViewModel"
+        Title="PacketLab · Packet Explorer" Width="1440" Height="950" MinWidth="700" MinHeight="530"
+        WindowStartupLocation="CenterScreen" Background="{x:Static local:ViewStyle.Bg}"
+        Foreground="{x:Static local:ViewStyle.Text}" FontFamily="{x:Static local:ViewStyle.Body}">
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+O" Command="{Binding ChooseFileCommand}" />
+    <KeyBinding Gesture="Escape" Command="{Binding CloseMetadataCommand}" />
+  </Window.KeyBindings>
+  <Window.Styles>
+    <Style Selector="TextBlock.landing">
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="LineHeight" Value="22" />
+    </Style>
+    <Style Selector="TextBlock.metric">
+      <Setter Property="FontFamily" Value="{x:Static local:ViewStyle.Display}" />
+      <Setter Property="FontSize" Value="27" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LineHeight" Value="30" />
+    </Style>
+    <Style Selector="TextBlock.metric-label">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{x:Static local:ViewStyle.Muted}" />
+    </Style>
+    <Style Selector="Border.metric">
+      <Setter Property="BorderBrush" Value="{x:Static local:ViewStyle.Line}" />
+      <Setter Property="BorderThickness" Value="1,0,0,0" />
+      <Setter Property="Padding" Value="15,0" />
+    </Style>
+    <Style Selector="Button.filter">
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="MinHeight" Value="22" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{x:Static local:ViewStyle.Muted}" />
+    </Style>
+  </Window.Styles>
+  <Grid RowDefinitions="56,*">
+    <Border x:Name="Brand" Background="{x:Static local:ViewStyle.Top}" BorderBrush="{x:Static local:ViewStyle.Line}"
+            BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="11" VerticalAlignment="Center">
+        <Path Fill="{x:Static local:ViewStyle.Accent}" Width="30" Height="30" Stretch="Uniform"
+              Data="M2 9L15 2L28 9L15 16Z M2 13L15 20L28 13V17L15 24L2 17Z M2 21L15 28L28 21V25L15 32L2 25Z" />
+        <TextBlock Text="PacketLab" FontSize="21" FontWeight="Bold" FontFamily="{x:Static local:ViewStyle.Display}" VerticalAlignment="Center" />
+        <Border Width="1" Height="18" Background="{x:Static local:ViewStyle.Line}" VerticalAlignment="Center" />
+        <TextBlock Text="Packet Explorer" FontSize="13" Foreground="{x:Static local:ViewStyle.Muted}" VerticalAlignment="Center" />
+      </StackPanel>
+    </Border>
+
+    <Border x:Name="Landing" Grid.Row="1" IsVisible="{Binding !Header.HasRecords}" Padding="20,28,20,100">
+      <StackPanel MaxWidth="400" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <local:OpenCaptureIcon Width="54" Height="54" Margin="0,0,0,18" />
+        <TextBlock Classes="landing" Text="{Binding Header.LandingTitle}" FontSize="24" LineHeight="32"
+                   FontWeight="SemiBold" FontFamily="{x:Static local:ViewStyle.Display}" />
+        <TextBlock Classes="landing" Text="{Binding Header.LandingHint}" Foreground="{x:Static local:ViewStyle.Muted}" Margin="0,7,0,0" />
+        <Button Classes="choose-capture" HorizontalAlignment="Center" Margin="0,23,0,0" Command="{Binding ChooseFileCommand}"
+                AutomationProperties.Name="{Binding Header.LandingAction}">
+          <TextBlock Text="{Binding Header.LandingAction}" Classes="landing" LineHeight="18" Foreground="#102333" FontWeight="SemiBold" />
+        </Button>
+        <TextBlock Classes="landing" Text="{Binding Header.Error}" IsVisible="{Binding Header.HasError}"
+                   Foreground="{x:Static local:ViewStyle.Bad}" Margin="0,14,0,0" />
+      </StackPanel>
+    </Border>
+
+    <Grid x:Name="Workbench" Grid.Row="1" RowDefinitions="Auto,Auto,*,22" MaxWidth="1730" IsVisible="{Binding Header.HasRecords}">
+      <Border Padding="0,16,0,12">
+        <Grid ColumnDefinitions="1.15*,0.85*" ColumnSpacing="26">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+              <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+                <Border Width="20" Height="2" Background="{x:Static local:ViewStyle.Accent}" />
+                <TextBlock Text="PACKET EXPLORER" FontSize="10" FontWeight="SemiBold" LetterSpacing="1.8"
+                           FontFamily="{x:Static local:ViewStyle.Mono}" Foreground="{x:Static local:ViewStyle.Accent}" />
+              </StackPanel>
+              <TextBlock Text="记录工作台" FontSize="31" FontWeight="Bold" FontFamily="{x:Static local:ViewStyle.Display}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+              <Border Classes="metric"><StackPanel><TextBlock Classes="metric" Text="{Binding Header.Count}" /><TextBlock Classes="metric-label" Text="记录" /></StackPanel></Border>
+              <Border Classes="metric"><StackPanel><TextBlock Classes="metric" Text="{Binding Header.Groups}" /><TextBlock Classes="metric-label" Text="分片组" /></StackPanel></Border>
+              <Border Classes="metric"><StackPanel><TextBlock Classes="metric" Text="{Binding Header.Diagnostics}" Foreground="{x:Static local:ViewStyle.Warn}" /><TextBlock Classes="metric-label" Text="诊断记录" /></StackPanel></Border>
+            </StackPanel>
+          </Grid>
+          <Border Grid.Column="1" Background="{x:Static local:ViewStyle.PanelBrush}" BorderBrush="{x:Static local:ViewStyle.Line}"
+                  BorderThickness="1" CornerRadius="6" Padding="9,5" MinHeight="41" VerticalAlignment="Center">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
+              <Button x:Name="FileButton" Classes="explorer" Command="{Binding ChooseFileCommand}" AutomationProperties.Name="选择其他抓包文件"
+                      ToolTip.Tip="选择其他抓包文件">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <Path Data="M6 3H14L18 7V21H6Z M14 3V8H18 M9 12H15 M9 16H15"
+                        Width="16" Height="16" Stretch="Uniform" Stroke="{x:Static local:ViewStyle.Accent}" StrokeThickness="1.4" />
+                  <TextBlock x:Name="FileLabel" Text="{Binding Header.File}" FontSize="13" FontWeight="SemiBold"
+                             FontFamily="{x:Static local:ViewStyle.Mono}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <Path Data="M2 3L6 7L10 3" Width="10" Height="10" Stretch="Uniform" Stroke="{x:Static local:ViewStyle.Muted}" StrokeThickness="1.4" />
+                </StackPanel>
+              </Button>
+              <Border Grid.Column="1" Width="1" Height="15" Background="{x:Static local:ViewStyle.Line}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="{Binding Header.Format}" FontSize="12" FontFamily="{x:Static local:ViewStyle.Mono}"
+                         Foreground="{x:Static local:ViewStyle.Muted}" VerticalAlignment="Center" />
+              <Button Grid.Column="3" Classes="explorer" Command="{Binding ShowMetadataCommand}" AutomationProperties.Name="捕获元数据"
+                      ToolTip.Tip="捕获元数据">
+                <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                  <Path Data="M2 4H20V18H2Z M8 4V18 M11 8H17 M11 12H16" Width="16" Height="16" Stretch="Uniform"
+                        Stroke="{x:Static local:ViewStyle.Muted}" StrokeThickness="1.4" />
+                  <TextBlock Text="捕获元数据" FontSize="12" Foreground="{x:Static local:ViewStyle.Muted}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="1" IsVisible="{Binding Header.HasError}" Background="{x:Static local:ViewStyle.BadBackground}"
+              BorderBrush="{x:Static local:ViewStyle.Bad}" BorderThickness="1" Padding="10,7" Margin="0,0,0,8">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+          <TextBlock Text="× 文件读取错误" Foreground="{x:Static local:ViewStyle.Bad}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Text="{Binding Header.Error}" Foreground="{x:Static local:ViewStyle.Bad}" FontSize="12" TextWrapping="Wrap" />
+        </Grid>
+      </Border>
+
+      <Grid x:Name="Workspace" Grid.Row="2" ColumnDefinitions="348,16,*">
+        <Border Background="{x:Static local:ViewStyle.PanelBrush}" BorderBrush="{x:Static local:ViewStyle.CardBorder}"
+                BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+          <Grid RowDefinitions="Auto,*">
+            <Border BorderBrush="{x:Static local:ViewStyle.Line}" BorderThickness="0,0,0,1" Padding="10,9,10,13">
+              <StackPanel Spacing="9">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock Text="捕获记录" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding ListCount}" FontSize="10" FontFamily="{x:Static local:ViewStyle.Mono}"
+                               Foreground="{x:Static local:ViewStyle.Muted}" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <Border Grid.Column="1" BorderBrush="{x:Static local:ViewStyle.Line}" BorderThickness="1"
+                          CornerRadius="4" Padding="2" Background="{x:Static local:ViewStyle.Bg}">
+                    <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                      <Button Classes="explorer filter" Classes.selected="{Binding AllSelected}" Content="全部" AutomationProperties.Name="全部"
+                              Command="{Binding SetFilterCommand}" CommandParameter="{x:Static local:RecordFilter.All}" />
+                      <Button Classes="explorer filter" Classes.selected="{Binding DiagnosticsSelected}" Content="诊断" AutomationProperties.Name="诊断"
+                              Command="{Binding SetFilterCommand}" CommandParameter="{x:Static local:RecordFilter.Diagnostics}" />
+                      <Button Classes="explorer filter" Classes.selected="{Binding FragmentsSelected}" Content="分片" AutomationProperties.Name="分片"
+                              Command="{Binding SetFilterCommand}" CommandParameter="{x:Static local:RecordFilter.Fragments}" />
+                    </StackPanel>
+                  </Border>
+                </Grid>
+                <TextBox Classes="explorer" PlaceholderText="搜索序号、地址或协议" AutomationProperties.Name="搜索记录"
+                         Text="{Binding Query, Mode=TwoWay}">
+                  <TextBox.InnerLeftContent>
+                    <Path Margin="9,0,3,0" Width="13" Height="13" Data="M12 12L17 17 M14 8A6 6 0 1 1 2 8A6 6 0 0 1 14 8"
+                          Stretch="Uniform" Stroke="{x:Static local:ViewStyle.Muted}" StrokeThickness="1.4" />
+                  </TextBox.InnerLeftContent>
+                </TextBox>
+              </StackPanel>
+            </Border>
+            <Grid Grid.Row="1">
+              <ListBox x:Name="RecordList" Classes="records" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                       AutomationProperties.Name="捕获记录列表">
+                <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+              </ListBox>
+              <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Top" IsVisible="{Binding NoMatches}">
+                <TextBlock Text="没有匹配的记录。" FontSize="12" Foreground="{x:Static local:ViewStyle.Muted}" Margin="12" VerticalAlignment="Center" />
+                <Button Classes="explorer" Command="{Binding ClearFilterCommand}">
+                  <TextBlock Text="清除筛选" FontSize="12" Foreground="{x:Static local:ViewStyle.Accent}" />
+                </Button>
+              </StackPanel>
+            </Grid>
+          </Grid>
+        </Border>
+        <local:RecordInspectorView Grid.Column="2" DataContext="{Binding Inspector}" />
+        <TextBlock Grid.Column="2" IsVisible="{Binding NoMatches}" Text="当前筛选下没有可查看的记录。"
+                   FontSize="12" Foreground="{x:Static local:ViewStyle.Muted}" Margin="12" />
+      </Grid>
+      <Border Grid.Row="3" BorderBrush="{x:Static local:ViewStyle.Line}" BorderThickness="0,1,0,0" Margin="0,8,0,0">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Text="{Binding Header.Footer}" FontSize="11" Foreground="{x:Static local:ViewStyle.Soft}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Grid.Column="1" Text="{Binding FooterCount}" FontSize="11" Foreground="{x:Static local:ViewStyle.Soft}" />
+        </Grid>
+      </Border>
+    </Grid>
+
+    <Grid x:Name="Overlay" Grid.RowSpan="2" Background="#8F080D13" IsVisible="{Binding HasMetadata}">
+      <Border x:Name="MetadataPane" MaxWidth="740" Background="#303135" BorderBrush="{x:Static local:ViewStyle.CardBorder}"
+              BorderThickness="1" CornerRadius="8" Padding="22,17,22,20" HorizontalAlignment="Center" VerticalAlignment="Top">
+        <StackPanel Spacing="12">
+          <Border BorderBrush="{x:Static local:ViewStyle.Line}" BorderThickness="0,0,0,1" Padding="0,0,0,12">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="捕获元数据" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <Button x:Name="CloseButton" Grid.Column="1" Classes="explorer outline" Width="32" Height="32"
+                      HorizontalContentAlignment="Center" Command="{Binding CloseMetadataCommand}" AutomationProperties.Name="关闭">
+                <TextBlock Text="×" FontSize="18" />
+              </Button>
+            </Grid>
+          </Border>
+          <ScrollViewer x:Name="MetadataScroll">
+            <local:CaptureMetadataView DataContext="{Binding Metadata}" />
+          </ScrollViewer>
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</Window>
