@@ -1,3 +1,4 @@
+using PacketLab.Desktop.Localization;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using Avalonia;
@@ -7,6 +8,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 using static PacketLab.Desktop.ViewStyle;
 using static PacketLab.Desktop.RecordStatus;
 
@@ -15,6 +17,7 @@ namespace PacketLab.Desktop;
 [SuppressMessage("Design", "PL0001", Justification = "Layout elements exist only for the currently displayed inspector panels.")]
 internal sealed partial class RecordInspectorView : UserControl
 {
+    private const double FieldRowHeight = 25;
     private readonly List<(CoverageLane Lane, HexView View)> fullViews = [];
     private readonly List<(PacketField Field, Border Row)> fieldRows = [];
     private RecordInspectorViewModel? model;
@@ -24,7 +27,7 @@ internal sealed partial class RecordInspectorView : UserControl
     private Button? toggle;
     private CoverageMatrix? matrix;
     private HexView? hexView;
-    private StackPanel? fieldList;
+    private ScrollViewer? fieldScroll;
     private WrapPanel? layerTabs;
     private ContentControl? selectionDetails;
     private string? renderedLayer;
@@ -87,7 +90,7 @@ internal sealed partial class RecordInspectorView : UserControl
         fullSlot = null;
         toggle = null;
         locationLabel = null;
-        fieldList = null;
+        fieldScroll = null;
         selectionDetails = null;
         layerTabs = null;
         fieldRows.Clear();
@@ -139,16 +142,18 @@ internal sealed partial class RecordInspectorView : UserControl
         var name = Label(RecordStatus.Title(anchor, row.Group, row.Index), 20, weight: Demi);
         name.FontFamily = Display;
         name.LineHeight = 28;
-        var details = Label($"{anchor.Time.Format()} · {anchor.Context} · 捕获 {anchor.Length} B / 原始 {anchor.OriginalLength} B",
-            11, Muted, mono: true);
+        var detailText = UiText.Format(Strings.RecordDetails, anchor.Time.Format(), anchor.Context, anchor.Length, anchor.OriginalLength);
+        var details = Label(detailText, 11, Muted, mono: true);
         details.LineHeight = 16;
-        ToolTip.SetTip(details, $"{anchor.Time.Format(date: true)} · {anchor.Block} · 文件偏移 0x{anchor.DataOffset:X}");
-        var marker = Eyebrow($"RECORD {Number(row.Index)}");
+        var fileLocation = UiText.Format(Strings.RecordLocationTooltip, anchor.Time.Format(date: true), anchor.Block, anchor.DataOffset);
+        ToolTip.SetTip(details, fileLocation);
+        var recordNumber = UiText.Format(Strings.RecordHeading, Number(row.Index));
+        var marker = Eyebrow(recordNumber);
         marker.LineHeight = 16;
         var main = Vertical(5, marker, name, details);
-        var ends = Horizontal(10, Endpoint("源地址", summary.SourceAddress),
+        var ends = Horizontal(10, Endpoint(Strings.SourceAddress, summary.SourceAddress),
             Label("→", 14, Muted),
-            Endpoint("目的地址", summary.DestinationAddress));
+            Endpoint(Strings.DestinationAddress, summary.DestinationAddress));
         ends.HorizontalAlignment = HorizontalAlignment.Right;
         var grid = new Grid();
         grid.Children.Add(main);
@@ -179,7 +184,7 @@ internal sealed partial class RecordInspectorView : UserControl
         var view = source.Data;
         var origin = source.Origin;
         var coordinates = source.Coordinates;
-        var fieldHeader = PanelHeading("M5 2V17Q5 21 9 21H14 M5 8H14 M14 5H20V11H14Z M14 17H20V23H14Z", "协议字段", origin);
+        var fieldHeader = PanelHeading("M5 2V17Q5 21 9 21H14 M5 8H14 M14 5H20V11H14Z M14 17H20V23H14Z", Strings.ProtocolFields, origin);
         layerTabs = new WrapPanel { Margin = new Thickness(9, 5), ItemSpacing = 4 };
         foreach (var layer in view.Fields.Select(item => item.Layer).Distinct())
         {
@@ -190,15 +195,15 @@ internal sealed partial class RecordInspectorView : UserControl
             button.MinHeight = 24;
             layerTabs.Children.Add(button);
         }
-        fieldList = new StackPanel();
-        var fieldScroll = new ScrollViewer { MaxHeight = 200, Content = fieldList };
-        AutomationProperties.SetName(fieldScroll, "当前协议字段");
+        var fields = new ScrollViewer { Content = new StackPanel(), VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        fieldScroll = fields;
+        AutomationProperties.SetName(fields, Strings.CurrentProtocolFields);
 
         var tabBorder = LineBelow(layerTabs, default);
-        var fieldContent = Vertical(0, fieldHeader, tabBorder, fieldScroll);
+        var fieldContent = Vertical(0, fieldHeader, tabBorder, fields);
         var fieldCard = Card(fieldContent);
         fieldCard.VerticalAlignment = VerticalAlignment.Top;
-        var bytesHeader = PanelHeading("M8 3L2 10L8 17 M16 3L22 10L16 17 M14 1L10 19", $"{origin}字节", $"{view.Bytes.Length} B · {coordinates}");
+        var bytesHeader = PanelHeading("M8 3L2 10L8 17 M16 3L22 10L16 17 M14 1L10 19", UiText.Format(Strings.EvidenceBytes, origin), $"{view.Bytes.Length} B · {coordinates}");
         hexView = new HexView(view.Bytes, compact: false, model!.PickByteCommand.Execute)
         {
             Margin = new Thickness(12, 7, 12, 7),
@@ -234,7 +239,7 @@ internal sealed partial class RecordInspectorView : UserControl
             Grid.SetColumn(byteCard, narrow ? 0 : 1);
             Grid.SetRow(byteCard, narrow ? 1 : 0);
             fieldCard.VerticalAlignment = narrow ? VerticalAlignment.Top : VerticalAlignment.Stretch;
-            fieldScroll.MaxHeight = narrow ? 150 : 200;
+            fields.MaxHeight = FieldRowHeight * (narrow ? 4 : 6);
         }
     }
 
@@ -250,10 +255,11 @@ internal sealed partial class RecordInspectorView : UserControl
 
     private void ShowFieldLayer(string layer)
     {
-        if (fieldList is null || layerTabs is null || model?.Evidence is not { } source)
+        if (fieldScroll?.Content is not StackPanel fieldList || layerTabs is null || model?.Evidence is not { } source)
             return;
 
         renderedLayer = layer;
+        fieldScroll.Offset = default;
         fieldRows.Clear();
         fieldList.Children.Clear();
         foreach (var button in layerTabs.Children.OfType<Button>())
@@ -269,11 +275,11 @@ internal sealed partial class RecordInspectorView : UserControl
             var cells = LayoutGrid("1*,1.7*,70", name, value, range);
             cells.ColumnSpacing = 7;
             var button = CommandButton(cells, model!.ChooseFieldCommand,
-                $"{item.Name} · {item.Value} · {item.Range?.Label ?? "无确定偏移"}", item);
+                $"{item.Name} · {item.Value} · {item.Range?.Label ?? Strings.NoKnownOffset}", item);
             button.HorizontalAlignment = HorizontalAlignment.Stretch;
             button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
             button.Padding = new Thickness(12, 3, 10, 3);
-            button.MinHeight = 25;
+            button.MinHeight = FieldRowHeight - 1;
             button.CornerRadius = default;
             var row = LineBelow(button, default);
             fieldList.Children.Add(row);
@@ -326,7 +332,21 @@ internal sealed partial class RecordInspectorView : UserControl
                 ((TextBlock)cells.Children[0]).Foreground = focused ? Accent : Text;
                 ((TextBlock)cells.Children[1]).Foreground = focused ? Accent : Text;
             }
+            if (focused && fieldScroll is { } scroll)
+                Dispatcher.UIThread.Post(() => RevealField(scroll, row, item), DispatcherPriority.Loaded);
         }
+    }
+
+    private void RevealField(ScrollViewer scroll, Border row, PacketField field)
+    {
+        if (fieldScroll != scroll || model?.Selection.Field != field || row.Parent != scroll.Content || scroll.Viewport.Height <= 0)
+            return;
+
+        var offset = scroll.Offset.Y;
+        var bounds = row.Bounds;
+        var top = bounds.Y;
+        var bottom = bounds.Bottom - scroll.Viewport.Height;
+        scroll.Offset = new Vector(0, Math.Clamp(offset, Math.Min(top, bottom), top));
     }
 
     private Control MakeCoverage(FragmentCoverage coverage)
@@ -334,7 +354,7 @@ internal sealed partial class RecordInspectorView : UserControl
         var group = coverage.Group;
         var data = coverage.Data;
         var status = ForGroup(group);
-        var name = Horizontal(9, Label("分片覆盖图", 16, weight: Demi),
+        var name = Horizontal(9, Label(Strings.FragmentCoverage, 16, weight: Demi),
             Label(group.Identity, 12, Muted, mono: true),
             Badge(status));
         toggle = CommandButton(Label(model!.ToggleLabel), model.ToggleFullCommand, model.ToggleLabel);
@@ -408,8 +428,8 @@ internal sealed partial class RecordInspectorView : UserControl
             Grid.SetColumn(card, n);
             cards.Children.Add(card);
         }
-        var previous = CommandButton(Label("上一组"), model!.PreviousPageCommand, "上一组");
-        var next = CommandButton(Label("下一组"), model.NextPageCommand, "下一组");
+        var previous = CommandButton(Label(Strings.PreviousGroup), model!.PreviousPageCommand, Strings.PreviousGroup);
+        var next = CommandButton(Label(Strings.NextGroup), model.NextPageCommand, Strings.NextGroup);
         var pageControls = Horizontal(4, previous, Label(page.Caption, 11, Muted), next);
         pageControls.IsVisible = page.HasPages;
         var scroll = new ScrollViewer { Content = cards, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -430,7 +450,7 @@ internal sealed partial class RecordInspectorView : UserControl
         var button = CommandButton(title, model!.ChooseSourceCommand, lane.Label, lane.Record);
         button.HorizontalAlignment = HorizontalAlignment.Stretch;
         button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
-        var origin = Label($"{(lane.Derived ? "IP" : "帧")}起点 0x0000 · 分片载荷始于 0x{lane.Slice.Start:X4}", 10, Muted);
+        var origin = Label(UiText.Format(Strings.FragmentStartsAt, (lane.Derived ? "IP" : Strings.Frame), lane.Slice.Start), 10, Muted);
 
         return new Border
         {

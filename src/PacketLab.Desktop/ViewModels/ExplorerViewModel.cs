@@ -1,3 +1,4 @@
+using PacketLab.Desktop.Localization;
 using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -40,11 +41,12 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
     public IRelayCommand ClearFilterCommand { get; }
     public IRelayCommand ShowMetadataCommand { get; }
     public IRelayCommand CloseMetadataCommand { get; }
+    public ToolNavigationViewModel Navigation { get; } = new();
     public RecordInspectorViewModel Inspector { get; } = new();
     public ExplorerHeader Header { get; private set; }
     public RecordItems Items => items;
     public string ListCount => $"{items.Count:N0} / {snapshot.Count:N0}";
-    public string FooterCount => $"显示 {ListCount} 条";
+    public string FooterCount => UiText.Format(Strings.DisplayedRecordCount, ListCount);
     public bool NoMatches => snapshot.Count > 0 && items.Count == 0;
     public bool AllSelected => filter == RecordFilter.All;
     public bool DiagnosticsSelected => filter == RecordFilter.Diagnostics;
@@ -103,7 +105,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
         {
             if (!disposed)
             {
-                openError = exception.Message;
+                openError = Strings.FilePickerError;
                 UpdateHeader();
             }
         }
@@ -115,6 +117,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
             return;
 
         Metadata = null;
+        Navigation.CloseDrawerCommand.Execute(null);
         var token = lifetime.Token;
         var revision = ++loadRevision;
         SetLoading(true);
@@ -134,7 +137,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
             token.ThrowIfCancellationRequested();
             SetLoading(false);
             if (complete.Format == "—")
-                ShowOpenError(path, complete.Error ?? "无法识别抓包格式。");
+                ShowOpenError(path, complete.Error ?? Strings.UnrecognizedCapture);
             else
                 await PublishAsync(current, complete);
         }
@@ -146,7 +149,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
             if (!token.IsCancellationRequested)
             {
                 SetLoading(false);
-                ShowOpenError(path, exception.Message);
+                ShowOpenError(path, CaptureDiagnostics.ReadFailure(exception));
             }
         }
         finally
@@ -189,7 +192,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
 
     private void ShowOpenError(string path, string message)
     {
-        openError = $"{Path.GetFileName(path)}：{message}";
+        openError = UiText.Format(Strings.FileErrorForName, Path.GetFileName(path), message);
         UpdateHeader();
     }
 
@@ -205,11 +208,11 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
         var name = Path.GetFileName(path) ?? "";
         var (title, hint, action) = (loading, path) switch
         {
-            (true, _) => ("正在读取抓包文件", "正在本地读取文件…", "正在读取…"),
-            (false, not null) => ("没有可预览的记录", $"{name} 中没有捕获记录。", "选择其他文件"),
-            _ => ("打开抓包文件", "选择本地 PCAP 或 PCAPNG 文件以查看捕获记录。", "选择文件")
+            (true, _) => (Strings.ReadingCapture, Strings.ReadingLocalFile, Strings.Reading),
+            (false, not null) => (Strings.NoPreviewableRecords, UiText.Format(Strings.EmptyCapture, name), Strings.ChooseAnotherFile),
+            _ => (Strings.OpenCapture, Strings.ChooseCaptureHint, Strings.ChooseFile)
         };
-        var footer = loading ? "正在索引捕获记录…" : path ?? "";
+        var footer = loading ? Strings.IndexingCapture : path ?? "";
         var error = openError ?? snapshot.Error;
         var count = snapshot.Count.ToString("00");
         var groups = snapshot.Groups.ToString("00");

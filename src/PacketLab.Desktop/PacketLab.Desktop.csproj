@@ -5,8 +5,15 @@
     <IsAotCompatible>true</IsAotCompatible>
     <PublishAot>true</PublishAot>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Update="Localization/Strings.resx"
+                      StronglyTypedLanguage="C#"
+                      StronglyTypedNamespace="PacketLab.Desktop.Localization"
+                      StronglyTypedClassName="Strings"
+                      StronglyTypedFileName="$(IntermediateOutputPath)Strings.Designer.cs"
+                      PublicClass="true" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />

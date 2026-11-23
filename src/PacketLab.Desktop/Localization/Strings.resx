@@ -1,0 +1,1302 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AcknowledgmentNumber" xml:space="preserve">
+    <value>Acknowledgment number</value>
+  </data>
+  <data name="AllFiles" xml:space="preserve">
+    <value>All files</value>
+  </data>
+  <data name="AllRecords" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="ArpOpcode" xml:space="preserve">
+    <value>ARP opcode {0}</value>
+  </data>
+  <data name="ArpOperationReply" xml:space="preserve">
+    <value>2 · Reply</value>
+  </data>
+  <data name="ArpOperationRequest" xml:space="preserve">
+    <value>1 · Request</value>
+  </data>
+  <data name="ArpProbe" xml:space="preserve">
+    <value>ARP address probe</value>
+  </data>
+  <data name="ArpReply" xml:space="preserve">
+    <value>ARP reply</value>
+  </data>
+  <data name="ArpRequest" xml:space="preserve">
+    <value>ARP request</value>
+  </data>
+  <data name="ArpSimplePacket" xml:space="preserve">
+    <value>ARP request · Simple Packet</value>
+  </data>
+  <data name="AssociationLimitDiscarded" xml:space="preserve">
+    <value>Reassembly was discarded because the associated record limit was exceeded.</value>
+  </data>
+  <data name="AssociationLimitReached" xml:space="preserve">
+    <value>Associated record limit reached</value>
+  </data>
+  <data name="AwaitingMoreFragments" xml:space="preserve">
+    <value>{0} awaiting more fragments</value>
+  </data>
+  <data name="BigEndian" xml:space="preserve">
+    <value>Big-endian</value>
+  </data>
+  <data name="ByteOffset" xml:space="preserve">
+    <value>OFFSET</value>
+  </data>
+  <data name="ByteOrder" xml:space="preserve">
+    <value>Byte order</value>
+  </data>
+  <data name="BytesAfter" xml:space="preserve">
+    <value>Bytes after {0}</value>
+  </data>
+  <data name="BytesBeyondUdpLength" xml:space="preserve">
+    <value>Bytes beyond UDP length</value>
+  </data>
+  <data name="CannotReadFragmentBytes" xml:space="preserve">
+    <value>Unable to read fragment bytes · {0}</value>
+  </data>
+  <data name="CannotReadFullBytes" xml:space="preserve">
+    <value>Unable to read full bytes · {0}</value>
+  </data>
+  <data name="CannotReadRecordBytes" xml:space="preserve">
+    <value>Unable to read record bytes · {0}</value>
+  </data>
+  <data name="Capture" xml:space="preserve">
+    <value>Capture</value>
+  </data>
+  <data name="CaptureChanged" xml:space="preserve">
+    <value>The capture file changed while it was being read.</value>
+  </data>
+  <data name="CaptureContext" xml:space="preserve">
+    <value>Capture context</value>
+  </data>
+  <data name="CaptureErrorAtOffset" xml:space="preserve">
+    <value>File offset {0:N0} (0x{1:X}){2} · {3}</value>
+  </data>
+  <data name="CaptureFiles" xml:space="preserve">
+    <value>Capture files</value>
+  </data>
+  <data name="CaptureMetadata" xml:space="preserve">
+    <value>Capture metadata</value>
+  </data>
+  <data name="CaptureRecordList" xml:space="preserve">
+    <value>Capture record list</value>
+  </data>
+  <data name="CaptureRecordStructure" xml:space="preserve">
+    <value>{0:N0} records · {1}</value>
+  </data>
+  <data name="CaptureRecords" xml:space="preserve">
+    <value>Capture records</value>
+  </data>
+  <data name="CaptureStructure" xml:space="preserve">
+    <value>Capture structure</value>
+  </data>
+  <data name="CaptureTime" xml:space="preserve">
+    <value>Capture time</value>
+  </data>
+  <data name="CapturedFragment" xml:space="preserve">
+    <value>Captured fragment</value>
+  </data>
+  <data name="CapturedOriginalLength" xml:space="preserve">
+    <value>Captured / original length</value>
+  </data>
+  <data name="CapturedPayload" xml:space="preserve">
+    <value>Captured payload</value>
+  </data>
+  <data name="Checksum" xml:space="preserve">
+    <value>Checksum</value>
+  </data>
+  <data name="ChecksumStatus" xml:space="preserve">
+    <value>Checksum status</value>
+  </data>
+  <data name="ChooseAnotherCapture" xml:space="preserve">
+    <value>Choose another capture file</value>
+  </data>
+  <data name="ChooseAnotherFile" xml:space="preserve">
+    <value>Choose another file</value>
+  </data>
+  <data name="ChooseCaptureHint" xml:space="preserve">
+    <value>Choose a local PCAP or PCAPNG file to inspect its records.</value>
+  </data>
+  <data name="ChooseFile" xml:space="preserve">
+    <value>Choose file</value>
+  </data>
+  <data name="ClearFilters" xml:space="preserve">
+    <value>Clear filters</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="CloseNavigation" xml:space="preserve">
+    <value>Close tool navigation</value>
+  </data>
+  <data name="CloseWindow" xml:space="preserve">
+    <value>Close window</value>
+  </data>
+  <data name="CollapseGroup" xml:space="preserve">
+    <value>Collapse {0}</value>
+  </data>
+  <data name="CollapseNavigation" xml:space="preserve">
+    <value>Collapse navigation</value>
+  </data>
+  <data name="CompleteCoverage" xml:space="preserve">
+    <value>Full coverage of {0} B</value>
+  </data>
+  <data name="CurrentProtocolFields" xml:space="preserve">
+    <value>Current protocol fields</value>
+  </data>
+  <data name="CurrentRecord" xml:space="preserve">
+    <value>Current record {0}</value>
+  </data>
+  <data name="DeclaredFragmentLength" xml:space="preserve">
+    <value>Declared fragment length</value>
+  </data>
+  <data name="DeclaredPayloadLength" xml:space="preserve">
+    <value>Declared payload length</value>
+  </data>
+  <data name="DestinationAddress" xml:space="preserve">
+    <value>Destination address</value>
+  </data>
+  <data name="DestinationMac" xml:space="preserve">
+    <value>Destination MAC</value>
+  </data>
+  <data name="DestinationOptionsHeader" xml:space="preserve">
+    <value>Destination options</value>
+  </data>
+  <data name="DestinationPort" xml:space="preserve">
+    <value>Destination port</value>
+  </data>
+  <data name="DiagnosticRecords" xml:space="preserve">
+    <value>Diagnostics</value>
+  </data>
+  <data name="Diagnostics" xml:space="preserve">
+    <value>Issues</value>
+  </data>
+  <data name="DirectoryMissing" xml:space="preserve">
+    <value>The capture file directory could not be found.</value>
+  </data>
+  <data name="DisplayedRecordCount" xml:space="preserve">
+    <value>Showing {0} records</value>
+  </data>
+  <data name="EffectiveLength" xml:space="preserve">
+    <value>Effective length</value>
+  </data>
+  <data name="EffectivePayloadLength" xml:space="preserve">
+    <value>Effective payload length</value>
+  </data>
+  <data name="EmptyCapture" xml:space="preserve">
+    <value>{0} contains no capture records.</value>
+  </data>
+  <data name="EndOfOptions" xml:space="preserve">
+    <value>End of options</value>
+  </data>
+  <data name="EthernetHeaderTooShort" xml:space="preserve">
+    <value>Ethernet header too short</value>
+  </data>
+  <data name="EthernetRequiredBytes" xml:space="preserve">
+    <value>Requires 14 B · Captured {0} B</value>
+  </data>
+  <data name="EvidenceBytes" xml:space="preserve">
+    <value>{0} bytes</value>
+  </data>
+  <data name="ExpandGroup" xml:space="preserve">
+    <value>Expand {0}</value>
+  </data>
+  <data name="ExpandNavigation" xml:space="preserve">
+    <value>Expand navigation</value>
+  </data>
+  <data name="ExtensionData" xml:space="preserve">
+    <value>Extension data</value>
+  </data>
+  <data name="ExtensionLength" xml:space="preserve">
+    <value>Extension length</value>
+  </data>
+  <data name="ExtensionType" xml:space="preserve">
+    <value>Extension {0}</value>
+  </data>
+  <data name="FileAccessDenied" xml:space="preserve">
+    <value>Permission was denied while reading this file.</value>
+  </data>
+  <data name="FileAndFormat" xml:space="preserve">
+    <value>File and format</value>
+  </data>
+  <data name="FileErrorForName" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="FileIoError" xml:space="preserve">
+    <value>File I/O failed (error 0x{0:X8}).</value>
+  </data>
+  <data name="FileMissing" xml:space="preserve">
+    <value>The capture file could not be found.</value>
+  </data>
+  <data name="FilePathTooLong" xml:space="preserve">
+    <value>The file path is too long.</value>
+  </data>
+  <data name="FilePickerError" xml:space="preserve">
+    <value>The file picker could not be opened.</value>
+  </data>
+  <data name="FileReadError" xml:space="preserve">
+    <value>× File read error</value>
+  </data>
+  <data name="FinalFragment" xml:space="preserve">
+    <value>Final fragment</value>
+  </data>
+  <data name="FinalFragmentFirst" xml:space="preserve">
+    <value>{0} final fragment arrived first</value>
+  </data>
+  <data name="FirstFragment" xml:space="preserve">
+    <value>First fragment</value>
+  </data>
+  <data name="FirstFragmentOf" xml:space="preserve">
+    <value>{0} first fragment</value>
+  </data>
+  <data name="Flags" xml:space="preserve">
+    <value>Flags</value>
+  </data>
+  <data name="FlagsAndFragmentOffset" xml:space="preserve">
+    <value>Flags / fragment offset</value>
+  </data>
+  <data name="FractionOutOfRange" xml:space="preserve">
+    <value>{0} · Out of range</value>
+  </data>
+  <data name="FragmentByteTooltip" xml:space="preserve">
+    <value>{0} · 0x{1:X4} · Payload +{2} B · {3:X2}</value>
+  </data>
+  <data name="FragmentCoverage" xml:space="preserve">
+    <value>Fragment coverage</value>
+  </data>
+  <data name="FragmentCoverageAndBytes" xml:space="preserve">
+    <value>Fragment coverage and byte comparison</value>
+  </data>
+  <data name="FragmentExtensionHeader" xml:space="preserve">
+    <value>Fragment</value>
+  </data>
+  <data name="FragmentFlagAndOffset" xml:space="preserve">
+    <value>{0} is {1}, with a fragment offset of {2} B.</value>
+  </data>
+  <data name="FragmentGroupDiscarded" xml:space="preserve">
+    <value>{0} fragment group discarded</value>
+  </data>
+  <data name="FragmentGroups" xml:space="preserve">
+    <value>Fragment groups</value>
+  </data>
+  <data name="FragmentOffsetAndMore" xml:space="preserve">
+    <value>Fragment offset / M</value>
+  </data>
+  <data name="FragmentOverlap" xml:space="preserve">
+    <value>{0} fragment overlap</value>
+  </data>
+  <data name="FragmentPayload" xml:space="preserve">
+    <value>Fragment payload</value>
+  </data>
+  <data name="FragmentPayloadOffset" xml:space="preserve">
+    <value>Payload offset / B</value>
+  </data>
+  <data name="FragmentStartsAt" xml:space="preserve">
+    <value>{0} origin 0x0000 · Fragment payload starts at 0x{1:X4}</value>
+  </data>
+  <data name="FragmentTruncated" xml:space="preserve">
+    <value>{0} fragment truncated</value>
+  </data>
+  <data name="Fragments" xml:space="preserve">
+    <value>Fragments</value>
+  </data>
+  <data name="Frame" xml:space="preserve">
+    <value>Frame</value>
+  </data>
+  <data name="FrameOrigin" xml:space="preserve">
+    <value>Frame origin</value>
+  </data>
+  <data name="FullBytes" xml:space="preserve">
+    <value>Full bytes</value>
+  </data>
+  <data name="Global" xml:space="preserve">
+    <value>Global</value>
+  </data>
+  <data name="GlobalLinkNoSection" xml:space="preserve">
+    <value>Global link information · Sections do not apply</value>
+  </data>
+  <data name="HardwareAddressLength" xml:space="preserve">
+    <value>Hardware address length</value>
+  </data>
+  <data name="HardwareType" xml:space="preserve">
+    <value>Hardware type</value>
+  </data>
+  <data name="HeaderChecksum" xml:space="preserve">
+    <value>Header checksum</value>
+  </data>
+  <data name="HeaderLength" xml:space="preserve">
+    <value>Header length</value>
+  </data>
+  <data name="HexAndAscii" xml:space="preserve">
+    <value>Hexadecimal and ASCII</value>
+  </data>
+  <data name="HideFullBytes" xml:space="preserve">
+    <value>Hide full bytes ▴</value>
+  </data>
+  <data name="HopByHopHeader" xml:space="preserve">
+    <value>Hop-by-Hop</value>
+  </data>
+  <data name="HopCount" xml:space="preserve">
+    <value>{0} hops</value>
+  </data>
+  <data name="HopLimit" xml:space="preserve">
+    <value>Hop limit</value>
+  </data>
+  <data name="Identification" xml:space="preserve">
+    <value>Identification</value>
+  </data>
+  <data name="IeeeLength" xml:space="preserve">
+    <value>802.3 length</value>
+  </data>
+  <data name="IncompleteArpAddress" xml:space="preserve">
+    <value>Incomplete ARP address</value>
+  </data>
+  <data name="IncompleteCaptureHeader" xml:space="preserve">
+    <value>Incomplete file header. Expected 24 bytes, received {0}.</value>
+  </data>
+  <data name="IncompletePacketData" xml:space="preserve">
+    <value>Incomplete packet data. Expected {0} bytes, received {1}.</value>
+  </data>
+  <data name="IncompleteRecordHeader" xml:space="preserve">
+    <value>Incomplete record header. Expected 16 bytes, received {0}.</value>
+  </data>
+  <data name="IndexingCapture" xml:space="preserve">
+    <value>Indexing capture records…</value>
+  </data>
+  <data name="Invalid" xml:space="preserve">
+    <value>Invalid</value>
+  </data>
+  <data name="InvalidCaptureMagic" xml:space="preserve">
+    <value>Unknown PCAP magic number 0x{0:X8}.</value>
+  </data>
+  <data name="InvalidFilePath" xml:space="preserve">
+    <value>The file path or format is invalid.</value>
+  </data>
+  <data name="InvalidIhl" xml:space="preserve">
+    <value>Invalid IHL</value>
+  </data>
+  <data name="InvalidLengthType" xml:space="preserve">
+    <value>Invalid length / type</value>
+  </data>
+  <data name="InvalidLinkTypeBits" xml:space="preserve">
+    <value>LinkType R and Reserved3 bits must be zero (raw value 0x{0:X8}).</value>
+  </data>
+  <data name="InvalidOption" xml:space="preserve">
+    <value>Invalid option</value>
+  </data>
+  <data name="InvalidOptionLength" xml:space="preserve">
+    <value>Invalid option length</value>
+  </data>
+  <data name="InvalidProtocolField" xml:space="preserve">
+    <value>{0} invalid field</value>
+  </data>
+  <data name="InvalidSnapLen" xml:space="preserve">
+    <value>SnapLen must be nonzero.</value>
+  </data>
+  <data name="InvalidTcpDataOffset" xml:space="preserve">
+    <value>Data offset below 5</value>
+  </data>
+  <data name="InvalidTimestampValue" xml:space="preserve">
+    <value>Invalid · {0} s / {1} {2}</value>
+  </data>
+  <data name="InvalidTotalLength" xml:space="preserve">
+    <value>Invalid total length</value>
+  </data>
+  <data name="InvalidUdpLengthField" xml:space="preserve">
+    <value>Invalid UDP length field</value>
+  </data>
+  <data name="InvalidUdpLengthFromIp" xml:space="preserve">
+    <value>Invalid UDP length declared by IP · {0}</value>
+  </data>
+  <data name="InvalidUdpLengthOrChecksum" xml:space="preserve">
+    <value>Invalid UDP length or checksum</value>
+  </data>
+  <data name="InvalidUpperLayerLength" xml:space="preserve">
+    <value>Invalid upper-layer length</value>
+  </data>
+  <data name="InvalidVersion" xml:space="preserve">
+    <value>Invalid version</value>
+  </data>
+  <data name="IpDatagram" xml:space="preserve">
+    <value>IP datagram</value>
+  </data>
+  <data name="Ipv4Options" xml:space="preserve">
+    <value>IPv4 options</value>
+  </data>
+  <data name="Ipv6AtomicFragment" xml:space="preserve">
+    <value>IPv6 atomic fragment</value>
+  </data>
+  <data name="Ipv6DestinationUnavailable" xml:space="preserve">
+    <value>The final destination address for checksum verification is unavailable</value>
+  </data>
+  <data name="Ipv6DuplicateFragment" xml:space="preserve">
+    <value>Duplicate Fragment header</value>
+  </data>
+  <data name="Ipv6EncryptedEsp" xml:space="preserve">
+    <value>ESP content is encrypted</value>
+  </data>
+  <data name="Ipv6ExtensionExceedsPayload" xml:space="preserve">
+    <value>Extension header exceeds the declared payload</value>
+  </data>
+  <data name="Ipv6ExtensionLengthInvalid" xml:space="preserve">
+    <value>Invalid extension header length</value>
+  </data>
+  <data name="Ipv6ExtensionTruncated" xml:space="preserve">
+    <value>Truncated extension header</value>
+  </data>
+  <data name="Ipv6FirstFragmentWithExtensions" xml:space="preserve">
+    <value>IPv6 first fragment · Extension chain</value>
+  </data>
+  <data name="Ipv6HeaderCaptureLength" xml:space="preserve">
+    <value>Header {0} requires {1} B, captured {2} B</value>
+  </data>
+  <data name="Ipv6HeaderRemainingLength" xml:space="preserve">
+    <value>Header {0} requires {1} B, declared remainder {2} B</value>
+  </data>
+  <data name="Ipv6HopByHopPosition" xml:space="preserve">
+    <value>Hop-by-Hop options must follow the fixed header</value>
+  </data>
+  <data name="Ipv6InvalidAhLength" xml:space="preserve">
+    <value>AH length {0} B must include 12 fixed bytes and be a multiple of 8</value>
+  </data>
+  <data name="Ipv6JumboFragment" xml:space="preserve">
+    <value>Jumbo Payload cannot be used with a Fragment header</value>
+  </data>
+  <data name="Ipv6JumboInvalid" xml:space="preserve">
+    <value>Invalid Jumbo Payload option</value>
+  </data>
+  <data name="Ipv6JumboMissing" xml:space="preserve">
+    <value>Missing Jumbo Payload option</value>
+  </data>
+  <data name="Ipv6OptionInvalid" xml:space="preserve">
+    <value>Invalid extension header options</value>
+  </data>
+  <data name="Ipv6OverlapDiscarded" xml:space="preserve">
+    <value>Overlapping IPv6 fragments caused the entire group to be discarded.</value>
+  </data>
+  <data name="Ipv6PayloadCaptureLengths" xml:space="preserve">
+    <value>Declared payload {0} B, captured {1} B</value>
+  </data>
+  <data name="Ipv6PayloadTruncated" xml:space="preserve">
+    <value>Payload was not fully captured</value>
+  </data>
+  <data name="Ipv6ReassemblyRequired" xml:space="preserve">
+    <value>Reassembly is required to read the complete upper layer</value>
+  </data>
+  <data name="Ipv6RoutingContext" xml:space="preserve">
+    <value>Routing Type {0}, Segments Left {1}</value>
+  </data>
+  <data name="Ipv6SourceUnavailable" xml:space="preserve">
+    <value>The source address for checksum verification is unavailable</value>
+  </data>
+  <data name="Ipv6UdpAfterExtensions" xml:space="preserve">
+    <value>UDP after IPv6 extensions</value>
+  </data>
+  <data name="Ipv6UnsupportedHeader" xml:space="preserve">
+    <value>Unsupported Next Header type</value>
+  </data>
+  <data name="Ipv6UnsupportedHeaderNumber" xml:space="preserve">
+    <value>Next Header {0}, upper-layer data unavailable</value>
+  </data>
+  <data name="IssueChecksumMismatch" xml:space="preserve">
+    <value>The captured checksum differs from the computed value. Checksum offloading may be responsible.</value>
+  </data>
+  <data name="IssueChecksumUnavailable" xml:space="preserve">
+    <value>The checksum could not be verified.</value>
+  </data>
+  <data name="IssueInvalidCaptureLength" xml:space="preserve">
+    <value>The declared original length is smaller than the captured length.</value>
+  </data>
+  <data name="IssueInvalidFields" xml:space="preserve">
+    <value>The packet contains invalid protocol fields.</value>
+  </data>
+  <data name="IssueInvalidTimestamp" xml:space="preserve">
+    <value>The timestamp fraction is out of range. The original value is retained.</value>
+  </data>
+  <data name="IssueNoTimestamp" xml:space="preserve">
+    <value>This record has no timestamp.</value>
+  </data>
+  <data name="IssueTruncated" xml:space="preserve">
+    <value>The packet or protocol header was not fully captured.</value>
+  </data>
+  <data name="IssueUnknownValues" xml:space="preserve">
+    <value>Unknown fields and options retain their original values.</value>
+  </data>
+  <data name="IssueUnsupportedProtocol" xml:space="preserve">
+    <value>This encapsulation or protocol is unsupported. The raw bytes are available for inspection.</value>
+  </data>
+  <data name="JumboPayloadLength" xml:space="preserve">
+    <value>Jumbo payload length</value>
+  </data>
+  <data name="LengthAndHeaderSize" xml:space="preserve">
+    <value>{0} · Header {1}</value>
+  </data>
+  <data name="LengthExceedsSnapLen" xml:space="preserve">
+    <value>Captured length {0} exceeds SnapLen {1}.</value>
+  </data>
+  <data name="Link" xml:space="preserve">
+    <value>Link</value>
+  </data>
+  <data name="LinkType" xml:space="preserve">
+    <value>Link type</value>
+  </data>
+  <data name="ListSeparator" xml:space="preserve">
+    <value>, </value>
+  </data>
+  <data name="LittleEndian" xml:space="preserve">
+    <value>Little-endian</value>
+  </data>
+  <data name="LiveCapture" xml:space="preserve">
+    <value>Live capture</value>
+  </data>
+  <data name="Match" xml:space="preserve">
+    <value>Match</value>
+  </data>
+  <data name="MaximizeWindow" xml:space="preserve">
+    <value>Maximize</value>
+  </data>
+  <data name="MetadataButtonLabel" xml:space="preserve">
+    <value>Metadata</value>
+  </data>
+  <data name="Microseconds" xml:space="preserve">
+    <value>μs</value>
+  </data>
+  <data name="MiddleFragment" xml:space="preserve">
+    <value>Middle fragment</value>
+  </data>
+  <data name="MinimizeWindow" xml:space="preserve">
+    <value>Minimize</value>
+  </data>
+  <data name="Mismatch" xml:space="preserve">
+    <value>Mismatch</value>
+  </data>
+  <data name="MissingAtEndOfCapture" xml:space="preserve">
+    <value>Fragments were still missing at the end of the capture.</value>
+  </data>
+  <data name="MissingAtEndOfSection" xml:space="preserve">
+    <value>Fragments were still missing at the end of the section.</value>
+  </data>
+  <data name="MissingFragments" xml:space="preserve">
+    <value>{0} missing fragments</value>
+  </data>
+  <data name="NamedFrame" xml:space="preserve">
+    <value>Frame {0}</value>
+  </data>
+  <data name="NamedRecordsAndTotal" xml:space="preserve">
+    <value>{0} ({1} records total)</value>
+  </data>
+  <data name="Nanoseconds" xml:space="preserve">
+    <value>ns</value>
+  </data>
+  <data name="NetworkExperiments" xml:space="preserve">
+    <value>Network experiments</value>
+  </data>
+  <data name="NextGroup" xml:space="preserve">
+    <value>Next group</value>
+  </data>
+  <data name="NextHeader" xml:space="preserve">
+    <value>Next header</value>
+  </data>
+  <data name="NoDescription" xml:space="preserve">
+    <value>Description unavailable</value>
+  </data>
+  <data name="NoInterfaceName" xml:space="preserve">
+    <value>Interface name unavailable</value>
+  </data>
+  <data name="NoKnownOffset" xml:space="preserve">
+    <value>No known offset</value>
+  </data>
+  <data name="NoMatchingRecords" xml:space="preserve">
+    <value>No matching records.</value>
+  </data>
+  <data name="NoNextHeader" xml:space="preserve">
+    <value>No next header</value>
+  </data>
+  <data name="NoPreviewableRecords" xml:space="preserve">
+    <value>No records to preview</value>
+  </data>
+  <data name="NoReassembledDatagram" xml:space="preserve">
+    <value>No reassembled datagram</value>
+  </data>
+  <data name="NoRecordsWithFilters" xml:space="preserve">
+    <value>No records to inspect with the current filters.</value>
+  </data>
+  <data name="NonZeroPadding" xml:space="preserve">
+    <value> · contains non-zero bytes</value>
+  </data>
+  <data name="NotApplicable" xml:space="preserve">
+    <value>Not applicable</value>
+  </data>
+  <data name="NotProvided" xml:space="preserve">
+    <value>Not provided</value>
+  </data>
+  <data name="OffsetNoCapturedBytes" xml:space="preserve">
+    <value>{0} B · No captured bytes</value>
+  </data>
+  <data name="Opcode" xml:space="preserve">
+    <value>Opcode</value>
+  </data>
+  <data name="OpenCapture" xml:space="preserve">
+    <value>Open a capture file</value>
+  </data>
+  <data name="OpenNavigation" xml:space="preserve">
+    <value>Open tool navigation</value>
+  </data>
+  <data name="OptionCaptureTruncated" xml:space="preserve">
+    <value>Option was not fully captured</value>
+  </data>
+  <data name="OptionExceedsHeader" xml:space="preserve">
+    <value>Option exceeds the header</value>
+  </data>
+  <data name="OptionKind" xml:space="preserve">
+    <value>Kind {0}</value>
+  </data>
+  <data name="OriginalRecord" xml:space="preserve">
+    <value>Original record {0}</value>
+  </data>
+  <data name="OverlapDifferentBytes" xml:space="preserve">
+    <value>The overlapping bytes differ.</value>
+  </data>
+  <data name="OverlapFirstFragment" xml:space="preserve">
+    <value>{0} overlapping group · First fragment</value>
+  </data>
+  <data name="OverlapIdenticalBytes" xml:space="preserve">
+    <value>The overlapping bytes match.</value>
+  </data>
+  <data name="OverlapSummary" xml:space="preserve">
+    <value>Payload overlap at {0} B (hatched). {1} {2}</value>
+  </data>
+  <data name="OverlappingFragmentRanges" xml:space="preserve">
+    <value>Fragment ranges conflict. Reassembly was discarded.</value>
+  </data>
+  <data name="PacketBytesSource" xml:space="preserve">
+    <value>Packet byte source</value>
+  </data>
+  <data name="PacketLimitExceeded" xml:space="preserve">
+    <value>Captured length {0} exceeds the single-packet limit {1}.</value>
+  </data>
+  <data name="PacketTruncated" xml:space="preserve">
+    <value>Truncated packet</value>
+  </data>
+  <data name="PaddingBytes" xml:space="preserve">
+    <value>Padding</value>
+  </data>
+  <data name="Payload" xml:space="preserve">
+    <value>Payload</value>
+  </data>
+  <data name="PayloadLength" xml:space="preserve">
+    <value>Payload length</value>
+  </data>
+  <data name="PayloadLocation" xml:space="preserve">
+    <value>Payload +{0} B  ｜  {1}  ｜  {2}</value>
+  </data>
+  <data name="PcapNgBlockAtOffset" xml:space="preserve">
+    <value>PCAPNG block at byte {0}: {1}</value>
+  </data>
+  <data name="PcapNgBlockLengthLimit" xml:space="preserve">
+    <value>Block length {0} exceeds the configured limit {1} bytes.</value>
+  </data>
+  <data name="PcapNgBlockLengthMismatch" xml:space="preserve">
+    <value>Trailing block length does not match its header.</value>
+  </data>
+  <data name="PcapNgCapturedLengthExceedsOriginal" xml:space="preserve">
+    <value>Captured length {0} exceeds original length {1}.</value>
+  </data>
+  <data name="PcapNgCapturedLengthExceedsSnapLen" xml:space="preserve">
+    <value>Captured length {0} exceeds interface SnapLen {1}.</value>
+  </data>
+  <data name="PcapNgDuplicateInterfaceOption" xml:space="preserve">
+    <value>Duplicate interface option {0}.</value>
+  </data>
+  <data name="PcapNgEnhancedPacketBlock" xml:space="preserve">
+    <value>Enhanced Packet Block</value>
+  </data>
+  <data name="PcapNgExpectedSectionHeader" xml:space="preserve">
+    <value>Expected a PCAPNG Section Header Block.</value>
+  </data>
+  <data name="PcapNgExtraSimplePacketBytes" xml:space="preserve">
+    <value>Simple Packet Blocks cannot contain options or extra packet bytes.</value>
+  </data>
+  <data name="PcapNgIncompleteOptionHeader" xml:space="preserve">
+    <value>Incomplete option header.</value>
+  </data>
+  <data name="PcapNgInvalidBlock" xml:space="preserve">
+    <value>The PCAPNG block is invalid or incomplete.</value>
+  </data>
+  <data name="PcapNgInvalidBlockLength" xml:space="preserve">
+    <value>Invalid block length {0}; expected an aligned length of at least {1}.</value>
+  </data>
+  <data name="PcapNgInvalidByteOrder" xml:space="preserve">
+    <value>Invalid byte-order magic 0x{0:X8}.</value>
+  </data>
+  <data name="PcapNgInvalidEndOfOptions" xml:space="preserve">
+    <value>End-of-options must have zero length and terminate the options.</value>
+  </data>
+  <data name="PcapNgInvalidSectionLength" xml:space="preserve">
+    <value>Invalid section length {0}.</value>
+  </data>
+  <data name="PcapNgMetadataLimit" xml:space="preserve">
+    <value>Section/interface metadata exceeds the configured limit {0} bytes.</value>
+  </data>
+  <data name="PcapNgMissingInterfaceFilterType" xml:space="preserve">
+    <value>Interface filter option requires a filter type.</value>
+  </data>
+  <data name="PcapNgOptionCountLimit" xml:space="preserve">
+    <value>Option count exceeds the configured per-block limit {0}.</value>
+  </data>
+  <data name="PcapNgOptionExceedsBlock" xml:space="preserve">
+    <value>Option {0} data and padding exceed the block body.</value>
+  </data>
+  <data name="PcapNgPacketBlock" xml:space="preserve">
+    <value>Packet Block</value>
+  </data>
+  <data name="PcapNgPacketDataExceedsBlock" xml:space="preserve">
+    <value>Captured packet data and padding exceed the block body.</value>
+  </data>
+  <data name="PcapNgPacketLengthLimit" xml:space="preserve">
+    <value>Captured length {0} exceeds the single-packet limit {1}.</value>
+  </data>
+  <data name="PcapNgPrematureEndOfSection" xml:space="preserve">
+    <value>EOF before the declared end of the section.</value>
+  </data>
+  <data name="PcapNgSectionBoundaryMismatch" xml:space="preserve">
+    <value>Block boundary does not match the declared section length.</value>
+  </data>
+  <data name="PcapNgSectionOffsetLimit" xml:space="preserve">
+    <value>Section length exceeds the supported stream offset range.</value>
+  </data>
+  <data name="PcapNgShortInterfaceDescription" xml:space="preserve">
+    <value>Interface description requires an 8-byte body.</value>
+  </data>
+  <data name="PcapNgShortInterfaceOption" xml:space="preserve">
+    <value>Interface option {0} requires {1} bytes.</value>
+  </data>
+  <data name="PcapNgShortPacketBlock" xml:space="preserve">
+    <value>Packet block requires at least {0} body bytes.</value>
+  </data>
+  <data name="PcapNgShortPacketOption" xml:space="preserve">
+    <value>Packet option {0} requires {1} bytes.</value>
+  </data>
+  <data name="PcapNgShortSectionHeader" xml:space="preserve">
+    <value>Section header requires a 16-byte body.</value>
+  </data>
+  <data name="PcapNgSimplePacketBlock" xml:space="preserve">
+    <value>Simple Packet Block</value>
+  </data>
+  <data name="PcapNgTruncatedBlock" xml:space="preserve">
+    <value>Truncated block; expected {0} bytes.</value>
+  </data>
+  <data name="PcapNgTruncatedBlockHeader" xml:space="preserve">
+    <value>Truncated block header.</value>
+  </data>
+  <data name="PcapNgTruncatedSectionBlockType" xml:space="preserve">
+    <value>Truncated section block type; expected 4 bytes.</value>
+  </data>
+  <data name="PcapNgTruncatedSectionByteOrder" xml:space="preserve">
+    <value>Truncated section byte-order magic.</value>
+  </data>
+  <data name="PcapNgUndefinedInterface" xml:space="preserve">
+    <value>Interface {0} has not been defined in this section.</value>
+  </data>
+  <data name="PcapNgUnsupportedSectionVersion" xml:space="preserve">
+    <value>Unsupported section version {0}.{1}; expected 1.0 or 1.2.</value>
+  </data>
+  <data name="PcapRecord" xml:space="preserve">
+    <value>PCAP record</value>
+  </data>
+  <data name="Permitted" xml:space="preserve">
+    <value>Permitted</value>
+  </data>
+  <data name="Planned" xml:space="preserve">
+    <value>Planned</value>
+  </data>
+  <data name="PlannedTool" xml:space="preserve">
+    <value>{0} · Planned</value>
+  </data>
+  <data name="PreviousGroup" xml:space="preserve">
+    <value>Previous group</value>
+  </data>
+  <data name="ProtocolAddressLength" xml:space="preserve">
+    <value>Protocol address length</value>
+  </data>
+  <data name="ProtocolChecksumMismatch" xml:space="preserve">
+    <value>{0} checksum mismatch</value>
+  </data>
+  <data name="ProtocolDecodingUnavailable" xml:space="preserve">
+    <value>Protocol decoding unavailable</value>
+  </data>
+  <data name="ProtocolFields" xml:space="preserve">
+    <value>Protocol fields</value>
+  </data>
+  <data name="ProtocolType" xml:space="preserve">
+    <value>Protocol type</value>
+  </data>
+  <data name="PseudoHeaderUnavailable" xml:space="preserve">
+    <value>Pseudo-header unavailable</value>
+  </data>
+  <data name="Raw" xml:space="preserve">
+    <value>Raw</value>
+  </data>
+  <data name="RawBytes" xml:space="preserve">
+    <value>Raw bytes</value>
+  </data>
+  <data name="RawOptionBytes" xml:space="preserve">
+    <value>Raw option bytes</value>
+  </data>
+  <data name="Reading" xml:space="preserve">
+    <value>Reading…</value>
+  </data>
+  <data name="ReadingCapture" xml:space="preserve">
+    <value>Reading capture file</value>
+  </data>
+  <data name="ReadingFullBytes" xml:space="preserve">
+    <value>Reading full bytes…</value>
+  </data>
+  <data name="ReadingLocalFile" xml:space="preserve">
+    <value>Reading the local file…</value>
+  </data>
+  <data name="ReadingProtocolFields" xml:space="preserve">
+    <value>Reading protocol fields…</value>
+  </data>
+  <data name="ReassembledDatagramSummary" xml:space="preserve">
+    <value>Reassembled IP datagram {0} B · {1}</value>
+  </data>
+  <data name="ReassembledIp" xml:space="preserve">
+    <value>Reassembled IP</value>
+  </data>
+  <data name="ReassembledIpDatagram" xml:space="preserve">
+    <value>Reassembled IP datagram</value>
+  </data>
+  <data name="ReassembledIpOrigin" xml:space="preserve">
+    <value>Reassembled IP origin</value>
+  </data>
+  <data name="ReassembledPayloadMembers" xml:space="preserve">
+    <value>{0} together form a {1} B IP payload.</value>
+  </data>
+  <data name="ReassemblyAborted" xml:space="preserve">
+    <value>Reassembly was incomplete when reading stopped.</value>
+  </data>
+  <data name="ReassemblyAlreadyDiscarded" xml:space="preserve">
+    <value>The datagram was already discarded. Its identity is retained until expiry.</value>
+  </data>
+  <data name="ReassemblyAtomicFragment" xml:space="preserve">
+    <value>Independent atomic fragment.</value>
+  </data>
+  <data name="ReassemblyAwaitingFragments" xml:space="preserve">
+    <value>Waiting for contiguous fragments and final length.</value>
+  </data>
+  <data name="ReassemblyBufferLimit" xml:space="preserve">
+    <value>Buffered byte limit reached.</value>
+  </data>
+  <data name="ReassemblyCompleteCoverage" xml:space="preserve">
+    <value>All fragment bytes captured.</value>
+  </data>
+  <data name="ReassemblyCompletion" xml:space="preserve">
+    <value>{0} {1} · Completes datagram</value>
+  </data>
+  <data name="ReassemblyDatagramByteLimit" xml:space="preserve">
+    <value>Single datagram byte limit reached.</value>
+  </data>
+  <data name="ReassemblyDatagramTableLimit" xml:space="preserve">
+    <value>Datagram table limit reached (including discarded identities).</value>
+  </data>
+  <data name="ReassemblyDiscarded" xml:space="preserve">
+    <value>Reassembly discarded</value>
+  </data>
+  <data name="ReassemblyDiscardedByCaller" xml:space="preserve">
+    <value>Datagram discarded by caller.</value>
+  </data>
+  <data name="ReassemblyDuplicateIgnored" xml:space="preserve">
+    <value>Exact duplicate ignored.</value>
+  </data>
+  <data name="ReassemblyExpiredByCaller" xml:space="preserve">
+    <value>Datagram expired by caller.</value>
+  </data>
+  <data name="ReassemblyFragmentCountLimit" xml:space="preserve">
+    <value>Fragment count limit reached.</value>
+  </data>
+  <data name="ReassemblyIncompatibleEcn" xml:space="preserve">
+    <value>CE and Not-ECT fragments cannot be combined.</value>
+  </data>
+  <data name="ReassemblyIncompatibleHeaders" xml:space="preserve">
+    <value>incompatible IP or extension header context.</value>
+  </data>
+  <data name="ReassemblyIncomplete" xml:space="preserve">
+    <value>The fragment set is incomplete.</value>
+  </data>
+  <data name="ReassemblyInconsistentFinalLength" xml:space="preserve">
+    <value>Inconsistent final fragment length.</value>
+  </data>
+  <data name="ReassemblyInvalidIpv4Flags" xml:space="preserve">
+    <value>invalid IPv4 fragmentation flags.</value>
+  </data>
+  <data name="ReassemblyInvalidIpv6ExtensionChain" xml:space="preserve">
+    <value>invalid or incomplete IPv6 extension chain.</value>
+  </data>
+  <data name="ReassemblyInvalidLengthOrAlignment" xml:space="preserve">
+    <value>Invalid fragment length or eight-byte alignment.</value>
+  </data>
+  <data name="ReassemblyIpLengthLimit" xml:space="preserve">
+    <value>reassembled IP length exceeds limit.</value>
+  </data>
+  <data name="ReassemblyLimitReached" xml:space="preserve">
+    <value>Reassembly resource limit reached</value>
+  </data>
+  <data name="ReassemblyMissingFragments" xml:space="preserve">
+    <value>Missing fragments.</value>
+  </data>
+  <data name="ReassemblyMissingIpv6UpperLayerChain" xml:space="preserve">
+    <value>IPv6 first fragment lacks a complete upper-layer header chain.</value>
+  </data>
+  <data name="ReassemblyOverlapDiscarded" xml:space="preserve">
+    <value>Overlap: entire datagram discarded.</value>
+  </data>
+  <data name="ReassemblyRangeExceedsIpLength" xml:space="preserve">
+    <value>fragment range exceeds IP length limit.</value>
+  </data>
+  <data name="ReassemblyTimedOut" xml:space="preserve">
+    <value>Reassembly timeout reached.</value>
+  </data>
+  <data name="ReassemblyTruncatedPayload" xml:space="preserve">
+    <value>Fragment payload was not fully captured.</value>
+  </data>
+  <data name="RecordComment" xml:space="preserve">
+    <value>Record comment</value>
+  </data>
+  <data name="RecordDetails" xml:space="preserve">
+    <value>{0} · {1} · Captured {2} B / original {3} B</value>
+  </data>
+  <data name="RecordHeading" xml:space="preserve">
+    <value>RECORD {0}</value>
+  </data>
+  <data name="RecordLocationTooltip" xml:space="preserve">
+    <value>{0} · {1} · File offset 0x{2:X}</value>
+  </data>
+  <data name="RecordSpanLimit" xml:space="preserve">
+    <value>Reassembly ended because the record span limit was exceeded.</value>
+  </data>
+  <data name="RecordTooltip" xml:space="preserve">
+    <value>{0} · {1} · {2} · {3}
+{4} · {5}
+{6}
+Captured {7} B / original {8} B</value>
+  </data>
+  <data name="RecordWorkbench" xml:space="preserve">
+    <value>Record workbench</value>
+  </data>
+  <data name="Records" xml:space="preserve">
+    <value>Records</value>
+  </data>
+  <data name="ReferenceGroupsSuffix" xml:space="preserve">
+    <value> ({0} ranges total)</value>
+  </data>
+  <data name="RequiredAndCapturedBytes" xml:space="preserve">
+    <value>Requires {0} B · Captured {1} B</value>
+  </data>
+  <data name="ReservedBits" xml:space="preserve">
+    <value>Reserved bits</value>
+  </data>
+  <data name="ReservedBytes" xml:space="preserve">
+    <value>Reserved bytes</value>
+  </data>
+  <data name="ResizeRecordList" xml:space="preserve">
+    <value>Resize the capture record list</value>
+  </data>
+  <data name="ResizeRecordListHint" xml:space="preserve">
+    <value>Drag to resize · Arrow keys to adjust · Double-click or press Enter to reset</value>
+  </data>
+  <data name="RestoreWindow" xml:space="preserve">
+    <value>Restore down</value>
+  </data>
+  <data name="RoutingExtensionHeader" xml:space="preserve">
+    <value>Routing</value>
+  </data>
+  <data name="SackPermitted" xml:space="preserve">
+    <value>SACK permitted</value>
+  </data>
+  <data name="SearchRecords" xml:space="preserve">
+    <value>Search records</value>
+  </data>
+  <data name="SearchRecordsHint" xml:space="preserve">
+    <value>Search by number, address, or protocol</value>
+  </data>
+  <data name="SectionTimestampOffset" xml:space="preserve">
+    <value>{0} · Timestamp offset {1} s</value>
+  </data>
+  <data name="SectionWithoutInterfaces" xml:space="preserve">
+    <value>PCAPNG {0}.{1} · {2} · No interfaces</value>
+  </data>
+  <data name="SectionsAndInterfaces" xml:space="preserve">
+    <value>{0} sections · {1} interfaces</value>
+  </data>
+  <data name="SenderHardwareAddress" xml:space="preserve">
+    <value>Sender hardware address</value>
+  </data>
+  <data name="SenderIp" xml:space="preserve">
+    <value>Sender IP</value>
+  </data>
+  <data name="SenderMac" xml:space="preserve">
+    <value>Sender MAC</value>
+  </data>
+  <data name="SenderProtocolAddress" xml:space="preserve">
+    <value>Sender protocol address</value>
+  </data>
+  <data name="SequenceNumber" xml:space="preserve">
+    <value>Sequence number</value>
+  </data>
+  <data name="ShowFullBytes" xml:space="preserve">
+    <value>Compare full bytes ▾</value>
+  </data>
+  <data name="SingleByte" xml:space="preserve">
+    <value>Single byte</value>
+  </data>
+  <data name="SourceAddress" xml:space="preserve">
+    <value>Source address</value>
+  </data>
+  <data name="SourceFileOffset" xml:space="preserve">
+    <value>{0} · File offset 0x{1:X}</value>
+  </data>
+  <data name="SourceMac" xml:space="preserve">
+    <value>Source MAC</value>
+  </data>
+  <data name="SourcePort" xml:space="preserve">
+    <value>Source port</value>
+  </data>
+  <data name="StatusAtomicFragment" xml:space="preserve">
+    <value>✓ Atomic fragment</value>
+  </data>
+  <data name="StatusChecksumUnavailable" xml:space="preserve">
+    <value>· Checksum unavailable</value>
+  </data>
+  <data name="StatusConflict" xml:space="preserve">
+    <value>× Conflict</value>
+  </data>
+  <data name="StatusDiscarded" xml:space="preserve">
+    <value>× Discarded</value>
+  </data>
+  <data name="StatusDuplicateFragment" xml:space="preserve">
+    <value>↳ Duplicate fragment</value>
+  </data>
+  <data name="StatusFragment" xml:space="preserve">
+    <value>↳ Fragment</value>
+  </data>
+  <data name="StatusInvalidFields" xml:space="preserve">
+    <value>× Invalid fields</value>
+  </data>
+  <data name="StatusMismatch" xml:space="preserve">
+    <value>! Mismatch</value>
+  </data>
+  <data name="StatusMissingFragments" xml:space="preserve">
+    <value>! Missing fragments</value>
+  </data>
+  <data name="StatusNoTimestamp" xml:space="preserve">
+    <value>· No timestamp</value>
+  </data>
+  <data name="StatusNormal" xml:space="preserve">
+    <value>✓ Valid</value>
+  </data>
+  <data name="StatusReassembled" xml:space="preserve">
+    <value>✓ Reassembled</value>
+  </data>
+  <data name="StatusReassemblyTimeout" xml:space="preserve">
+    <value>! Reassembly timeout</value>
+  </data>
+  <data name="StatusResourceLimit" xml:space="preserve">
+    <value>! Resource limit</value>
+  </data>
+  <data name="StatusTruncated" xml:space="preserve">
+    <value>! Truncated</value>
+  </data>
+  <data name="StatusUnknownItems" xml:space="preserve">
+    <value>· Unknown items</value>
+  </data>
+  <data name="StatusUnsupported" xml:space="preserve">
+    <value>· Unsupported</value>
+  </data>
+  <data name="TargetHardwareAddress" xml:space="preserve">
+    <value>Target hardware address</value>
+  </data>
+  <data name="TargetIp" xml:space="preserve">
+    <value>Target IP</value>
+  </data>
+  <data name="TargetMac" xml:space="preserve">
+    <value>Target MAC</value>
+  </data>
+  <data name="TargetProtocolAddress" xml:space="preserve">
+    <value>Target protocol address</value>
+  </data>
+  <data name="TcpHeaderExceedsSegment" xml:space="preserve">
+    <value>TCP header exceeds the segment length</value>
+  </data>
+  <data name="TcpHeaderTooLong" xml:space="preserve">
+    <value>Header exceeds the TCP length declared by IP ({0})</value>
+  </data>
+  <data name="TcpOptions" xml:space="preserve">
+    <value>TCP options</value>
+  </data>
+  <data name="TcpOptionsMss" xml:space="preserve">
+    <value>TCP options · MSS {0}</value>
+  </data>
+  <data name="TcpRequiredBytes" xml:space="preserve">
+    <value>Requires 20 B · Captured {0}</value>
+  </data>
+  <data name="TimeResolution" xml:space="preserve">
+    <value>Time resolution</value>
+  </data>
+  <data name="TimedRecordRange" xml:space="preserve">
+    <value>{0} – {1} ({2:N0} with timestamps)</value>
+  </data>
+  <data name="Timestamp" xml:space="preserve">
+    <value>Timestamp</value>
+  </data>
+  <data name="TitleBar" xml:space="preserve">
+    <value>PacketLab title bar</value>
+  </data>
+  <data name="ToolNavigation" xml:space="preserve">
+    <value>Tool navigation</value>
+  </data>
+  <data name="TotalLength" xml:space="preserve">
+    <value>Total length</value>
+  </data>
+  <data name="TrafficAnalysis" xml:space="preserve">
+    <value>Traffic analysis</value>
+  </data>
+  <data name="Trailing" xml:space="preserve">
+    <value>Trailing bytes</value>
+  </data>
+  <data name="Truncated" xml:space="preserve">
+    <value>Truncated</value>
+  </data>
+  <data name="TruncatedFragmentPayload" xml:space="preserve">
+    <value>The fragment payload was not fully captured.</value>
+  </data>
+  <data name="TruncatedHeader" xml:space="preserve">
+    <value>Truncated header</value>
+  </data>
+  <data name="TruncatedOptions" xml:space="preserve">
+    <value>Truncated options</value>
+  </data>
+  <data name="TruncatedPayloadOrHeader" xml:space="preserve">
+    <value>Truncated payload or header</value>
+  </data>
+  <data name="TruncatedUdpPayload" xml:space="preserve">
+    <value>Truncated UDP payload</value>
+  </data>
+  <data name="UdpLength" xml:space="preserve">
+    <value>UDP length</value>
+  </data>
+  <data name="UdpLengthBeyondIpPayload" xml:space="preserve">
+    <value>UDP length exceeds the IP payload</value>
+  </data>
+  <data name="UdpLengthExceedsIpPayload" xml:space="preserve">
+    <value>UDP length exceeds the IP payload length ({0})</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+  </data>
+  <data name="UnavailableReason" xml:space="preserve">
+    <value>Unavailable · {0}</value>
+  </data>
+  <data name="Undetermined" xml:space="preserve">
+    <value>Undetermined</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="UnknownBytePosition" xml:space="preserve">
+    <value>Unknown byte position</value>
+  </data>
+  <data name="UnknownEtherType" xml:space="preserve">
+    <value>0x{0:X4} · Unknown or unsupported</value>
+  </data>
+  <data name="UnknownField" xml:space="preserve">
+    <value>Field could not be identified</value>
+  </data>
+  <data name="UnknownOption" xml:space="preserve">
+    <value>Unknown option</value>
+  </data>
+  <data name="UnknownValue" xml:space="preserve">
+    <value>{0} · Unknown</value>
+  </data>
+  <data name="Unlimited" xml:space="preserve">
+    <value>Unlimited · 0</value>
+  </data>
+  <data name="UnparsedBytes" xml:space="preserve">
+    <value>Unparsed bytes</value>
+  </data>
+  <data name="UnparsedHeaderBytes" xml:space="preserve">
+    <value>Unparsed header bytes</value>
+  </data>
+  <data name="UnparsedIeeePayload" xml:space="preserve">
+    <value>Unparsed 802.3 payload</value>
+  </data>
+  <data name="UnparsedPayload" xml:space="preserve">
+    <value>Unparsed payload</value>
+  </data>
+  <data name="UnrecognizedCapture" xml:space="preserve">
+    <value>The capture format could not be recognized.</value>
+  </data>
+  <data name="Unsupported" xml:space="preserve">
+    <value>Unsupported</value>
+  </data>
+  <data name="UnsupportedEncapsulation" xml:space="preserve">
+    <value>{0} · Unsupported encapsulation or protocol</value>
+  </data>
+  <data name="UnsupportedLinkType" xml:space="preserve">
+    <value>Unsupported link type</value>
+  </data>
+  <data name="UnsupportedPcapNg" xml:space="preserve">
+    <value>PCAPNG is not supported.</value>
+  </data>
+  <data name="UnsupportedPcapVersion" xml:space="preserve">
+    <value>PCAP version {0}.{1} is not supported. Version 2.4 is required.</value>
+  </data>
+  <data name="UnsupportedProtocolNumber" xml:space="preserve">
+    <value>Protocol {0} · Unsupported</value>
+  </data>
+  <data name="UnsupportedType" xml:space="preserve">
+    <value>Type {0} · Unsupported</value>
+  </data>
+  <data name="UnsupportedValue" xml:space="preserve">
+    <value>Unsupported · {0}</value>
+  </data>
+  <data name="UpperLayerProtocol" xml:space="preserve">
+    <value>Upper-layer protocol</value>
+  </data>
+  <data name="UrgentPointer" xml:space="preserve">
+    <value>Urgent pointer</value>
+  </data>
+  <data name="VersionAndHeaderSize" xml:space="preserve">
+    <value>{0} · {1} header</value>
+  </data>
+  <data name="VersionIhl" xml:space="preserve">
+    <value>Version / IHL</value>
+  </data>
+  <data name="VersionTrafficFlow" xml:space="preserve">
+    <value>Version / traffic class / flow label</value>
+  </data>
+  <data name="WindowScale" xml:space="preserve">
+    <value>Window scale</value>
+  </data>
+  <data name="WindowSize" xml:space="preserve">
+    <value>Window</value>
+  </data>
+  <data name="ZeroChecksumNotAllowed" xml:space="preserve">
+    <value>A zero checksum is invalid in this context</value>
+  </data>
+</root>

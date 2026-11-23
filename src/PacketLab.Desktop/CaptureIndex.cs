@@ -1,3 +1,4 @@
+using PacketLab.Desktop.Localization;
 using PacketLab.Analyzers.Annotations;
 using System.Collections.Immutable;
 using Microsoft.Win32.SafeHandles;
@@ -16,19 +17,19 @@ internal readonly record struct CaptureRecord(long DataOffset, int Length, uint 
     PacketSummary Summary, PcapNgInterface? Interface, PcapNgPacketKind? Kind, FragmentSlice? Fragment)
 {
     internal ushort LinkType(PcapFileHeader? header) => Interface?.LinkType ?? header?.LinkType ?? 0;
-    internal string Context => Interface is { } item ? $"S{item.Section.Number} / I{item.Id}" : "全局";
+    internal string Context => Interface is { } item ? $"S{item.Section.Number} / I{item.Id}" : Strings.Global;
     internal string Block => Kind switch
     {
-        PcapNgPacketKind.Enhanced => "Enhanced Packet Block",
-        PcapNgPacketKind.Simple => "Simple Packet Block",
-        PcapNgPacketKind.Obsolete => "Packet Block",
-        _ => "PCAP 记录"
+        PcapNgPacketKind.Enhanced => Strings.PcapNgEnhancedPacketBlock,
+        PcapNgPacketKind.Simple => Strings.PcapNgSimplePacketBlock,
+        PcapNgPacketKind.Obsolete => Strings.PcapNgPacketBlock,
+        _ => Strings.PcapRecord
     };
 }
 
 [TransportModel]
 internal sealed record FragmentGroup(int Version, uint Identification, ImmutableArray<int> Records,
-    IpReassemblyStatus Status, IpReassemblyAnalysisReason Reason, string Message, long DerivedOffset, int DerivedLength,
+    IpReassemblyStatus Status, IpReassemblyAnalysisReason Reason, IpReassemblyDiagnosticCode DiagnosticCode, long DerivedOffset, int DerivedLength,
     FragmentSlice? DerivedSlice, PacketSummary DerivedSummary)
 {
     internal string Identity => Version == 4 ? $"IPv4 / 0x{Identification:X4}" : $"IPv6 / 0x{Identification:X8}";
@@ -235,7 +236,8 @@ internal sealed class CaptureIndex : IDisposable
     private void SetError(PcapError failure)
     {
         var scope = failure.RecordNumber is { } number ? $" · #{number:000}" : "";
-        error = $"文件偏移 {failure.Offset:N0}（0x{failure.Offset:X}）{scope} · {failure.Message}";
+        var diagnostic = CaptureDiagnostics.ParseFailure(failure);
+        error = UiText.Format(Strings.CaptureErrorAtOffset, failure.Offset, failure.Offset, scope, diagnostic);
     }
 
     private int Append(CaptureRecord record, string? comment)
@@ -324,7 +326,7 @@ internal sealed class CaptureIndex : IDisposable
             };
         }
         var group = new FragmentGroup(update.IpVersion, update.Identification, members, update.Status, update.Reason,
-            update.Reassembly.Message, offset, length, slice, summary);
+            update.Reassembly.DiagnosticCode, offset, length, slice, summary);
         groups[key] = group;
         if (update.Status is IpReassemblyStatus.Pending or IpReassemblyStatus.Duplicate)
             groupByRecord[members[^1]] = key;
@@ -387,7 +389,7 @@ internal sealed class CaptureIndex : IDisposable
     internal string Comment(int index)
     {
         lock (gate)
-            return comments.GetValueOrDefault(index) ?? "未提供";
+            return comments.GetValueOrDefault(index) ?? Strings.NotProvided;
     }
 
     internal byte[] ReadBytes(CaptureRecord record) => ReadAt(file, record.DataOffset, record.Length);
@@ -416,7 +418,7 @@ internal sealed class CaptureIndex : IDisposable
         {
             var received = RandomAccess.Read(handle, bytes.AsSpan(read), offset + read);
             if (received == 0)
-                throw new EndOfStreamException("抓包文件在读取时发生变化。");
+                throw new EndOfStreamException(Strings.CaptureChanged);
 
             read += received;
         }

@@ -1,9 +1,10 @@
+using PacketLab.Desktop.Localization;
 namespace PacketLab.Desktop;
 
 internal sealed record CoverageLane(int Record, FragmentSlice Slice, byte[] Bytes, string Scope)
 {
     internal bool Derived => Record < 0;
-    internal string Label => Derived ? "重组 IP" : RecordStatus.Number(Record);
+    internal string Label => Derived ? Strings.ReassembledIp : RecordStatus.Number(Record);
     internal int RawIndex(int offset) => Slice.Start + offset - Slice.Offset;
     internal int PayloadOffset(int raw) => Slice.Offset + raw - Slice.Start;
     internal bool Covers(int offset) => offset >= Slice.Offset && offset < Slice.Offset + Bytes.Length;
@@ -85,7 +86,7 @@ internal sealed class CoverageData
             if (record.Fragment is { } slice)
             {
                 var flag = group.Version == 4 ? "MF" : "M";
-                var range = slice.Length > 0 ? $"{slice.Offset}–{slice.End - 1} B" : $"{slice.Offset} B · 无捕获字节";
+                var range = slice.Length > 0 ? $"{slice.Offset}–{slice.End - 1} B" : UiText.Format(Strings.OffsetNoCapturedBytes, slice.Offset);
                 var scope = $"{range} · {flag} {(slice.More ? 1 : 0)}";
                 var bytes = capture.ReadFragment(record, MaxMappedBytes);
                 lanes.Add(new(index, slice, bytes, scope));

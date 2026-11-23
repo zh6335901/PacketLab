@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Globalization;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -24,6 +25,98 @@ public sealed class ExploreCaptureTests
     private static readonly HeadlessUnitTestSession Session = HeadlessUnitTestSession.StartNew(typeof(HeadlessApp));
 
     [Test]
+    public async Task Compact_navigation_keeps_all_tool_icons_and_restores_folded_groups()
+    {
+        var result = await WithExplorer(async window =>
+        {
+            await SelectFixtureFragment(window);
+            var rail = Find<ToolNavigationView>(window)!;
+            var simulator = ButtonNamed(window, "Network Simulator · 规划中");
+            var section = simulator.GetVisualAncestors().OfType<Border>().Single(border => border.Classes.Contains("nav-entries"));
+            Click(window, ButtonNamed(window, "网络实验"));
+            await WaitFor(() => section.Bounds.Height == 0);
+            SaveFrame(window, "app-folded");
+
+            Click(window, ButtonNamed(window, "收起工具导航"));
+            await WaitFor(() => rail.Bounds.Width == 63 && section.Bounds.Height > 0);
+            var disabled = new[] { "实时抓包", "Network Simulator", "Network Benchmark" }
+                .All(tool => ButtonNamed(window, tool + " · 规划中") is { IsEffectivelyEnabled: false });
+            SaveFrame(window, "app-compact");
+
+            Click(window, ButtonNamed(window, "展开工具导航"));
+            await WaitFor(() => rail.Bounds.Width == 254 && section.Bounds.Height == 0);
+            Click(window, ButtonNamed(window, "网络实验"));
+            await WaitFor(() => section.Bounds.Height > 0);
+
+            return (Disabled: disabled, Selection: Text(window, "记录 #005"));
+        });
+
+        await Assert.That(result.Disabled).IsTrue();
+        await Assert.That(result.Selection).IsTrue();
+    }
+
+    [Test]
+    public async Task Narrow_navigation_drawer_dismisses_on_escape_backdrop_and_tool_selection()
+    {
+        var result = await WithExplorer(async window =>
+        {
+            window.Width = 620;
+            await SelectFixtureFragment(window);
+            var rail = Find<ToolNavigationView>(window)!;
+            await WaitFor(() => !rail.IsHitTestVisible);
+            var toggle = ButtonNamed(window, "打开工具导航");
+
+            async Task OpenDrawer()
+            {
+                Click(window, toggle);
+                await WaitFor(() => rail.IsHitTestVisible && rail.RenderTransform?.Value.M31 == 0);
+            }
+
+            await OpenDrawer();
+            window.MouseMove(new Point(500, 15));
+            SaveFrame(window, "app-drawer");
+            window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            await WaitFor(() => !rail.IsHitTestVisible && toggle.IsFocused);
+            await OpenDrawer();
+
+            Click(window, window, new Point(550, 100));
+            await WaitFor(() => !rail.IsHitTestVisible);
+            await OpenDrawer();
+
+            Click(window, rail.GetVisualDescendants().OfType<Button>()
+                .Single(button => AutomationProperties.GetName(button) == "Packet Explorer"));
+            await WaitFor(() => !rail.IsHitTestVisible && toggle.IsFocused);
+            return Text(window, "记录 #005");
+        });
+
+        await Assert.That(result).IsTrue();
+    }
+
+    [Test]
+    public async Task Caption_buttons_maximize_restore_minimize_and_close_the_window()
+    {
+        var result = await WithExplorer(window =>
+        {
+            Click(window, ButtonNamed(window, "最大化"));
+            var maximized = window.WindowState;
+            Click(window, ButtonNamed(window, "向下还原"));
+            var restored = window.WindowState;
+            Click(window, ButtonNamed(window, "最小化"));
+            var minimized = window.WindowState;
+            window.WindowState = WindowState.Normal;
+            Dispatcher.UIThread.RunJobs();
+            Click(window, ButtonNamed(window, "关闭窗口"));
+
+            return Task.FromResult((Maximized: maximized, Restored: restored, Minimized: minimized, Visible: window.IsVisible));
+        }, file: null);
+
+        await Assert.That(result.Maximized).IsEqualTo(WindowState.Maximized);
+        await Assert.That(result.Restored).IsEqualTo(WindowState.Normal);
+        await Assert.That(result.Minimized).IsEqualTo(WindowState.Minimized);
+        await Assert.That(result.Visible).IsFalse();
+    }
+
+    [Test]
     public async Task Starting_without_a_file_shows_the_open_prompt_and_loads_the_file_chosen_there()
     {
         var result = await WithExplorer(async window =>
@@ -33,7 +126,7 @@ public sealed class ExploreCaptureTests
             var workbench = Text(window, "记录工作台");
             SaveFrame(window, "app-landing");
             Click(window, ButtonNamed(window, "选择文件"));
-            await WaitFor(() => Text(window, "RECORD #001"));
+            await WaitFor(() => Text(window, "记录 #001"));
 
             return (Prompt: prompt, Hint: hint, InitialWorkbench: workbench,
                 Records: Find<ListBox>(window)!.ItemCount, PromptAfterOpen: Text(window, "打开抓包文件"));
@@ -47,12 +140,78 @@ public sealed class ExploreCaptureTests
     }
 
     [Test]
+    public async Task English_ui_culture_localizes_the_picker_workbench_and_capture_metadata()
+    {
+        FilePickerOpenOptions? picker = null;
+        var result = await WithExplorer(async window =>
+        {
+            var prompt = Text(window, "Open a capture file");
+            var navigation = Text(window, "Traffic analysis");
+            SaveFrame(window, "app-en-landing");
+            Click(window, ButtonNamed(window, "Choose file"));
+            await WaitFor(() => Text(window, "RECORD #001") && Text(window, "ARP / Target IP"));
+            var workbench = Text(window, "Record workbench");
+            var fields = Text(window, "Protocol fields");
+            SaveFrame(window, "app-en-workbench");
+
+            Click(window, ButtonNamed(window, "Capture metadata"));
+            await WaitFor(() => Text(window, "16 records · 2 sections · 3 interfaces"));
+            var metadata = Text(window, "Byte order") && Text(window, "Big-endian");
+            SaveFrame(window, "app-en-metadata");
+
+            return (Prompt: prompt, Navigation: navigation, Workbench: workbench, Fields: fields, Metadata: metadata);
+        }, file: null, chooseFile: options =>
+        {
+            picker = options;
+            return Task.FromResult<string?>(Fixture("record-workbench.pcapng"));
+        }, culture: "en-US");
+
+        await Assert.That(result.Prompt).IsTrue();
+        await Assert.That(result.Navigation).IsTrue();
+        await Assert.That(result.Workbench).IsTrue();
+        await Assert.That(result.Fields).IsTrue();
+        await Assert.That(result.Metadata).IsTrue();
+        await Assert.That(picker!.Title).IsEqualTo("Open a capture file");
+        await Assert.That(picker.FileTypeFilter!.Select(type => type.Name)).IsEquivalentTo(["Capture files", "All files"]);
+    }
+
+    [Test]
+    [Arguments("zh-CN", "块被截断，应为 28 字节。")]
+    [Arguments("en-US", "Truncated block; expected 28 bytes.")]
+    public async Task Truncated_pcapng_reports_the_specific_error_in_the_ui_culture(string culture, string expected)
+    {
+        var file = Path.GetTempFileName();
+        try
+        {
+            using (var fixture = File.OpenRead(Fixture("record-workbench.pcapng")))
+            {
+                var prefix = new byte[16];
+                fixture.ReadExactly(prefix);
+                File.WriteAllBytes(file, prefix);
+            }
+            var error = await WithExplorer(async window =>
+            {
+                var name = Path.GetFileName(file);
+                await WaitFor(() => TextStartsWith(window, name));
+
+                return ReadText(window).Single(text => text.StartsWith(name, StringComparison.Ordinal));
+            }, file, culture: culture);
+
+            await Assert.That(error).Contains(expected);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Test]
     public async Task Control_O_opens_the_file_selected_by_the_picker()
     {
         var result = await WithExplorer(async window =>
         {
             window.KeyPress(Key.O, RawInputModifiers.Control, PhysicalKey.O, null);
-            await WaitFor(() => Text(window, "RECORD #001"));
+            await WaitFor(() => Text(window, "记录 #001"));
 
             return Find<ListBox>(window)!.ItemCount;
         }, file: null, chooseFile: _ => Task.FromResult<string?>(Fixture("record-workbench.pcapng")));
@@ -99,7 +258,7 @@ public sealed class ExploreCaptureTests
 
             Click(window, ButtonNamed(window, "重组 IP"));
             await WaitFor(() => Text(window, "UDP / 目的端口"));
-            return (Record: Text(window, "RECORD #005"), Source: Text(window, "重组 IP 数据报字节"),
+            return (Record: Text(window, "记录 #005"), Source: Text(window, "重组 IP 数据报字节"),
                 Range: Text(window, "0x0016–0017 · 2 B"), Value: Text(window, "53"));
         });
 
@@ -107,6 +266,60 @@ public sealed class ExploreCaptureTests
         await Assert.That(result.Source).IsTrue();
         await Assert.That(result.Range).IsTrue();
         await Assert.That(result.Value).IsTrue();
+    }
+
+    [Test]
+    [Arguments(false, 100d)]
+    [Arguments(true, 150d)]
+    public async Task Scrolling_protocol_fields_leaves_the_byte_panel_in_place(bool compactNavigation, double expectedHeight)
+    {
+        var result = await WithExplorer(async window =>
+        {
+            if (compactNavigation)
+            {
+                Click(window, ButtonNamed(window, "收起工具导航"));
+                await WaitFor(() => Find<ToolNavigationView>(window)!.Bounds.Width == 63);
+            }
+
+            await SelectFixtureFragment(window);
+            await WaitFor(() => Text(window, "IPv4 / 标识符"));
+            var fields = ProtocolFields(window);
+            await WaitFor(() => fields.Viewport.Height > 0);
+            var bytes = Find<HexSurface>(window)!;
+            var fieldHeight = fields.Bounds.Height;
+            var bytesOrigin = bytes.TranslatePoint(default, window);
+            SaveFrame(window, compactNavigation ? "app-side-by-side" : "app-stacked");
+
+            window.MouseWheel(Center(fields, window), new Vector(0, -1));
+            await WaitFor(() => fields.Offset.Y > 0);
+
+            return (FieldHeight: fieldHeight, Overflow: fields.Extent.Height > fields.Viewport.Height,
+                BytesStayed: bytes.TranslatePoint(default, window) == bytesOrigin);
+        });
+
+        await Assert.That(result.FieldHeight).IsEqualTo(expectedHeight);
+        await Assert.That(result.Overflow).IsTrue();
+        await Assert.That(result.BytesStayed).IsTrue();
+    }
+
+    [Test]
+    public async Task An_initially_selected_field_below_the_viewport_is_scrolled_into_view()
+    {
+        var offset = await WithExplorer(async window =>
+        {
+            await WaitFor(() => Text(window, "ARP / 目标 IP"));
+            var fields = ProtocolFields(window);
+            await WaitFor(() => fields.Offset.Y > 0);
+
+            var target = fields.GetVisualDescendants().OfType<Button>().Single(button =>
+                AutomationProperties.GetName(button)?.StartsWith("目标 IP ·", StringComparison.Ordinal) == true);
+
+            return target.TranslatePoint(default, fields)?.Y;
+        });
+
+        await Assert.That(offset).IsNotNull();
+        await Assert.That(offset!.Value).IsGreaterThanOrEqualTo(0);
+        await Assert.That(offset.Value).IsLessThan(100);
     }
 
     [Test]
@@ -130,12 +343,12 @@ public sealed class ExploreCaptureTests
     {
         var result = await WithExplorer(async window =>
         {
-            await WaitFor(() => Text(window, "RECORD #001"));
+            await WaitFor(() => Text(window, "记录 #001"));
             Click(window, ButtonNamed(window, "分片"));
             var search = Find<TextBox>(window)!;
             Click(window, search);
             window.KeyTextInput("#012");
-            await WaitFor(() => Text(window, "RECORD #012") && Text(window, "1 / 16"));
+            await WaitFor(() => Text(window, "记录 #012") && Text(window, "1 / 16"));
             var count = Find<ListBox>(window)!.ItemCount;
 
             window.KeyTextInput("missing");
@@ -156,7 +369,7 @@ public sealed class ExploreCaptureTests
         {
             await WaitFor(() => FindRow(window, "#012") is not null);
             Click(window, FindRow(window, "#012")!);
-            await WaitFor(() => Text(window, "重组已丢弃") && Text(window, "RECORD #012"));
+            await WaitFor(() => Text(window, "重组已丢弃") && Text(window, "记录 #012"));
             SaveFrame(window, "app-overlap");
             var message = ReadText(window).Single(text => text.StartsWith("载荷 8–15 B", StringComparison.Ordinal));
 
@@ -179,7 +392,7 @@ public sealed class ExploreCaptureTests
             window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
             await WaitFor(() => FindButton(window, "关闭") is null);
             Click(window, FindRow(window, "#013")!);
-            await WaitFor(() => Text(window, "RECORD #013"));
+            await WaitFor(() => Text(window, "记录 #013"));
             Click(window, ButtonNamed(window, "捕获元数据"));
 
             return (Sections: Text(window, "16 条记录 · 2 个 Section · 3 个接口"),
@@ -196,7 +409,7 @@ public sealed class ExploreCaptureTests
     {
         var result = await WithExplorer(async window =>
         {
-            await WaitFor(() => Text(window, "RECORD #001"));
+            await WaitFor(() => Text(window, "记录 #001"));
             Click(window, ButtonNamed(window, "选择其他抓包文件"));
             await WaitFor(() => Text(window, "× 文件读取错误") && Text(window, "原始记录 #001字节"));
 
@@ -215,7 +428,7 @@ public sealed class ExploreCaptureTests
         {
             var result = await WithExplorer(async window =>
             {
-                await WaitFor(() => Text(window, "RECORD #001"));
+                await WaitFor(() => Text(window, "记录 #001"));
                 Click(window, ButtonNamed(window, "选择其他抓包文件"));
                 await WaitFor(() => TextStartsWith(window, Path.GetFileName(file) + "："));
 
@@ -236,7 +449,7 @@ public sealed class ExploreCaptureTests
     {
         var result = await WithExplorer(async window =>
         {
-            await WaitFor(() => Text(window, "RECORD #001"));
+            await WaitFor(() => Text(window, "记录 #001"));
             var list = Find<ListBox>(window)!;
             var grip = window.GetVisualDescendants().OfType<Control>()
                 .Single(control => AutomationProperties.GetName(control) == "调整捕获记录列表宽度");
@@ -277,7 +490,7 @@ public sealed class ExploreCaptureTests
                 var visible = window.GetVisualDescendants().OfType<RecordRow>().Count();
                 Click(window, Find<TextBox>(window)!);
                 window.KeyTextInput($"#{count}");
-                await WaitFor(() => Text(window, $"RECORD #{count}") && Text(window, "1024 B · 帧起点"), seconds: 45);
+                await WaitFor(() => Text(window, $"记录 #{count}") && Text(window, "1024 B · 帧起点"), seconds: 45);
                 Console.WriteLine($"Capture {count:N0} records · first displayed {first:N0} ms · indexed {indexed:N0} ms · final lookup {clock.ElapsedMilliseconds - indexed:N0} ms · {visible} realized rows");
 
                 return (Visible: visible, Selected: records.SelectedItem, Filtered: records.ItemCount);
@@ -324,15 +537,17 @@ public sealed class ExploreCaptureTests
     {
         await WaitFor(() => FindRow(window, "#005") is not null);
         Click(window, FindRow(window, "#005")!);
-        await WaitFor(() => Find<CoverageMatrix>(window) is not null && Text(window, "RECORD #005"));
+        await WaitFor(() => Find<CoverageMatrix>(window) is not null && Text(window, "记录 #005"));
     }
 
     private static Task<T> WithExplorer<T>(Func<ExplorerWindow, Task<T>> interact) =>
         WithExplorer(interact, Fixture("record-workbench.pcapng"));
 
     private static Task<T> WithExplorer<T>(Func<ExplorerWindow, Task<T>> interact, string? file,
-        Func<FilePickerOpenOptions, Task<string?>>? chooseFile = null) => Session.Dispatch<T>(async () =>
+        Func<FilePickerOpenOptions, Task<string?>>? chooseFile = null, string culture = "zh-CN") => Session.Dispatch<T>(async () =>
     {
+        var previousCulture = CultureInfo.CurrentUICulture;
+        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(culture);
         var window = new ExplorerWindow(file, chooseFile: chooseFile);
         window.Show();
         try
@@ -347,6 +562,7 @@ public sealed class ExploreCaptureTests
         finally
         {
             window.Close();
+            CultureInfo.CurrentUICulture = previousCulture;
         }
     }, CancellationToken.None);
 
@@ -368,6 +584,8 @@ public sealed class ExploreCaptureTests
         ReadText(window).Any(text => text.StartsWith(prefix, StringComparison.Ordinal));
 
     private static T? Find<T>(Window window) where T : Visual => window.GetVisualDescendants().OfType<T>().FirstOrDefault();
+    private static ScrollViewer ProtocolFields(Window window) => window.GetVisualDescendants().OfType<ScrollViewer>()
+        .Single(scroll => AutomationProperties.GetName(scroll) == "当前协议字段");
     private static Button? FindButton(Window window, string name) => window.GetVisualDescendants().OfType<Button>()
         .FirstOrDefault(button => button.IsEffectivelyVisible && AutomationProperties.GetName(button) == name);
     private static Button ButtonNamed(Window window, string name) => FindButton(window, name)!;

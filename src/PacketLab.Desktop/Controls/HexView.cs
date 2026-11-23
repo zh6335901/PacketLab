@@ -1,3 +1,4 @@
+using PacketLab.Desktop.Localization;
 using PacketLab.Analyzers.Annotations;
 using System.Globalization;
 using Avalonia;
@@ -30,7 +31,7 @@ internal sealed class HexView : Grid
             Height = (compact ? 0 : 25) + visibleRows * (compact ? 19 : 24),
             Focusable = true
         };
-        AutomationProperties.SetName(surface, compact ? "完整字节" : "十六进制和 ASCII");
+        AutomationProperties.SetName(surface, compact ? Strings.FullBytes : Strings.HexAndAscii);
         bar = new ScrollBar
         {
             Orientation = Orientation.Vertical, SmallChange = 1, LargeChange = visibleRows, ViewportSize = visibleRows,
@@ -138,7 +139,7 @@ internal sealed class HexSurface : Control
         var asciiCell = asciiWidth / columns;
         if (headerHeight > 0)
         {
-            Draw(context, "OFFSET", 10, Soft, 0, 4);
+            Draw(context, Strings.ByteOffset, 10, Soft, 0, 4);
             Draw(context, "ASCII", 10, Soft, asciiStart, 4);
             for (var col = 0; col < columns; col++)
             {

@@ -1,3 +1,4 @@
+using PacketLab.Desktop.Localization;
 using PacketLab.Analyzers.Annotations;
 using Avalonia;
 using Avalonia.Automation;
@@ -45,7 +46,7 @@ internal sealed class CoverageMatrix : Control
         Height = Header + Row * data.Lanes.Count + gap;
         Focusable = true;
         ClipToBounds = true;
-        AutomationProperties.SetName(this, "分片覆盖图与字节对照");
+        AutomationProperties.SetName(this, Strings.FragmentCoverageAndBytes);
     }
 
     internal void SetViewport(Vector offset, Size viewport)
@@ -112,7 +113,7 @@ internal sealed class CoverageMatrix : Control
         var endLane = Math.Clamp((int)Math.Ceiling((bottom - Header) / Row), 0, data.Lanes.Count);
         if (offset.Y < Header)
         {
-            HexSurface.Draw(context, "分片载荷偏移 / B", 10, Soft, 0, 3);
+            HexSurface.Draw(context, Strings.FragmentPayloadOffset, 10, Soft, 0, 3);
             for (var band = startBand; band < endBand; band++)
             {
                 var x = LabelWidth + w * band;
@@ -204,7 +205,7 @@ internal sealed class CoverageMatrix : Control
             var lane = data.Lanes[located.Lane];
             var raw = lane.RawIndex(offsetInPayload);
             var value = lane.Bytes[offsetInPayload - lane.Slice.Offset];
-            tooltip = $"{lane.Label} · 0x{raw:X4} · 载荷 +{offsetInPayload} B · {value:X2}";
+            tooltip = UiText.Format(Strings.FragmentByteTooltip, lane.Label, raw, offsetInPayload, value);
         }
         ToolTip.SetTip(this, tooltip);
         InvalidateVisual();

@@ -12,6 +12,8 @@ public enum IpReassemblyStatus
 public sealed record IpReassemblyUpdate(long DatagramId, int IpVersion, uint Identification,
     string Message, IpReassemblyOutcome Outcome)
 {
+    public IpReassemblyDiagnosticCode DiagnosticCode { get; init; }
+
     public IpReassemblyStatus Status => Outcome switch
     {
         IpReassemblyDiagnostic diagnostic => diagnostic.Status,

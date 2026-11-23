@@ -1,10 +1,13 @@
+using PacketLab.Desktop.Localization;
 using System.ComponentModel;
 using System.Globalization;
 using Avalonia;
+using Avalonia.Animation;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
@@ -16,19 +19,21 @@ namespace PacketLab.Desktop;
 
 internal sealed partial class ExplorerWindow : Window
 {
+    private static readonly Geometry MaximizeGlyph = Geometry.Parse("M2.5 1.5H9.5Q10.5 1.5 10.5 2.5V9.5Q10.5 10.5 9.5 10.5H2.5Q1.5 10.5 1.5 9.5V2.5Q1.5 1.5 2.5 1.5Z");
+    private static readonly Geometry RestoreGlyph = Geometry.Parse("M3.5 3.5V2Q3.5 1.5 4 1.5H10Q10.5 1.5 10.5 2V8Q10.5 8.5 10 8.5H8.5 M2 3.5H8Q8.5 3.5 8.5 4V10Q8.5 10.5 8 10.5H2Q1.5 10.5 1.5 10V4Q1.5 3.5 2 3.5Z");
     private readonly string preferencesPath;
     private readonly ColumnDefinition listColumn;
     private readonly ExplorerViewModel model;
-    private double? savedListWidth;
+    private readonly bool animate = NavigationMotion.Enabled;
+    private GridLength savedListWidth;
 
     internal ExplorerWindow(string? file, string? preferencesPath = null,
         Func<FilePickerOpenOptions, Task<string?>>? chooseFile = null)
     {
         this.preferencesPath = preferencesPath ?? "";
-        savedListWidth = ReadWidth(preferencesPath);
+        savedListWidth = ReadWidth(preferencesPath) is { } width ? new GridLength(width) : GridLength.Auto;
         InitializeComponent();
         listColumn = Workspace.ColumnDefinitions[0];
-        listColumn.MinWidth = 246;
         var grip = MakeGrip();
         Grid.SetColumn(grip, 1);
         Workspace.Children.Add(grip);
@@ -39,8 +44,30 @@ internal sealed partial class ExplorerWindow : Window
             new RecordRow(model.ReadRow(index), model.SelectedRecord, model.SelectedGroup), supportsRecycling: false);
         DataContext = model;
         model.PropertyChanged += ModelChanged;
+        model.Navigation.PropertyChanged += NavigationChanged;
+        if (animate)
+        {
+            DrawerShade.Transitions = [new DoubleTransition
+            {
+                Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(200), Easing = NavigationMotion.EasyEase
+            }];
+        }
+        UpdateCaption();
 
         SizeChanged += (_, _) => ApplyLayout();
+        ContentArea.SizeChanged += (_, args) => ApplyWorkspaceLayout(args.NewSize.Width);
+        RecordToolbar.SizeChanged += (_, args) => LayoutRecordToolbar(args.NewSize.Width);
+        PropertyChanged += (_, args) =>
+        {
+            if (args.Property == WindowStateProperty)
+                UpdateCaption();
+        };
+        KeyDown += HandleEscape;
+        DrawerShade.PointerPressed += (_, args) =>
+        {
+            model.Navigation.CloseDrawerCommand.Execute(null);
+            args.Handled = true;
+        };
         Overlay.PointerPressed += (_, args) =>
         {
             if (args.Source == Overlay)
@@ -55,6 +82,7 @@ internal sealed partial class ExplorerWindow : Window
         Closed += (_, _) =>
         {
             model.PropertyChanged -= ModelChanged;
+            model.Navigation.PropertyChanged -= NavigationChanged;
             model.Dispose();
         };
     }
@@ -83,21 +111,118 @@ internal sealed partial class ExplorerWindow : Window
     private void ApplyLayout()
     {
         var width = Bounds.Width;
-        var margin = Math.Clamp(width * .034, 19, 52);
-        Brand.Padding = new Thickness(margin, 0);
-        Workbench.Margin = new Thickness(margin, 0, margin, 0);
-        var contentWidth = width - 2 * margin;
-        var availableListWidth = contentWidth - 16 - 350;
-        var max = Math.Max(246, availableListWidth);
-        var initial = Math.Clamp(contentWidth * .26, 275, 360);
-        listColumn.MaxWidth = max;
-        listColumn.Width = new GridLength(Math.Clamp(savedListWidth ?? initial, 246, max));
-        FileLabel.MaxWidth = Math.Max(95, contentWidth * .36 - 153);
+        var narrow = width <= 650;
+        Grid.SetColumn(ContentArea, narrow ? 0 : 1);
+        Grid.SetColumnSpan(ContentArea, narrow ? 2 : 1);
+        Grid.SetColumnSpan(ToolRail, narrow ? 2 : 1);
+        TitlePath.Margin = new Thickness(narrow ? 10 : 16, 0, 0, 0);
+        TitlePath.Spacing = narrow ? 7 : 12;
+        CrumbCategory.IsVisible = !narrow;
+        CrumbSeparator.IsVisible = !narrow;
+        MinimizeButton.Classes.Set("narrow", narrow);
+        SizeButton.Classes.Set("narrow", narrow);
+        CloseWindowButton.Classes.Set("narrow", narrow);
+        model.Navigation.SetNarrow(narrow);
+        ApplyNavigationLayout();
         Landing.Padding = new Thickness(20, 28, 20, Math.Clamp(Bounds.Height * .11, 28, 100));
         MetadataPane.Width = Math.Min(740, width - 36);
         MetadataPane.Margin = new Thickness(0, Math.Clamp(Bounds.Height * .09, 30, 92), 0, 0);
         MetadataScroll.MaxHeight = Math.Max(245, Bounds.Height * .75 - 68);
     }
+
+    private void ApplyWorkspaceLayout(double width)
+    {
+        if (width <= 0)
+            return;
+
+        var narrow = width <= 650;
+        var margin = narrow ? 12 : Math.Clamp(width * .034, 24, 52);
+        Workbench.Margin = new Thickness(margin, 0, margin, 0);
+        var contentWidth = width - 2 * margin;
+        var (min, detail, initial) = contentWidth switch
+        {
+            <= 650 => (146, 226, Math.Clamp(contentWidth * .30, 156, 222)),
+            <= 850 => (210, 320, Math.Clamp(contentWidth * .29, 228, 280)),
+            _ => (246, 400, Math.Clamp(contentWidth * .26, 275, 360))
+        };
+        var max = Math.Max(min, contentWidth - 16 - detail);
+        listColumn.MinWidth = min;
+        listColumn.MaxWidth = max;
+        listColumn.Width = new GridLength(Math.Clamp(savedListWidth.IsAuto ? initial : savedListWidth.Value, min, max));
+        LayoutCaptureHeading(contentWidth);
+    }
+
+    private void LayoutCaptureHeading(double width)
+    {
+        var stacked = width < 720;
+        CaptureHeading.Classes.Set("stacked-heading", stacked);
+        CaptureHeading.RowSpacing = stacked ? 9 : 0;
+        Grid.SetColumnSpan(CaptureSummary, stacked ? 2 : 1);
+        Grid.SetColumn(FileBar, stacked ? 0 : 1);
+        Grid.SetRow(FileBar, stacked ? 1 : 0);
+        Grid.SetColumnSpan(FileBar, stacked ? 2 : 1);
+    }
+
+    private void LayoutRecordToolbar(double width)
+    {
+        var combinedWidth = RecordListTitle.DesiredSize.Width + RecordListCount.DesiredSize.Width + RecordFilters.DesiredSize.Width + 12;
+        var stacked = width < Math.Max(216, combinedWidth);
+        Grid.SetColumnSpan(RecordFilters, stacked ? 2 : 1);
+        Grid.SetColumn(RecordFilters, stacked ? 0 : 1);
+        Grid.SetRow(RecordFilters, stacked ? 1 : 0);
+        RecordToolbar.RowSpacing = stacked ? 5 : 0;
+    }
+
+    private void NavigationChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName is not (nameof(ToolNavigationViewModel.IsCompactDesktop) or nameof(ToolNavigationViewModel.DrawerOpen)))
+            return;
+
+        ApplyNavigationLayout();
+        if (args.PropertyName == nameof(ToolNavigationViewModel.DrawerOpen) &&
+            model.Navigation.IsNarrow && !model.Navigation.DrawerOpen)
+            Dispatcher.UIThread.Post(() => MobileNavigation.Focus(), DispatcherPriority.Loaded);
+    }
+
+    private void ApplyNavigationLayout()
+    {
+        var navigation = model.Navigation;
+        ToolRail.UpdateLayout(Bounds.Width, navigation, animate);
+        var showShade = navigation.IsNarrow && navigation.DrawerOpen;
+        DrawerShade.Opacity = showShade ? 1 : 0;
+        DrawerShade.IsHitTestVisible = showShade;
+    }
+
+    private void HandleEscape(object? sender, KeyEventArgs args)
+    {
+        if (args.Key != Key.Escape)
+            return;
+
+        if (model.Navigation.DrawerOpen)
+            model.Navigation.CloseDrawerCommand.Execute(null);
+        else if (model.HasMetadata)
+            model.CloseMetadataCommand.Execute(null);
+        else
+            return;
+
+        args.Handled = true;
+    }
+
+    private void UpdateCaption()
+    {
+        var maximized = WindowState == WindowState.Maximized;
+        var action = maximized ? Strings.RestoreWindow : Strings.MaximizeWindow;
+        SizeGlyph.Data = maximized ? RestoreGlyph : MaximizeGlyph;
+        AutomationProperties.SetName(SizeButton, action);
+        ToolTip.SetTip(SizeButton, action);
+    }
+
+    private void MinimizeWindow(object? sender, RoutedEventArgs args) => WindowState = WindowState.Minimized;
+
+    private void ToggleWindowSize(object? sender, RoutedEventArgs args) =>
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void CloseWindow(object? sender, RoutedEventArgs args) => Close();
 
     private Control MakeGrip()
     {
@@ -110,8 +235,8 @@ internal sealed partial class ExplorerWindow : Window
         };
         grip.Children.Add(rule);
         grip.Children.Add(handle);
-        const string hint = "拖动调整宽度 · 方向键微调 · 双击或按 Enter 复位";
-        AutomationProperties.SetName(grip, "调整捕获记录列表宽度");
+        var hint = Strings.ResizeRecordListHint;
+        AutomationProperties.SetName(grip, Strings.ResizeRecordList);
         ToolTip.SetTip(grip, hint);
         double? start = null;
         double? before = null;
@@ -135,7 +260,7 @@ internal sealed partial class ExplorerWindow : Window
             }
 
             start = e.GetPosition(Workspace).X;
-            before = savedListWidth;
+            before = savedListWidth.IsAuto ? null : savedListWidth.Value;
             startWidth = listColumn.ActualWidth;
             e.Pointer.Capture(grip);
             e.Handled = true;
@@ -185,8 +310,9 @@ internal sealed partial class ExplorerWindow : Window
 
     private void SetWidth(double? width)
     {
-        savedListWidth = width is { } requested ? Math.Clamp(requested, listColumn.MinWidth, listColumn.MaxWidth) : null;
-        ApplyLayout();
+        savedListWidth = width is { } requested
+            ? new GridLength(Math.Clamp(requested, listColumn.MinWidth, listColumn.MaxWidth)) : GridLength.Auto;
+        ApplyWorkspaceLayout(ContentArea.Bounds.Width);
     }
 
     private static double? ReadWidth(string? path)
@@ -216,7 +342,7 @@ internal sealed partial class ExplorerWindow : Window
         {
             var parent = Path.GetDirectoryName(preferencesPath)!;
             Directory.CreateDirectory(parent);
-            var width = savedListWidth?.ToString(CultureInfo.InvariantCulture) ?? "";
+            var width = savedListWidth.IsAuto ? "" : savedListWidth.Value.ToString(CultureInfo.InvariantCulture);
             File.WriteAllText(preferencesPath, width);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -228,9 +354,13 @@ internal sealed partial class ExplorerWindow : Window
     {
         var options = new FilePickerOpenOptions
         {
-            Title = "打开抓包文件",
+            Title = Strings.OpenCapture,
             AllowMultiple = false,
-            FileTypeFilter = [new FilePickerFileType("捕获文件") { Patterns = ["*.pcap", "*.pcapng", "*.cap"] }, FilePickerFileTypes.All]
+            FileTypeFilter =
+            [
+                new FilePickerFileType(Strings.CaptureFiles) { Patterns = ["*.pcap", "*.pcapng", "*.cap"] },
+                new FilePickerFileType(Strings.AllFiles) { Patterns = ["*"] }
+            ]
         };
 
         return pick(options);

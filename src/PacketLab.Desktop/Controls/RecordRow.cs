@@ -1,3 +1,4 @@
+using PacketLab.Desktop.Localization;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using static PacketLab.Desktop.ViewStyle;
@@ -39,7 +40,7 @@ internal sealed class RecordRow : Border
         route = Label($"{summary.SourceAddress} → {summary.DestinationAddress}", 10, Muted, mono: true);
         route.MaxWidth = 190;
         var tag = Badge(status, 10);
-        tag.IsVisible = status.Label is not ("✓ 正常" or "↳ 分片");
+        tag.IsVisible = status.ShowBadge;
         var bottom = LayoutGrid("*,Auto,Auto", subtitle, route, tag);
         bottom.ColumnSpacing = 5;
         var text = Vertical(0, headline, bottom);
@@ -53,7 +54,7 @@ internal sealed class RecordRow : Border
         Height = 40;
         BorderBrush = Line;
         BorderThickness = new Avalonia.Thickness(0, 0, 0, 1);
-        var tooltip = $"{number.Text} · {summary.Name} · {title} · {status.Label}\n{timeText} · {record.Context}\n{route.Text}\n捕获 {record.Length} B / 原始 {record.OriginalLength} B";
+        var tooltip = UiText.Format(Strings.RecordTooltip, number.Text, summary.Name, title, status.Label, timeText, record.Context, route.Text, record.Length, record.OriginalLength);
         ToolTip.SetTip(this, tooltip);
         Avalonia.Automation.AutomationProperties.SetName(this, tooltip);
         Refresh(selected, selectedGroup);

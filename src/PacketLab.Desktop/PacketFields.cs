@@ -1,3 +1,4 @@
+using PacketLab.Desktop.Localization;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Arp;
 using PacketLab.Protocols.Ethernet;
@@ -32,12 +33,15 @@ internal sealed partial class PacketFields(byte[] bytes)
         if (decoding.Value is EthernetDecodeResult ethernet)
             view.Ethernet(ethernet);
         else
-            view.Add("原始", "链路类型", $"未支持 · {capture.LinkTypeFor(record)}");
+        {
+            var unsupported = UiText.Format(Strings.UnsupportedValue, capture.LinkTypeFor(record));
+            view.Add(Strings.Raw, Strings.LinkType, unsupported);
+        }
 
         if (record.Time.Kind != TimeKind.Present)
-            view.Add("捕获", "时间戳", record.Time.Format());
+            view.Add(Strings.Capture, Strings.Timestamp, record.Time.Format());
         if (record.Length != record.OriginalLength)
-            view.Add("捕获", "捕获 / 原始长度", $"{record.Length} / {record.OriginalLength} B");
+            view.Add(Strings.Capture, Strings.CapturedOriginalLength, $"{record.Length} / {record.OriginalLength} B");
 
         return view.Finish(record.Summary);
     }
@@ -56,7 +60,7 @@ internal sealed partial class PacketFields(byte[] bytes)
     private PacketEvidence Finish(PacketSummary summary)
     {
         if (!fields.Any(static field => field.Range.HasValue))
-            Add("原始", "未解析字节", Size(bytes.Length), 0, bytes.Length);
+            Add(Strings.Raw, Strings.UnparsedBytes, Size(bytes.Length), 0, bytes.Length);
 
         return new(bytes, summary, fields);
     }
@@ -76,7 +80,7 @@ internal sealed partial class PacketFields(byte[] bytes)
         0x0800 => "0x0800 · IPv4",
         0x0806 => "0x0806 · ARP",
         0x86dd => "0x86DD · IPv6",
-        _ => $"0x{type:X4} · 未知或未支持"
+        _ => UiText.Format(Strings.UnknownEtherType, type)
     };
 
     private void Ethernet(EthernetDecodeResult ethernet)
@@ -100,31 +104,31 @@ internal sealed partial class PacketFields(byte[] bytes)
                         break;
 
                     case UnsupportedEtherType unsupported:
-                        Add("载荷", "未解析载荷", Size(unsupported.Bytes.Length), 14, unsupported.Bytes.Length);
+                        Add(Strings.Payload, Strings.UnparsedPayload, Size(unsupported.Bytes.Length), 14, unsupported.Bytes.Length);
                         break;
                 }
                 break;
 
             case EthernetParseResult.Ieee8023Length length:
-                EthernetHeader(length.Source, length.Destination, "802.3 长度", Size(length.Length));
-                Add("载荷", "802.3 载荷未解析", Size(length.RemainingBytes.Length), 14, length.RemainingBytes.Length);
+                EthernetHeader(length.Source, length.Destination, Strings.IeeeLength, Size(length.Length));
+                Add(Strings.Payload, Strings.UnparsedIeeePayload, Size(length.RemainingBytes.Length), 14, length.RemainingBytes.Length);
                 break;
 
             case EthernetParseResult.InvalidLengthOrType invalid:
-                EthernetHeader(invalid.Source, invalid.Destination, "无效长度 / 类型", $"0x{invalid.Value:X4}");
-                Add("载荷", "未解析载荷", Size(invalid.RemainingBytes.Length), 14, invalid.RemainingBytes.Length);
+                EthernetHeader(invalid.Source, invalid.Destination, Strings.InvalidLengthType, $"0x{invalid.Value:X4}");
+                Add(Strings.Payload, Strings.UnparsedPayload, Size(invalid.RemainingBytes.Length), 14, invalid.RemainingBytes.Length);
                 break;
 
             case EthernetParseResult.IncompleteHeader truncated:
-                Add("Ethernet", "首部截断", $"需要 14 B · 已捕获 {truncated.CapturedLength} B");
+                Add("Ethernet", Strings.TruncatedHeader, UiText.Format(Strings.EthernetRequiredBytes, truncated.CapturedLength));
                 break;
         }
     }
 
     private void EthernetHeader(MacAddress source, MacAddress destination, string label, string value)
     {
-        Add("Ethernet", "目的 MAC", destination.ToString(), 0, 6);
-        Add("Ethernet", "源 MAC", source.ToString(), 6, 6);
+        Add("Ethernet", Strings.DestinationMac, destination.ToString(), 0, 6);
+        Add("Ethernet", Strings.SourceMac, source.ToString(), 6, 6);
         Add("Ethernet", label, value, 12, 2);
     }
 
@@ -133,7 +137,7 @@ internal sealed partial class PacketFields(byte[] bytes)
         if (arp.Value is not ArpPacket packet)
         {
             if (arp.Value is ArpParseResult.IncompleteHeader failure)
-                Add("ARP", "报文截断", $"需要 {failure.RequiredLength} B · 已捕获 {failure.CapturedLength} B",
+                Add("ARP", Strings.PacketTruncated, UiText.Format(Strings.RequiredAndCapturedBytes, failure.RequiredLength, failure.CapturedLength),
                     start, failure.CapturedLength);
 
             return;
@@ -141,31 +145,40 @@ internal sealed partial class PacketFields(byte[] bytes)
 
         var hardware = packet.HardwareAddressLength;
         var protocol = packet.ProtocolAddressLength;
-        Add("ARP", "硬件类型", packet.HardwareType == 1 ? "1 · Ethernet" : $"{packet.HardwareType} · 未知", start, 2);
-        Add("ARP", "协议类型", EtherType(packet.ProtocolType),
+        Add("ARP", Strings.HardwareType, packet.HardwareType == 1 ? "1 · Ethernet" : UiText.Format(Strings.UnknownValue, packet.HardwareType), start, 2);
+        Add("ARP", Strings.ProtocolType, EtherType(packet.ProtocolType),
             start + 2, 2);
-        Add("ARP", "硬件地址长度", hardware.ToString(),
+        Add("ARP", Strings.HardwareAddressLength, hardware.ToString(),
             start + 4, 1);
-        Add("ARP", "协议地址长度", protocol.ToString(),
+        Add("ARP", Strings.ProtocolAddressLength, protocol.ToString(),
             start + 5, 1);
-        var operation = packet.Operation switch { 1 => "1 · 请求", 2 => "2 · 应答", _ => $"{packet.Operation} · 未知" };
-        Add("ARP", "操作码", operation, start + 6, 2);
+        var operation = packet.Operation switch { 1 => Strings.ArpOperationRequest, 2 => Strings.ArpOperationReply, _ => UiText.Format(Strings.UnknownValue, packet.Operation) };
+        Add("ARP", Strings.Opcode, operation, start + 6, 2);
         var isMac = hardware == 6 && packet.HardwareType == 1;
         var sender = start + 8;
         var target = sender + hardware + protocol;
-        ArpAddress(isMac ? "发送方 MAC" : "发送方硬件地址", packet.SenderHardwareAddress.Span, sender, isMac, null);
-        ArpAddress("发送方", packet.SenderProtocolAddress.Span, sender + hardware, false, packet.ProtocolType);
-        ArpAddress(isMac ? "目标 MAC" : "目标硬件地址", packet.TargetHardwareAddress.Span, target, isMac, null);
-        ArpAddress("目标", packet.TargetProtocolAddress.Span, target + hardware, false, packet.ProtocolType);
+        ArpHardwareAddress(isMac ? Strings.SenderMac : Strings.SenderHardwareAddress, packet.SenderHardwareAddress.Span, sender, isMac);
+        ArpProtocolAddress(packet.SenderProtocolAddress.Span, packet.ProtocolType, sender + hardware, isTarget: false);
+        ArpHardwareAddress(isMac ? Strings.TargetMac : Strings.TargetHardwareAddress, packet.TargetHardwareAddress.Span, target, isMac);
+        ArpProtocolAddress(packet.TargetProtocolAddress.Span, packet.ProtocolType, target + hardware, isTarget: true);
         AddTrailing(packet.RemainingBytes, target + hardware + protocol, "ARP");
     }
 
-    private void ArpAddress(string name, ReadOnlySpan<byte> value, int start, bool mac, ushort? protocol)
+    private void ArpHardwareAddress(string name, ReadOnlySpan<byte> value, int start, bool mac) =>
+        Add("ARP", name, Raw(value, mac ? ":" : " "), start, value.Length);
+
+    private void ArpProtocolAddress(ReadOnlySpan<byte> value, ushort protocol, int start, bool isTarget)
     {
-        var address = protocol is { } type ? PacketAddress.FromArp(value, type) : default;
-        if (protocol.HasValue)
-            name += address.Kind == AddressKind.None ? "协议地址" : " IP";
-        var text = address.Kind != AddressKind.None ? address.ToString() : Raw(value, mac ? ":" : " ");
+        var address = PacketAddress.FromArp(value, protocol);
+        var isIp = address.Kind != AddressKind.None;
+        var name = (isTarget, isIp) switch
+        {
+            (true, true) => Strings.TargetIp,
+            (true, false) => Strings.TargetProtocolAddress,
+            (false, true) => Strings.SenderIp,
+            (false, false) => Strings.SenderProtocolAddress
+        };
+        var text = isIp ? address.ToString() : Raw(value);
         Add("ARP", name, text, start, value.Length);
     }
 
@@ -176,46 +189,49 @@ internal sealed partial class PacketFields(byte[] bytes)
             case DecodedIPv4 ip:
                 var packet = ip.Packet;
                 var header = packet.Header;
-                Add("IPv4", "版本 / IHL", $"{header.Version} · {Size(header.HeaderLength)} 首部", start, 1);
+                var versionAndHeader = UiText.Format(Strings.VersionAndHeaderSize, header.Version, Size(header.HeaderLength));
+                Add("IPv4", Strings.VersionIhl, versionAndHeader, start, 1);
                 Add("IPv4", "DSCP / ECN", $"{header.Dscp} / {header.Ecn}", start + 1, 1);
-                Add("IPv4", "总长度", Size(header.TotalLength),
+                Add("IPv4", Strings.TotalLength, Size(header.TotalLength),
                     start + 2, 2);
-                Add("IPv4", "标识符", $"0x{header.Identification:X4}", start + 4, 2);
+                Add("IPv4", Strings.Identification, $"0x{header.Identification:X4}", start + 4, 2);
                 var reserved = header.ReservedFlag ? "R 1 · " : "";
                 var flags = $"{reserved}DF {Bit(header.DontFragment)} · MF {Bit(header.MoreFragments)} · {Size(header.FragmentOffsetBytes)}";
-                Add("IPv4", "标志 / 片偏移", flags, start + 6, 2);
-                Add("IPv4", "TTL", $"{header.Ttl} 跳", start + 8, 1);
-                Add("IPv4", "上层协议", IpProtocol(header.Protocol),
+                Add("IPv4", Strings.FlagsAndFragmentOffset, flags, start + 6, 2);
+                var ttl = UiText.Format(Strings.HopCount, header.Ttl);
+                Add("IPv4", "TTL", ttl, start + 8, 1);
+                Add("IPv4", Strings.UpperLayerProtocol, IpProtocol(header.Protocol),
                     start + 9, 1);
-                var checksum = packet.ChecksumStatus switch { IPv4ChecksumStatus.Match => "匹配", IPv4ChecksumStatus.Mismatch => "不匹配", _ => "不可用" };
-                Add("IPv4", "首部校验和", $"0x{header.HeaderChecksum:X4} · {checksum}", start + 10, 2);
-                Add("IPv4", "源地址", header.Source.ToString(),
+                var checksum = packet.ChecksumStatus switch { IPv4ChecksumStatus.Match => Strings.Match, IPv4ChecksumStatus.Mismatch => Strings.Mismatch, _ => Strings.Unavailable };
+                Add("IPv4", Strings.HeaderChecksum, $"0x{header.HeaderChecksum:X4} · {checksum}", start + 10, 2);
+                Add("IPv4", Strings.SourceAddress, header.Source.ToString(),
                     start + 12, 4);
-                Add("IPv4", "目的地址", header.Destination.ToString(),
+                Add("IPv4", Strings.DestinationAddress, header.Destination.ToString(),
                     start + 16, 4);
                 if (!header.Options.IsEmpty)
-                    Add("IPv4 选项", "选项原值", Raw(header.Options.Span),
+                    Add(Strings.Ipv4Options, Strings.RawOptionBytes, Raw(header.Options.Span),
                         start + 20, header.Options.Length);
 
                 Transport(ip.Payload.Value, start + header.HeaderLength);
-                AddTrailing(packet.TrailingBytes, start + header.TotalLength, "IP 数据报");
+                AddTrailing(packet.TrailingBytes, start + header.TotalLength, Strings.IpDatagram);
 
                 return PacketSummary.FromIPv4(ip);
 
             case IPv4ParseResult.IncompleteHeader failure:
-                Add("IPv4", "首部截断", $"需要 {failure.RequiredLength} B · 已捕获 {failure.CapturedLength} B");
+                Add("IPv4", Strings.TruncatedHeader, UiText.Format(Strings.RequiredAndCapturedBytes, failure.RequiredLength, failure.CapturedLength));
                 break;
 
             case IPv4ParseResult.InvalidVersion invalid:
-                Add("IPv4", "版本无效", invalid.Version.ToString(), start, 1);
+                Add("IPv4", Strings.InvalidVersion, invalid.Version.ToString(), start, 1);
                 break;
 
             case IPv4ParseResult.InvalidHeaderLength invalid:
-                Add("IPv4", "IHL 无效", invalid.Ihl.ToString(), start, 1);
+                Add("IPv4", Strings.InvalidIhl, invalid.Ihl.ToString(), start, 1);
                 break;
 
             case IPv4ParseResult.InvalidTotalLength invalid:
-                Add("IPv4", "总长度无效", $"{Size(invalid.TotalLength)} · 首部 {Size(invalid.HeaderLength)}", start + 2, 2);
+                var invalidLength = UiText.Format(Strings.LengthAndHeaderSize, Size(invalid.TotalLength), Size(invalid.HeaderLength));
+                Add("IPv4", Strings.InvalidTotalLength, invalidLength, start + 2, 2);
                 break;
         }
 
@@ -227,40 +243,44 @@ internal sealed partial class PacketFields(byte[] bytes)
         if (result.Value is not DecodedIPv6 ip)
         {
             if (result.Value is IPv6ParseResult.InvalidVersion invalid)
-                Add("IPv6", "版本无效", invalid.Version.ToString(), start, 1);
+                Add("IPv6", Strings.InvalidVersion, invalid.Version.ToString(), start, 1);
             if (result.Value is IPv6ParseResult.IncompleteHeader failure)
-                Add("IPv6", "首部截断", $"需要 {failure.RequiredLength} B · 已捕获 {failure.CapturedLength} B");
+                Add("IPv6", Strings.TruncatedHeader, UiText.Format(Strings.RequiredAndCapturedBytes, failure.RequiredLength, failure.CapturedLength));
 
             return new(default, default, PacketIssue.Invalid, Protocol.IPv6);
         }
 
         var header = ip.Header;
-        Add("IPv6", "版本 / 流量类 / 流标签", $"{header.Version} / {header.TrafficClass} / 0x{header.FlowLabel:X5}", start, 4);
-        Add("IPv6", "载荷长度", Size(header.PayloadLength),
+        Add("IPv6", Strings.VersionTrafficFlow, $"{header.Version} / {header.TrafficClass} / 0x{header.FlowLabel:X5}", start, 4);
+        Add("IPv6", Strings.PayloadLength, Size(header.PayloadLength),
             start + 4, 2);
-        Add("IPv6", "下一首部", header.NextHeader.ToString(),
+        Add("IPv6", Strings.NextHeader, header.NextHeader.ToString(),
             start + 6, 1);
-        Add("IPv6", "跳数限制", header.HopLimit.ToString(),
+        Add("IPv6", Strings.HopLimit, header.HopLimit.ToString(),
             start + 7, 1);
-        Add("IPv6", "源地址", header.Source.ToString(),
+        Add("IPv6", Strings.SourceAddress, header.Source.ToString(),
             start + 8, 16);
-        Add("IPv6", "目的地址", header.Destination.ToString(),
+        Add("IPv6", Strings.DestinationAddress, header.Destination.ToString(),
             start + 24, 16);
         for (var index = 0; index < ip.Extensions.Length; index++)
             IPv6Extension(ip.Extensions[index], start, index);
 
         Transport(ip.Payload.Value, start + ip.RemainingOffset);
         foreach (var diagnostic in ip.Diagnostics)
-            Add("诊断", diagnostic.Code.ToString(), $"+{diagnostic.Offset} B · {diagnostic.Message}");
+        {
+            var name = Ipv6DiagnosticName(diagnostic.Code);
+            var location = Ipv6DiagnosticLocation(diagnostic);
+            Add(Strings.Diagnostics, name, location);
+        }
         if (ip.Capture.Value is IPv6Payload.KnownLength known)
         {
             if (known.DeclaredLength != header.PayloadLength)
-                Add("IPv6", "Jumbo 载荷长度", Size(known.DeclaredLength));
+                Add("IPv6", Strings.JumboPayloadLength, Size(known.DeclaredLength));
 
-            AddTrailing(known.TrailingBytes, start + 40 + known.Bytes.Length, "IP 数据报");
+            AddTrailing(known.TrailingBytes, start + 40 + known.Bytes.Length, Strings.IpDatagram);
         }
         else
-            Add("IPv6", "有效载荷长度", "无法确认");
+            Add("IPv6", Strings.EffectivePayloadLength, Strings.Undetermined);
 
         return PacketSummary.FromIPv6(ip);
     }
@@ -270,23 +290,28 @@ internal sealed partial class PacketFields(byte[] bytes)
         var start = ipStart + extension.Offset;
         var kind = extension.Type switch
         {
-            0 => "Hop-by-Hop", 43 => "Routing", 44 => "Fragment", 51 => "AH", 60 => "Destination", _ => $"扩展 {extension.Type}"
+            0 => Strings.HopByHopHeader,
+            43 => Strings.RoutingExtensionHeader,
+            44 => Strings.FragmentExtensionHeader,
+            51 => "AH",
+            60 => Strings.DestinationOptionsHeader,
+            _ => UiText.Format(Strings.ExtensionType, extension.Type)
         };
         var layer = fields.Any(field => field.Layer == kind) ? $"{kind} · {index + 1}" : kind;
-        Add(layer, "下一首部", extension.NextHeader.ToString(), start, 1);
+        Add(layer, Strings.NextHeader, extension.NextHeader.ToString(), start, 1);
         if (extension.Fragment is { } fragment)
         {
-            Add(layer, "保留字节", bytes[start + 1].ToString(),
+            Add(layer, Strings.ReservedBytes, bytes[start + 1].ToString(),
                 start + 1, 1);
-            Add(layer, "片偏移 / M", $"{Size(fragment.OffsetBytes)} · M {Bit(fragment.MoreFragments)}", start + 2, 2);
-            Add(layer, "标识符", $"0x{fragment.Identification:X8}", start + 4, 4);
+            Add(layer, Strings.FragmentOffsetAndMore, $"{Size(fragment.OffsetBytes)} · M {Bit(fragment.MoreFragments)}", start + 2, 2);
+            Add(layer, Strings.Identification, $"0x{fragment.Identification:X8}", start + 4, 4);
 
             return;
         }
 
-        Add(layer, "扩展长度", Size(extension.Length),
+        Add(layer, Strings.ExtensionLength, Size(extension.Length),
             start + 1, 1);
-        Add(layer, "扩展数据", Raw(extension.Bytes.Span[2..]),
+        Add(layer, Strings.ExtensionData, Raw(extension.Bytes.Span[2..]),
             start + 2,
                 extension.Length - 2);
     }
@@ -304,34 +329,85 @@ internal sealed partial class PacketFields(byte[] bytes)
                 break;
 
             case IPv4FragmentPayload fragment:
-                Add("分片载荷", "已捕获片段", Size(fragment.Bytes.Length), start, fragment.Bytes.Length);
-                Add("分片载荷", "声明片段长度", Size(fragment.DeclaredLength));
+                Add(Strings.FragmentPayload, Strings.CapturedFragment, Size(fragment.Bytes.Length), start, fragment.Bytes.Length);
+                Add(Strings.FragmentPayload, Strings.DeclaredFragmentLength, Size(fragment.DeclaredLength));
                 break;
 
             case IPv6FragmentPayload fragment:
-                Add("分片载荷", "已捕获片段", Size(fragment.Bytes.Length), start, fragment.Bytes.Length);
-                Add("分片载荷", "声明片段长度", Size(fragment.DeclaredLength));
+                Add(Strings.FragmentPayload, Strings.CapturedFragment, Size(fragment.Bytes.Length), start, fragment.Bytes.Length);
+                Add(Strings.FragmentPayload, Strings.DeclaredFragmentLength, Size(fragment.DeclaredLength));
                 break;
 
             case UnsupportedIpProtocol unknown:
-                Add("载荷", $"协议 {unknown.Protocol} · 未支持", Size(unknown.DeclaredLength));
-                Add("载荷", "未解析载荷", Size(unknown.Bytes.Length), start, unknown.Bytes.Length);
+                Add(Strings.Payload, UiText.Format(Strings.UnsupportedProtocolNumber, unknown.Protocol), Size(unknown.DeclaredLength));
+                Add(Strings.Payload, Strings.UnparsedPayload, Size(unknown.Bytes.Length), start, unknown.Bytes.Length);
                 break;
 
             case IPv6NoNextHeader:
-                Add("载荷", "无下一首部", "59");
+                Add(Strings.Payload, Strings.NoNextHeader, "59");
                 break;
 
             case IPv6PayloadUnavailable unavailable:
-                Add("载荷", "协议解析不可用", unavailable.Reason.ToString());
+                var reason = unavailable.Reason switch
+                {
+                    IPv6PayloadFailure.Invalid => Strings.Invalid,
+                    IPv6PayloadFailure.Truncated => Strings.Truncated,
+                    _ => Strings.Unsupported
+                };
+                Add(Strings.Payload, Strings.ProtocolDecodingUnavailable, reason);
                 break;
         }
+    }
+
+    private static string Ipv6DiagnosticName(IPv6DiagnosticCode code) => code switch
+    {
+        IPv6DiagnosticCode.PayloadTruncated => Strings.Ipv6PayloadTruncated,
+        IPv6DiagnosticCode.HeaderTruncated => Strings.Ipv6ExtensionTruncated,
+        IPv6DiagnosticCode.HeaderExceedsPayload => Strings.Ipv6ExtensionExceedsPayload,
+        IPv6DiagnosticCode.InvalidHeaderLength => Strings.Ipv6ExtensionLengthInvalid,
+        IPv6DiagnosticCode.InvalidOptions => Strings.Ipv6OptionInvalid,
+        IPv6DiagnosticCode.MissingJumboPayload => Strings.Ipv6JumboMissing,
+        IPv6DiagnosticCode.InvalidJumboPayload => Strings.Ipv6JumboInvalid,
+        IPv6DiagnosticCode.JumboFragment => Strings.Ipv6JumboFragment,
+        IPv6DiagnosticCode.InvalidHopByHopPosition => Strings.Ipv6HopByHopPosition,
+        IPv6DiagnosticCode.DuplicateFragment => Strings.Ipv6DuplicateFragment,
+        IPv6DiagnosticCode.ReassemblyRequired => Strings.Ipv6ReassemblyRequired,
+        IPv6DiagnosticCode.EncryptedEsp => Strings.Ipv6EncryptedEsp,
+        IPv6DiagnosticCode.UnsupportedNextHeader => Strings.Ipv6UnsupportedHeader,
+        IPv6DiagnosticCode.FinalDestinationUnavailable => Strings.Ipv6DestinationUnavailable,
+        IPv6DiagnosticCode.SourceAddressUnavailable => Strings.Ipv6SourceUnavailable,
+        _ => Strings.Unknown
+    };
+
+    private static string Ipv6DiagnosticLocation(IPv6Diagnostic diagnostic)
+    {
+        var pattern = diagnostic.Code switch
+        {
+            IPv6DiagnosticCode.PayloadTruncated => Strings.Ipv6PayloadCaptureLengths,
+            IPv6DiagnosticCode.HeaderTruncated => Strings.Ipv6HeaderCaptureLength,
+            IPv6DiagnosticCode.HeaderExceedsPayload => Strings.Ipv6HeaderRemainingLength,
+            IPv6DiagnosticCode.InvalidHeaderLength => Strings.Ipv6InvalidAhLength,
+            IPv6DiagnosticCode.UnsupportedNextHeader => Strings.Ipv6UnsupportedHeaderNumber,
+            IPv6DiagnosticCode.FinalDestinationUnavailable => Strings.Ipv6RoutingContext,
+            _ => null
+        };
+        var location = $"+{diagnostic.Offset} B";
+        if (pattern is null)
+            return location;
+
+        var arguments = diagnostic.Arguments;
+        var detail = UiText.Format(pattern, arguments.First, arguments.Second, arguments.Third);
+
+        return $"{location} · {detail}";
     }
 
     private void AddTrailing(ReadOnlyMemory<byte> unused, int start, string source)
     {
         if (!unused.IsEmpty)
-            Add("尾随", $"{source}后字节", Size(unused.Length), start, unused.Length);
+        {
+            var label = UiText.Format(Strings.BytesAfter, source);
+            Add(Strings.Trailing, label, Size(unused.Length), start, unused.Length);
+        }
     }
 
     internal static string Raw(ReadOnlySpan<byte> bytes, string separator = " ")

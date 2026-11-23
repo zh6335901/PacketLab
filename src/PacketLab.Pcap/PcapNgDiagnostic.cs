@@ -1,0 +1,78 @@
+namespace PacketLab.Pcap;
+
+public enum PcapNgDiagnosticCode
+{
+    Unspecified,
+    TruncatedSectionBlockType,
+    ExpectedSectionHeader,
+    SectionOffsetLimit,
+    MetadataLimit,
+    TruncatedSectionByteOrder,
+    InvalidByteOrder,
+    TruncatedBlock,
+    BlockLengthMismatch,
+    InvalidBlockLength,
+    BlockLengthLimit,
+    SectionBoundaryMismatch,
+    TruncatedBlockHeader,
+    PrematureEndOfSection,
+    ShortSectionHeader,
+    UnsupportedSectionVersion,
+    InvalidSectionLength,
+    ShortInterfaceDescription,
+    ShortInterfaceOption,
+    DuplicateInterfaceOption,
+    MissingInterfaceFilterType,
+    ShortPacketBlock,
+    UndefinedInterface,
+    PacketDataExceedsBlock,
+    ExtraSimplePacketBytes,
+    CapturedLengthExceedsOriginal,
+    CapturedLengthExceedsSnapLen,
+    PacketLengthLimit,
+    ShortPacketOption,
+    IncompleteOptionHeader,
+    InvalidEndOfOptions,
+    OptionExceedsBlock,
+    OptionCountLimit
+}
+
+public readonly record struct PcapNgDiagnostic(PcapNgDiagnosticCode Code, long FirstArgument = 0, long SecondArgument = 0)
+{
+    internal string Detail => Code switch
+    {
+        PcapNgDiagnosticCode.TruncatedSectionBlockType => "Truncated section block type; expected 4 bytes.",
+        PcapNgDiagnosticCode.ExpectedSectionHeader => "Expected a PCAPNG Section Header Block.",
+        PcapNgDiagnosticCode.SectionOffsetLimit => "Section length exceeds the supported stream offset range.",
+        PcapNgDiagnosticCode.MetadataLimit => $"Section/interface metadata exceeds the configured limit {FirstArgument} bytes.",
+        PcapNgDiagnosticCode.TruncatedSectionByteOrder => "Truncated section byte-order magic.",
+        PcapNgDiagnosticCode.InvalidByteOrder => $"Invalid byte-order magic 0x{FirstArgument:X8}.",
+        PcapNgDiagnosticCode.TruncatedBlock => $"Truncated block; expected {FirstArgument} bytes.",
+        PcapNgDiagnosticCode.BlockLengthMismatch => "Trailing block length does not match its header.",
+        PcapNgDiagnosticCode.InvalidBlockLength => $"Invalid block length {FirstArgument}; expected an aligned length of at least {SecondArgument}.",
+        PcapNgDiagnosticCode.BlockLengthLimit => $"Block length {FirstArgument} exceeds the configured limit {SecondArgument} bytes.",
+        PcapNgDiagnosticCode.SectionBoundaryMismatch => "Block boundary does not match the declared section length.",
+        PcapNgDiagnosticCode.TruncatedBlockHeader => "Truncated block header.",
+        PcapNgDiagnosticCode.PrematureEndOfSection => "EOF before the declared end of the section.",
+        PcapNgDiagnosticCode.ShortSectionHeader => "Section header requires a 16-byte body.",
+        PcapNgDiagnosticCode.UnsupportedSectionVersion => $"Unsupported section version {FirstArgument}.{SecondArgument}; expected 1.0 or 1.2.",
+        PcapNgDiagnosticCode.InvalidSectionLength => $"Invalid section length {FirstArgument}.",
+        PcapNgDiagnosticCode.ShortInterfaceDescription => "Interface description requires an 8-byte body.",
+        PcapNgDiagnosticCode.ShortInterfaceOption => $"Interface option {FirstArgument} requires {SecondArgument} bytes.",
+        PcapNgDiagnosticCode.DuplicateInterfaceOption => $"Duplicate interface option {FirstArgument}.",
+        PcapNgDiagnosticCode.MissingInterfaceFilterType => "Interface filter option requires a filter type.",
+        PcapNgDiagnosticCode.ShortPacketBlock => $"Packet block requires at least {FirstArgument} body bytes.",
+        PcapNgDiagnosticCode.UndefinedInterface => $"Interface {FirstArgument} has not been defined in this section.",
+        PcapNgDiagnosticCode.PacketDataExceedsBlock => "Captured packet data and padding exceed the block body.",
+        PcapNgDiagnosticCode.ExtraSimplePacketBytes => "Simple Packet Blocks cannot contain options or extra packet bytes.",
+        PcapNgDiagnosticCode.CapturedLengthExceedsOriginal => $"Captured length {FirstArgument} exceeds original length {SecondArgument}.",
+        PcapNgDiagnosticCode.CapturedLengthExceedsSnapLen => $"Captured length {FirstArgument} exceeds interface SnapLen {SecondArgument}.",
+        PcapNgDiagnosticCode.PacketLengthLimit => $"Captured length {FirstArgument} exceeds the single-packet limit {SecondArgument}.",
+        PcapNgDiagnosticCode.ShortPacketOption => $"Packet option {FirstArgument} requires {SecondArgument} bytes.",
+        PcapNgDiagnosticCode.IncompleteOptionHeader => "Incomplete option header.",
+        PcapNgDiagnosticCode.InvalidEndOfOptions => "End-of-options must have zero length and terminate the options.",
+        PcapNgDiagnosticCode.OptionExceedsBlock => $"Option {FirstArgument} data and padding exceed the block body.",
+        PcapNgDiagnosticCode.OptionCountLimit => $"Option count exceeds the configured per-block limit {FirstArgument}.",
+        _ => throw new ArgumentOutOfRangeException(nameof(Code))
+    };
+}

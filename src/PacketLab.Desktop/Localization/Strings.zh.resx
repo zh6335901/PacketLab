@@ -1,0 +1,1302 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AcknowledgmentNumber" xml:space="preserve">
+    <value>确认号</value>
+  </data>
+  <data name="AllFiles" xml:space="preserve">
+    <value>所有文件</value>
+  </data>
+  <data name="AllRecords" xml:space="preserve">
+    <value>全部</value>
+  </data>
+  <data name="ArpOpcode" xml:space="preserve">
+    <value>ARP 操作码 {0}</value>
+  </data>
+  <data name="ArpOperationReply" xml:space="preserve">
+    <value>2 · 应答</value>
+  </data>
+  <data name="ArpOperationRequest" xml:space="preserve">
+    <value>1 · 请求</value>
+  </data>
+  <data name="ArpProbe" xml:space="preserve">
+    <value>ARP 地址探测</value>
+  </data>
+  <data name="ArpReply" xml:space="preserve">
+    <value>ARP 应答</value>
+  </data>
+  <data name="ArpRequest" xml:space="preserve">
+    <value>ARP 请求</value>
+  </data>
+  <data name="ArpSimplePacket" xml:space="preserve">
+    <value>ARP 请求 · Simple Packet</value>
+  </data>
+  <data name="AssociationLimitDiscarded" xml:space="preserve">
+    <value>超过关联记录数限制，重组已丢弃。</value>
+  </data>
+  <data name="AssociationLimitReached" xml:space="preserve">
+    <value>达到关联记录上限</value>
+  </data>
+  <data name="AwaitingMoreFragments" xml:space="preserve">
+    <value>{0} 等待后续分片</value>
+  </data>
+  <data name="BigEndian" xml:space="preserve">
+    <value>大端</value>
+  </data>
+  <data name="ByteOffset" xml:space="preserve">
+    <value>偏移</value>
+  </data>
+  <data name="ByteOrder" xml:space="preserve">
+    <value>字节序</value>
+  </data>
+  <data name="BytesAfter" xml:space="preserve">
+    <value>{0}后字节</value>
+  </data>
+  <data name="BytesBeyondUdpLength" xml:space="preserve">
+    <value>UDP 长度外字节</value>
+  </data>
+  <data name="CannotReadFragmentBytes" xml:space="preserve">
+    <value>无法读取分片字节 · {0}</value>
+  </data>
+  <data name="CannotReadFullBytes" xml:space="preserve">
+    <value>无法读取完整字节 · {0}</value>
+  </data>
+  <data name="CannotReadRecordBytes" xml:space="preserve">
+    <value>无法读取记录字节 · {0}</value>
+  </data>
+  <data name="Capture" xml:space="preserve">
+    <value>捕获</value>
+  </data>
+  <data name="CaptureChanged" xml:space="preserve">
+    <value>抓包文件在读取时发生变化。</value>
+  </data>
+  <data name="CaptureContext" xml:space="preserve">
+    <value>捕获上下文</value>
+  </data>
+  <data name="CaptureErrorAtOffset" xml:space="preserve">
+    <value>文件偏移 {0:N0}（0x{1:X}）{2} · {3}</value>
+  </data>
+  <data name="CaptureFiles" xml:space="preserve">
+    <value>捕获文件</value>
+  </data>
+  <data name="CaptureMetadata" xml:space="preserve">
+    <value>捕获元数据</value>
+  </data>
+  <data name="CaptureRecordList" xml:space="preserve">
+    <value>捕获记录列表</value>
+  </data>
+  <data name="CaptureRecordStructure" xml:space="preserve">
+    <value>{0:N0} 条记录 · {1}</value>
+  </data>
+  <data name="CaptureRecords" xml:space="preserve">
+    <value>捕获记录</value>
+  </data>
+  <data name="CaptureStructure" xml:space="preserve">
+    <value>捕获结构</value>
+  </data>
+  <data name="CaptureTime" xml:space="preserve">
+    <value>捕获时间</value>
+  </data>
+  <data name="CapturedFragment" xml:space="preserve">
+    <value>已捕获片段</value>
+  </data>
+  <data name="CapturedOriginalLength" xml:space="preserve">
+    <value>捕获 / 原始长度</value>
+  </data>
+  <data name="CapturedPayload" xml:space="preserve">
+    <value>已捕获载荷</value>
+  </data>
+  <data name="Checksum" xml:space="preserve">
+    <value>校验和</value>
+  </data>
+  <data name="ChecksumStatus" xml:space="preserve">
+    <value>校验状态</value>
+  </data>
+  <data name="ChooseAnotherCapture" xml:space="preserve">
+    <value>选择其他抓包文件</value>
+  </data>
+  <data name="ChooseAnotherFile" xml:space="preserve">
+    <value>选择其他文件</value>
+  </data>
+  <data name="ChooseCaptureHint" xml:space="preserve">
+    <value>选择本地 PCAP 或 PCAPNG 文件以查看捕获记录。</value>
+  </data>
+  <data name="ChooseFile" xml:space="preserve">
+    <value>选择文件</value>
+  </data>
+  <data name="ClearFilters" xml:space="preserve">
+    <value>清除筛选</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="CloseNavigation" xml:space="preserve">
+    <value>关闭工具导航</value>
+  </data>
+  <data name="CloseWindow" xml:space="preserve">
+    <value>关闭窗口</value>
+  </data>
+  <data name="CollapseGroup" xml:space="preserve">
+    <value>收起{0}</value>
+  </data>
+  <data name="CollapseNavigation" xml:space="preserve">
+    <value>收起工具导航</value>
+  </data>
+  <data name="CompleteCoverage" xml:space="preserve">
+    <value>完整覆盖 {0} B</value>
+  </data>
+  <data name="CurrentProtocolFields" xml:space="preserve">
+    <value>当前协议字段</value>
+  </data>
+  <data name="CurrentRecord" xml:space="preserve">
+    <value>当前记录 {0}</value>
+  </data>
+  <data name="DeclaredFragmentLength" xml:space="preserve">
+    <value>声明片段长度</value>
+  </data>
+  <data name="DeclaredPayloadLength" xml:space="preserve">
+    <value>声明载荷长度</value>
+  </data>
+  <data name="DestinationAddress" xml:space="preserve">
+    <value>目的地址</value>
+  </data>
+  <data name="DestinationMac" xml:space="preserve">
+    <value>目的 MAC</value>
+  </data>
+  <data name="DestinationOptionsHeader" xml:space="preserve">
+    <value>目的选项</value>
+  </data>
+  <data name="DestinationPort" xml:space="preserve">
+    <value>目的端口</value>
+  </data>
+  <data name="DiagnosticRecords" xml:space="preserve">
+    <value>诊断记录</value>
+  </data>
+  <data name="Diagnostics" xml:space="preserve">
+    <value>诊断</value>
+  </data>
+  <data name="DirectoryMissing" xml:space="preserve">
+    <value>找不到抓包文件所在的目录。</value>
+  </data>
+  <data name="DisplayedRecordCount" xml:space="preserve">
+    <value>显示 {0} 条</value>
+  </data>
+  <data name="EffectiveLength" xml:space="preserve">
+    <value>有效长度</value>
+  </data>
+  <data name="EffectivePayloadLength" xml:space="preserve">
+    <value>有效载荷长度</value>
+  </data>
+  <data name="EmptyCapture" xml:space="preserve">
+    <value>{0} 中没有捕获记录。</value>
+  </data>
+  <data name="EndOfOptions" xml:space="preserve">
+    <value>选项结束</value>
+  </data>
+  <data name="EthernetHeaderTooShort" xml:space="preserve">
+    <value>Ethernet 首部不足</value>
+  </data>
+  <data name="EthernetRequiredBytes" xml:space="preserve">
+    <value>需要 14 B · 已捕获 {0} B</value>
+  </data>
+  <data name="EvidenceBytes" xml:space="preserve">
+    <value>{0}字节</value>
+  </data>
+  <data name="ExpandGroup" xml:space="preserve">
+    <value>展开{0}</value>
+  </data>
+  <data name="ExpandNavigation" xml:space="preserve">
+    <value>展开工具导航</value>
+  </data>
+  <data name="ExtensionData" xml:space="preserve">
+    <value>扩展数据</value>
+  </data>
+  <data name="ExtensionLength" xml:space="preserve">
+    <value>扩展长度</value>
+  </data>
+  <data name="ExtensionType" xml:space="preserve">
+    <value>扩展 {0}</value>
+  </data>
+  <data name="FileAccessDenied" xml:space="preserve">
+    <value>没有读取此文件的权限。</value>
+  </data>
+  <data name="FileAndFormat" xml:space="preserve">
+    <value>文件与格式</value>
+  </data>
+  <data name="FileErrorForName" xml:space="preserve">
+    <value>{0}：{1}</value>
+  </data>
+  <data name="FileIoError" xml:space="preserve">
+    <value>文件读取失败（错误 0x{0:X8}）。</value>
+  </data>
+  <data name="FileMissing" xml:space="preserve">
+    <value>找不到抓包文件。</value>
+  </data>
+  <data name="FilePathTooLong" xml:space="preserve">
+    <value>文件路径太长。</value>
+  </data>
+  <data name="FilePickerError" xml:space="preserve">
+    <value>无法打开文件选择器。</value>
+  </data>
+  <data name="FileReadError" xml:space="preserve">
+    <value>× 文件读取错误</value>
+  </data>
+  <data name="FinalFragment" xml:space="preserve">
+    <value>尾片</value>
+  </data>
+  <data name="FinalFragmentFirst" xml:space="preserve">
+    <value>{0} 尾片先到</value>
+  </data>
+  <data name="FirstFragment" xml:space="preserve">
+    <value>首片</value>
+  </data>
+  <data name="FirstFragmentOf" xml:space="preserve">
+    <value>{0} 首片</value>
+  </data>
+  <data name="Flags" xml:space="preserve">
+    <value>标志位</value>
+  </data>
+  <data name="FlagsAndFragmentOffset" xml:space="preserve">
+    <value>标志 / 片偏移</value>
+  </data>
+  <data name="FractionOutOfRange" xml:space="preserve">
+    <value>{0} · 超出范围</value>
+  </data>
+  <data name="FragmentByteTooltip" xml:space="preserve">
+    <value>{0} · 0x{1:X4} · 载荷 +{2} B · {3:X2}</value>
+  </data>
+  <data name="FragmentCoverage" xml:space="preserve">
+    <value>分片覆盖图</value>
+  </data>
+  <data name="FragmentCoverageAndBytes" xml:space="preserve">
+    <value>分片覆盖图与字节对照</value>
+  </data>
+  <data name="FragmentExtensionHeader" xml:space="preserve">
+    <value>分片首部</value>
+  </data>
+  <data name="FragmentFlagAndOffset" xml:space="preserve">
+    <value>{0} 为 {1}，片偏移为 {2} B。</value>
+  </data>
+  <data name="FragmentGroupDiscarded" xml:space="preserve">
+    <value>{0} 分片组已丢弃</value>
+  </data>
+  <data name="FragmentGroups" xml:space="preserve">
+    <value>分片组</value>
+  </data>
+  <data name="FragmentOffsetAndMore" xml:space="preserve">
+    <value>片偏移 / M</value>
+  </data>
+  <data name="FragmentOverlap" xml:space="preserve">
+    <value>{0} 分片发生重叠</value>
+  </data>
+  <data name="FragmentPayload" xml:space="preserve">
+    <value>分片载荷</value>
+  </data>
+  <data name="FragmentPayloadOffset" xml:space="preserve">
+    <value>分片载荷偏移 / B</value>
+  </data>
+  <data name="FragmentStartsAt" xml:space="preserve">
+    <value>{0}起点 0x0000 · 分片载荷始于 0x{1:X4}</value>
+  </data>
+  <data name="FragmentTruncated" xml:space="preserve">
+    <value>{0} 分片截断</value>
+  </data>
+  <data name="Fragments" xml:space="preserve">
+    <value>分片</value>
+  </data>
+  <data name="Frame" xml:space="preserve">
+    <value>帧</value>
+  </data>
+  <data name="FrameOrigin" xml:space="preserve">
+    <value>帧起点</value>
+  </data>
+  <data name="FullBytes" xml:space="preserve">
+    <value>完整字节</value>
+  </data>
+  <data name="Global" xml:space="preserve">
+    <value>全局</value>
+  </data>
+  <data name="GlobalLinkNoSection" xml:space="preserve">
+    <value>全局链路信息 · Section 不适用</value>
+  </data>
+  <data name="HardwareAddressLength" xml:space="preserve">
+    <value>硬件地址长度</value>
+  </data>
+  <data name="HardwareType" xml:space="preserve">
+    <value>硬件类型</value>
+  </data>
+  <data name="HeaderChecksum" xml:space="preserve">
+    <value>首部校验和</value>
+  </data>
+  <data name="HeaderLength" xml:space="preserve">
+    <value>首部长度</value>
+  </data>
+  <data name="HexAndAscii" xml:space="preserve">
+    <value>十六进制和 ASCII</value>
+  </data>
+  <data name="HideFullBytes" xml:space="preserve">
+    <value>收起完整字节 ▴</value>
+  </data>
+  <data name="HopByHopHeader" xml:space="preserve">
+    <value>逐跳选项</value>
+  </data>
+  <data name="HopCount" xml:space="preserve">
+    <value>{0} 跳</value>
+  </data>
+  <data name="HopLimit" xml:space="preserve">
+    <value>跳数限制</value>
+  </data>
+  <data name="Identification" xml:space="preserve">
+    <value>标识符</value>
+  </data>
+  <data name="IeeeLength" xml:space="preserve">
+    <value>802.3 长度</value>
+  </data>
+  <data name="IncompleteArpAddress" xml:space="preserve">
+    <value>ARP 地址不完整</value>
+  </data>
+  <data name="IncompleteCaptureHeader" xml:space="preserve">
+    <value>文件首部不完整，应有 24 字节，实际读取 {0} 字节。</value>
+  </data>
+  <data name="IncompletePacketData" xml:space="preserve">
+    <value>报文数据不完整，应有 {0} 字节，实际读取 {1} 字节。</value>
+  </data>
+  <data name="IncompleteRecordHeader" xml:space="preserve">
+    <value>记录首部不完整，应有 16 字节，实际读取 {0} 字节。</value>
+  </data>
+  <data name="IndexingCapture" xml:space="preserve">
+    <value>正在索引捕获记录…</value>
+  </data>
+  <data name="Invalid" xml:space="preserve">
+    <value>无效</value>
+  </data>
+  <data name="InvalidCaptureMagic" xml:space="preserve">
+    <value>未知的 PCAP 魔数 0x{0:X8}。</value>
+  </data>
+  <data name="InvalidFilePath" xml:space="preserve">
+    <value>文件路径或格式无效。</value>
+  </data>
+  <data name="InvalidIhl" xml:space="preserve">
+    <value>IHL 无效</value>
+  </data>
+  <data name="InvalidLengthType" xml:space="preserve">
+    <value>无效长度 / 类型</value>
+  </data>
+  <data name="InvalidLinkTypeBits" xml:space="preserve">
+    <value>LinkType 的 R 位和 Reserved3 位必须为零（原值 0x{0:X8}）。</value>
+  </data>
+  <data name="InvalidOption" xml:space="preserve">
+    <value>无效选项</value>
+  </data>
+  <data name="InvalidOptionLength" xml:space="preserve">
+    <value>选项长度无效</value>
+  </data>
+  <data name="InvalidProtocolField" xml:space="preserve">
+    <value>{0} 字段无效</value>
+  </data>
+  <data name="InvalidSnapLen" xml:space="preserve">
+    <value>SnapLen 必须为非零值。</value>
+  </data>
+  <data name="InvalidTcpDataOffset" xml:space="preserve">
+    <value>Data Offset 小于 5</value>
+  </data>
+  <data name="InvalidTimestampValue" xml:space="preserve">
+    <value>无效 · 秒 {0} / {1} {2}</value>
+  </data>
+  <data name="InvalidTotalLength" xml:space="preserve">
+    <value>总长度无效</value>
+  </data>
+  <data name="InvalidUdpLengthField" xml:space="preserve">
+    <value>UDP 长度字段无效</value>
+  </data>
+  <data name="InvalidUdpLengthFromIp" xml:space="preserve">
+    <value>IP 声明的 UDP 长度无效 · {0}</value>
+  </data>
+  <data name="InvalidUdpLengthOrChecksum" xml:space="preserve">
+    <value>UDP 长度或校验和字段无效</value>
+  </data>
+  <data name="InvalidUpperLayerLength" xml:space="preserve">
+    <value>上层长度无效</value>
+  </data>
+  <data name="InvalidVersion" xml:space="preserve">
+    <value>版本无效</value>
+  </data>
+  <data name="IpDatagram" xml:space="preserve">
+    <value>IP 数据报</value>
+  </data>
+  <data name="Ipv4Options" xml:space="preserve">
+    <value>IPv4 选项</value>
+  </data>
+  <data name="Ipv6AtomicFragment" xml:space="preserve">
+    <value>IPv6 原子分片</value>
+  </data>
+  <data name="Ipv6DestinationUnavailable" xml:space="preserve">
+    <value>无法确定校验和所需的最终目的地址</value>
+  </data>
+  <data name="Ipv6DuplicateFragment" xml:space="preserve">
+    <value>分片首部重复</value>
+  </data>
+  <data name="Ipv6EncryptedEsp" xml:space="preserve">
+    <value>ESP 内容已加密</value>
+  </data>
+  <data name="Ipv6ExtensionExceedsPayload" xml:space="preserve">
+    <value>扩展首部超出声明的载荷</value>
+  </data>
+  <data name="Ipv6ExtensionLengthInvalid" xml:space="preserve">
+    <value>扩展首部长度无效</value>
+  </data>
+  <data name="Ipv6ExtensionTruncated" xml:space="preserve">
+    <value>扩展首部被截断</value>
+  </data>
+  <data name="Ipv6FirstFragmentWithExtensions" xml:space="preserve">
+    <value>IPv6 首片 · 扩展链</value>
+  </data>
+  <data name="Ipv6HeaderCaptureLength" xml:space="preserve">
+    <value>首部 {0} 需要 {1} B，已捕获 {2} B</value>
+  </data>
+  <data name="Ipv6HeaderRemainingLength" xml:space="preserve">
+    <value>首部 {0} 需要 {1} B，声明剩余 {2} B</value>
+  </data>
+  <data name="Ipv6HopByHopPosition" xml:space="preserve">
+    <value>逐跳选项必须紧跟固定首部</value>
+  </data>
+  <data name="Ipv6InvalidAhLength" xml:space="preserve">
+    <value>AH 长度为 {0} B，须包含 12 字节的固定首部且是 8 的倍数</value>
+  </data>
+  <data name="Ipv6JumboFragment" xml:space="preserve">
+    <value>Jumbo Payload 不能与分片首部同时出现</value>
+  </data>
+  <data name="Ipv6JumboInvalid" xml:space="preserve">
+    <value>Jumbo Payload 选项无效</value>
+  </data>
+  <data name="Ipv6JumboMissing" xml:space="preserve">
+    <value>缺少 Jumbo Payload 选项</value>
+  </data>
+  <data name="Ipv6OptionInvalid" xml:space="preserve">
+    <value>扩展首部选项无效</value>
+  </data>
+  <data name="Ipv6OverlapDiscarded" xml:space="preserve">
+    <value>IPv6 重叠分片触发整组丢弃。</value>
+  </data>
+  <data name="Ipv6PayloadCaptureLengths" xml:space="preserve">
+    <value>声明载荷 {0} B，已捕获 {1} B</value>
+  </data>
+  <data name="Ipv6PayloadTruncated" xml:space="preserve">
+    <value>载荷未完整捕获</value>
+  </data>
+  <data name="Ipv6ReassemblyRequired" xml:space="preserve">
+    <value>重组前无法读取完整的上层报文</value>
+  </data>
+  <data name="Ipv6RoutingContext" xml:space="preserve">
+    <value>Routing Type {0}，Segments Left {1}</value>
+  </data>
+  <data name="Ipv6SourceUnavailable" xml:space="preserve">
+    <value>无法确定校验和所需的源地址</value>
+  </data>
+  <data name="Ipv6UdpAfterExtensions" xml:space="preserve">
+    <value>IPv6 扩展后承载 UDP</value>
+  </data>
+  <data name="Ipv6UnsupportedHeader" xml:space="preserve">
+    <value>不支持该下一首部类型</value>
+  </data>
+  <data name="Ipv6UnsupportedHeaderNumber" xml:space="preserve">
+    <value>下一首部 {0}，无法解析上层报文</value>
+  </data>
+  <data name="IssueChecksumMismatch" xml:space="preserve">
+    <value>捕获字节的校验和与计算值不匹配，可能与校验卸载有关。</value>
+  </data>
+  <data name="IssueChecksumUnavailable" xml:space="preserve">
+    <value>无法验证校验和。</value>
+  </data>
+  <data name="IssueInvalidCaptureLength" xml:space="preserve">
+    <value>声明的原始长度小于捕获长度。</value>
+  </data>
+  <data name="IssueInvalidFields" xml:space="preserve">
+    <value>存在无效的协议字段。</value>
+  </data>
+  <data name="IssueInvalidTimestamp" xml:space="preserve">
+    <value>时间戳的小数部分超出范围，保留原值。</value>
+  </data>
+  <data name="IssueNoTimestamp" xml:space="preserve">
+    <value>此记录未提供时间戳。</value>
+  </data>
+  <data name="IssueTruncated" xml:space="preserve">
+    <value>报文或协议首部未完整捕获。</value>
+  </data>
+  <data name="IssueUnknownValues" xml:space="preserve">
+    <value>保留未知字段或选项的原值。</value>
+  </data>
+  <data name="IssueUnsupportedProtocol" xml:space="preserve">
+    <value>封装或协议未支持，原始字节可供核对。</value>
+  </data>
+  <data name="JumboPayloadLength" xml:space="preserve">
+    <value>Jumbo 载荷长度</value>
+  </data>
+  <data name="LengthAndHeaderSize" xml:space="preserve">
+    <value>{0} · 首部 {1}</value>
+  </data>
+  <data name="LengthExceedsSnapLen" xml:space="preserve">
+    <value>捕获长度 {0} 超过了 SnapLen {1}。</value>
+  </data>
+  <data name="Link" xml:space="preserve">
+    <value>链路</value>
+  </data>
+  <data name="LinkType" xml:space="preserve">
+    <value>链路类型</value>
+  </data>
+  <data name="ListSeparator" xml:space="preserve">
+    <value>、</value>
+  </data>
+  <data name="LittleEndian" xml:space="preserve">
+    <value>小端</value>
+  </data>
+  <data name="LiveCapture" xml:space="preserve">
+    <value>实时抓包</value>
+  </data>
+  <data name="Match" xml:space="preserve">
+    <value>匹配</value>
+  </data>
+  <data name="MaximizeWindow" xml:space="preserve">
+    <value>最大化</value>
+  </data>
+  <data name="MetadataButtonLabel" xml:space="preserve">
+    <value>捕获元数据</value>
+  </data>
+  <data name="Microseconds" xml:space="preserve">
+    <value>微秒</value>
+  </data>
+  <data name="MiddleFragment" xml:space="preserve">
+    <value>中间片</value>
+  </data>
+  <data name="MinimizeWindow" xml:space="preserve">
+    <value>最小化</value>
+  </data>
+  <data name="Mismatch" xml:space="preserve">
+    <value>不匹配</value>
+  </data>
+  <data name="MissingAtEndOfCapture" xml:space="preserve">
+    <value>捕获结束时仍缺少分片。</value>
+  </data>
+  <data name="MissingAtEndOfSection" xml:space="preserve">
+    <value>Section 结束时仍缺少分片。</value>
+  </data>
+  <data name="MissingFragments" xml:space="preserve">
+    <value>{0} 缺片</value>
+  </data>
+  <data name="NamedFrame" xml:space="preserve">
+    <value>{0} 帧</value>
+  </data>
+  <data name="NamedRecordsAndTotal" xml:space="preserve">
+    <value>{0} 等 {1} 条记录</value>
+  </data>
+  <data name="Nanoseconds" xml:space="preserve">
+    <value>纳秒</value>
+  </data>
+  <data name="NetworkExperiments" xml:space="preserve">
+    <value>网络实验</value>
+  </data>
+  <data name="NextGroup" xml:space="preserve">
+    <value>下一组</value>
+  </data>
+  <data name="NextHeader" xml:space="preserve">
+    <value>下一首部</value>
+  </data>
+  <data name="NoDescription" xml:space="preserve">
+    <value>描述未提供</value>
+  </data>
+  <data name="NoInterfaceName" xml:space="preserve">
+    <value>接口名未提供</value>
+  </data>
+  <data name="NoKnownOffset" xml:space="preserve">
+    <value>无确定偏移</value>
+  </data>
+  <data name="NoMatchingRecords" xml:space="preserve">
+    <value>没有匹配的记录。</value>
+  </data>
+  <data name="NoNextHeader" xml:space="preserve">
+    <value>无下一首部</value>
+  </data>
+  <data name="NoPreviewableRecords" xml:space="preserve">
+    <value>没有可预览的记录</value>
+  </data>
+  <data name="NoReassembledDatagram" xml:space="preserve">
+    <value>未生成重组数据报</value>
+  </data>
+  <data name="NoRecordsWithFilters" xml:space="preserve">
+    <value>当前筛选下没有可查看的记录。</value>
+  </data>
+  <data name="NonZeroPadding" xml:space="preserve">
+    <value> · 含非零字节</value>
+  </data>
+  <data name="NotApplicable" xml:space="preserve">
+    <value>不适用</value>
+  </data>
+  <data name="NotProvided" xml:space="preserve">
+    <value>未提供</value>
+  </data>
+  <data name="OffsetNoCapturedBytes" xml:space="preserve">
+    <value>{0} B · 无捕获字节</value>
+  </data>
+  <data name="Opcode" xml:space="preserve">
+    <value>操作码</value>
+  </data>
+  <data name="OpenCapture" xml:space="preserve">
+    <value>打开抓包文件</value>
+  </data>
+  <data name="OpenNavigation" xml:space="preserve">
+    <value>打开工具导航</value>
+  </data>
+  <data name="OptionCaptureTruncated" xml:space="preserve">
+    <value>选项未完整捕获</value>
+  </data>
+  <data name="OptionExceedsHeader" xml:space="preserve">
+    <value>选项超出首部范围</value>
+  </data>
+  <data name="OptionKind" xml:space="preserve">
+    <value>类型 {0}</value>
+  </data>
+  <data name="OriginalRecord" xml:space="preserve">
+    <value>原始记录 {0}</value>
+  </data>
+  <data name="OverlapDifferentBytes" xml:space="preserve">
+    <value>重叠范围存在不同字节。</value>
+  </data>
+  <data name="OverlapFirstFragment" xml:space="preserve">
+    <value>{0} 重叠组 · 首片</value>
+  </data>
+  <data name="OverlapIdenticalBytes" xml:space="preserve">
+    <value>重叠位置的字节相同。</value>
+  </data>
+  <data name="OverlapSummary" xml:space="preserve">
+    <value>载荷 {0} B 重叠（斜纹）。{1}{2}</value>
+  </data>
+  <data name="OverlappingFragmentRanges" xml:space="preserve">
+    <value>分片范围发生冲突，重组已丢弃。</value>
+  </data>
+  <data name="PacketBytesSource" xml:space="preserve">
+    <value>报文字节来源</value>
+  </data>
+  <data name="PacketLimitExceeded" xml:space="preserve">
+    <value>捕获长度 {0} 超过了单报文上限 {1}。</value>
+  </data>
+  <data name="PacketTruncated" xml:space="preserve">
+    <value>报文截断</value>
+  </data>
+  <data name="PaddingBytes" xml:space="preserve">
+    <value>填充</value>
+  </data>
+  <data name="Payload" xml:space="preserve">
+    <value>载荷</value>
+  </data>
+  <data name="PayloadLength" xml:space="preserve">
+    <value>载荷长度</value>
+  </data>
+  <data name="PayloadLocation" xml:space="preserve">
+    <value>载荷 +{0} B  ｜  {1}  ｜  {2}</value>
+  </data>
+  <data name="PcapNgBlockAtOffset" xml:space="preserve">
+    <value>PCAPNG 块起始偏移 {0} B：{1}</value>
+  </data>
+  <data name="PcapNgBlockLengthLimit" xml:space="preserve">
+    <value>块长度 {0} 超过了配置的 {1} 字节上限。</value>
+  </data>
+  <data name="PcapNgBlockLengthMismatch" xml:space="preserve">
+    <value>块尾长度与块首部中的长度不一致。</value>
+  </data>
+  <data name="PcapNgCapturedLengthExceedsOriginal" xml:space="preserve">
+    <value>捕获长度 {0} 超过了原始长度 {1}。</value>
+  </data>
+  <data name="PcapNgCapturedLengthExceedsSnapLen" xml:space="preserve">
+    <value>捕获长度 {0} 超过了接口的 SnapLen {1}。</value>
+  </data>
+  <data name="PcapNgDuplicateInterfaceOption" xml:space="preserve">
+    <value>接口选项 {0} 重复。</value>
+  </data>
+  <data name="PcapNgEnhancedPacketBlock" xml:space="preserve">
+    <value>Enhanced Packet Block</value>
+  </data>
+  <data name="PcapNgExpectedSectionHeader" xml:space="preserve">
+    <value>此处应为 PCAPNG Section Header Block。</value>
+  </data>
+  <data name="PcapNgExtraSimplePacketBytes" xml:space="preserve">
+    <value>Simple Packet Block 不能包含选项或额外的报文字节。</value>
+  </data>
+  <data name="PcapNgIncompleteOptionHeader" xml:space="preserve">
+    <value>选项首部不完整。</value>
+  </data>
+  <data name="PcapNgInvalidBlock" xml:space="preserve">
+    <value>PCAPNG 块无效或不完整。</value>
+  </data>
+  <data name="PcapNgInvalidBlockLength" xml:space="preserve">
+    <value>块长度 {0} 无效，长度必须对齐且至少为 {1} 字节。</value>
+  </data>
+  <data name="PcapNgInvalidByteOrder" xml:space="preserve">
+    <value>字节序魔数 0x{0:X8} 无效。</value>
+  </data>
+  <data name="PcapNgInvalidEndOfOptions" xml:space="preserve">
+    <value>选项结束标记的长度必须为零，且必须位于选项末尾。</value>
+  </data>
+  <data name="PcapNgInvalidSectionLength" xml:space="preserve">
+    <value>Section 长度 {0} 无效。</value>
+  </data>
+  <data name="PcapNgMetadataLimit" xml:space="preserve">
+    <value>Section 或接口元数据超过了配置的 {0} 字节上限。</value>
+  </data>
+  <data name="PcapNgMissingInterfaceFilterType" xml:space="preserve">
+    <value>接口筛选选项缺少筛选类型。</value>
+  </data>
+  <data name="PcapNgOptionCountLimit" xml:space="preserve">
+    <value>选项数量超过了配置的每块上限 {0}。</value>
+  </data>
+  <data name="PcapNgOptionExceedsBlock" xml:space="preserve">
+    <value>选项 {0} 的数据和填充超出了块体范围。</value>
+  </data>
+  <data name="PcapNgPacketBlock" xml:space="preserve">
+    <value>Packet Block</value>
+  </data>
+  <data name="PcapNgPacketDataExceedsBlock" xml:space="preserve">
+    <value>捕获的报文数据和填充超出了块体范围。</value>
+  </data>
+  <data name="PcapNgPacketLengthLimit" xml:space="preserve">
+    <value>捕获长度 {0} 超过了单报文上限 {1}。</value>
+  </data>
+  <data name="PcapNgPrematureEndOfSection" xml:space="preserve">
+    <value>文件在 Section 声明的结束位置之前结束。</value>
+  </data>
+  <data name="PcapNgSectionBoundaryMismatch" xml:space="preserve">
+    <value>块边界与 Section 声明的长度不一致。</value>
+  </data>
+  <data name="PcapNgSectionOffsetLimit" xml:space="preserve">
+    <value>Section 长度超出了支持的流偏移范围。</value>
+  </data>
+  <data name="PcapNgShortInterfaceDescription" xml:space="preserve">
+    <value>Interface Description Block 需要 8 字节的块体。</value>
+  </data>
+  <data name="PcapNgShortInterfaceOption" xml:space="preserve">
+    <value>接口选项 {0} 需要 {1} 字节。</value>
+  </data>
+  <data name="PcapNgShortPacketBlock" xml:space="preserve">
+    <value>报文块的块体至少需要 {0} 字节。</value>
+  </data>
+  <data name="PcapNgShortPacketOption" xml:space="preserve">
+    <value>报文选项 {0} 需要 {1} 字节。</value>
+  </data>
+  <data name="PcapNgShortSectionHeader" xml:space="preserve">
+    <value>Section Header Block 需要 16 字节的块体。</value>
+  </data>
+  <data name="PcapNgSimplePacketBlock" xml:space="preserve">
+    <value>Simple Packet Block</value>
+  </data>
+  <data name="PcapNgTruncatedBlock" xml:space="preserve">
+    <value>块被截断，应为 {0} 字节。</value>
+  </data>
+  <data name="PcapNgTruncatedBlockHeader" xml:space="preserve">
+    <value>块首部被截断。</value>
+  </data>
+  <data name="PcapNgTruncatedSectionBlockType" xml:space="preserve">
+    <value>Section 块类型被截断，应为 4 字节。</value>
+  </data>
+  <data name="PcapNgTruncatedSectionByteOrder" xml:space="preserve">
+    <value>Section 的字节序魔数被截断。</value>
+  </data>
+  <data name="PcapNgUndefinedInterface" xml:space="preserve">
+    <value>此 Section 中没有定义接口 {0}。</value>
+  </data>
+  <data name="PcapNgUnsupportedSectionVersion" xml:space="preserve">
+    <value>不支持 Section 版本 {0}.{1}，支持 1.0 和 1.2。</value>
+  </data>
+  <data name="PcapRecord" xml:space="preserve">
+    <value>PCAP 记录</value>
+  </data>
+  <data name="Permitted" xml:space="preserve">
+    <value>允许</value>
+  </data>
+  <data name="Planned" xml:space="preserve">
+    <value>规划中</value>
+  </data>
+  <data name="PlannedTool" xml:space="preserve">
+    <value>{0} · 规划中</value>
+  </data>
+  <data name="PreviousGroup" xml:space="preserve">
+    <value>上一组</value>
+  </data>
+  <data name="ProtocolAddressLength" xml:space="preserve">
+    <value>协议地址长度</value>
+  </data>
+  <data name="ProtocolChecksumMismatch" xml:space="preserve">
+    <value>{0} 校验和不匹配</value>
+  </data>
+  <data name="ProtocolDecodingUnavailable" xml:space="preserve">
+    <value>协议解析不可用</value>
+  </data>
+  <data name="ProtocolFields" xml:space="preserve">
+    <value>协议字段</value>
+  </data>
+  <data name="ProtocolType" xml:space="preserve">
+    <value>协议类型</value>
+  </data>
+  <data name="PseudoHeaderUnavailable" xml:space="preserve">
+    <value>伪首部不可用</value>
+  </data>
+  <data name="Raw" xml:space="preserve">
+    <value>原始</value>
+  </data>
+  <data name="RawBytes" xml:space="preserve">
+    <value>原始字节</value>
+  </data>
+  <data name="RawOptionBytes" xml:space="preserve">
+    <value>选项原值</value>
+  </data>
+  <data name="Reading" xml:space="preserve">
+    <value>正在读取…</value>
+  </data>
+  <data name="ReadingCapture" xml:space="preserve">
+    <value>正在读取抓包文件</value>
+  </data>
+  <data name="ReadingFullBytes" xml:space="preserve">
+    <value>正在读取完整字节…</value>
+  </data>
+  <data name="ReadingLocalFile" xml:space="preserve">
+    <value>正在本地读取文件…</value>
+  </data>
+  <data name="ReadingProtocolFields" xml:space="preserve">
+    <value>正在读取协议字段…</value>
+  </data>
+  <data name="ReassembledDatagramSummary" xml:space="preserve">
+    <value>重组 IP 数据报 {0} B · {1}</value>
+  </data>
+  <data name="ReassembledIp" xml:space="preserve">
+    <value>重组 IP</value>
+  </data>
+  <data name="ReassembledIpDatagram" xml:space="preserve">
+    <value>重组 IP 数据报</value>
+  </data>
+  <data name="ReassembledIpOrigin" xml:space="preserve">
+    <value>重组 IP 起点</value>
+  </data>
+  <data name="ReassembledPayloadMembers" xml:space="preserve">
+    <value>{0} 共同形成 {1} B 的 IP 载荷。</value>
+  </data>
+  <data name="ReassemblyAborted" xml:space="preserve">
+    <value>读取中止时，重组尚未完成。</value>
+  </data>
+  <data name="ReassemblyAlreadyDiscarded" xml:space="preserve">
+    <value>此数据报已丢弃，标识将保留至超时。</value>
+  </data>
+  <data name="ReassemblyAtomicFragment" xml:space="preserve">
+    <value>此原子分片可独立处理。</value>
+  </data>
+  <data name="ReassemblyAwaitingFragments" xml:space="preserve">
+    <value>等待连续分片及末片提供的总长度。</value>
+  </data>
+  <data name="ReassemblyBufferLimit" xml:space="preserve">
+    <value>分片缓冲区已达到字节数上限。</value>
+  </data>
+  <data name="ReassemblyCompleteCoverage" xml:space="preserve">
+    <value>已捕获完整的分片载荷。</value>
+  </data>
+  <data name="ReassemblyCompletion" xml:space="preserve">
+    <value>{0} {1} · 补齐数据报</value>
+  </data>
+  <data name="ReassemblyDatagramByteLimit" xml:space="preserve">
+    <value>单个数据报已达到字节数上限。</value>
+  </data>
+  <data name="ReassemblyDatagramTableLimit" xml:space="preserve">
+    <value>数据报跟踪表已达到上限（含已丢弃的标识）。</value>
+  </data>
+  <data name="ReassemblyDiscarded" xml:space="preserve">
+    <value>重组已丢弃</value>
+  </data>
+  <data name="ReassemblyDiscardedByCaller" xml:space="preserve">
+    <value>调用方已丢弃此数据报。</value>
+  </data>
+  <data name="ReassemblyDuplicateIgnored" xml:space="preserve">
+    <value>已忽略完全相同的重复分片。</value>
+  </data>
+  <data name="ReassemblyExpiredByCaller" xml:space="preserve">
+    <value>调用方已终止此数据报的重组。</value>
+  </data>
+  <data name="ReassemblyFragmentCountLimit" xml:space="preserve">
+    <value>数据报的分片数已达到上限。</value>
+  </data>
+  <data name="ReassemblyIncompatibleEcn" xml:space="preserve">
+    <value>CE 与 Not-ECT 分片无法合并。</value>
+  </data>
+  <data name="ReassemblyIncompatibleHeaders" xml:space="preserve">
+    <value>IP 首部或扩展首部不兼容。</value>
+  </data>
+  <data name="ReassemblyIncomplete" xml:space="preserve">
+    <value>分片不完整。</value>
+  </data>
+  <data name="ReassemblyInconsistentFinalLength" xml:space="preserve">
+    <value>末片所确定的数据报长度不一致。</value>
+  </data>
+  <data name="ReassemblyInvalidIpv4Flags" xml:space="preserve">
+    <value>IPv4 分片标志无效。</value>
+  </data>
+  <data name="ReassemblyInvalidIpv6ExtensionChain" xml:space="preserve">
+    <value>IPv6 扩展首部链无效或不完整。</value>
+  </data>
+  <data name="ReassemblyInvalidLengthOrAlignment" xml:space="preserve">
+    <value>分片长度无效或未按 8 字节对齐。</value>
+  </data>
+  <data name="ReassemblyIpLengthLimit" xml:space="preserve">
+    <value>重组后的 IP 长度超出上限。</value>
+  </data>
+  <data name="ReassemblyLimitReached" xml:space="preserve">
+    <value>达到重组资源限制</value>
+  </data>
+  <data name="ReassemblyMissingFragments" xml:space="preserve">
+    <value>仍有分片缺失。</value>
+  </data>
+  <data name="ReassemblyMissingIpv6UpperLayerChain" xml:space="preserve">
+    <value>IPv6 首片缺少完整的上层首部链。</value>
+  </data>
+  <data name="ReassemblyOverlapDiscarded" xml:space="preserve">
+    <value>分片范围发生重叠，整个数据报已丢弃。</value>
+  </data>
+  <data name="ReassemblyRangeExceedsIpLength" xml:space="preserve">
+    <value>分片范围超出 IP 长度上限。</value>
+  </data>
+  <data name="ReassemblyTimedOut" xml:space="preserve">
+    <value>等待后续分片超时。</value>
+  </data>
+  <data name="ReassemblyTruncatedPayload" xml:space="preserve">
+    <value>分片载荷未完整捕获。</value>
+  </data>
+  <data name="RecordComment" xml:space="preserve">
+    <value>记录注释</value>
+  </data>
+  <data name="RecordDetails" xml:space="preserve">
+    <value>{0} · {1} · 捕获 {2} B / 原始 {3} B</value>
+  </data>
+  <data name="RecordHeading" xml:space="preserve">
+    <value>记录 {0}</value>
+  </data>
+  <data name="RecordLocationTooltip" xml:space="preserve">
+    <value>{0} · {1} · 文件偏移 0x{2:X}</value>
+  </data>
+  <data name="RecordSpanLimit" xml:space="preserve">
+    <value>超过记录跨度限制，重组已结束。</value>
+  </data>
+  <data name="RecordTooltip" xml:space="preserve">
+    <value>{0} · {1} · {2} · {3}
+{4} · {5}
+{6}
+捕获 {7} B / 原始 {8} B</value>
+  </data>
+  <data name="RecordWorkbench" xml:space="preserve">
+    <value>记录工作台</value>
+  </data>
+  <data name="Records" xml:space="preserve">
+    <value>记录</value>
+  </data>
+  <data name="ReferenceGroupsSuffix" xml:space="preserve">
+    <value> 等 {0} 段</value>
+  </data>
+  <data name="RequiredAndCapturedBytes" xml:space="preserve">
+    <value>需要 {0} B · 已捕获 {1} B</value>
+  </data>
+  <data name="ReservedBits" xml:space="preserve">
+    <value>保留位</value>
+  </data>
+  <data name="ReservedBytes" xml:space="preserve">
+    <value>保留字节</value>
+  </data>
+  <data name="ResizeRecordList" xml:space="preserve">
+    <value>调整捕获记录列表宽度</value>
+  </data>
+  <data name="ResizeRecordListHint" xml:space="preserve">
+    <value>拖动调整宽度 · 方向键微调 · 双击或按 Enter 复位</value>
+  </data>
+  <data name="RestoreWindow" xml:space="preserve">
+    <value>向下还原</value>
+  </data>
+  <data name="RoutingExtensionHeader" xml:space="preserve">
+    <value>路由首部</value>
+  </data>
+  <data name="SackPermitted" xml:space="preserve">
+    <value>允许 SACK</value>
+  </data>
+  <data name="SearchRecords" xml:space="preserve">
+    <value>搜索记录</value>
+  </data>
+  <data name="SearchRecordsHint" xml:space="preserve">
+    <value>搜索序号、地址或协议</value>
+  </data>
+  <data name="SectionTimestampOffset" xml:space="preserve">
+    <value>{0} · 时间偏移 {1} s</value>
+  </data>
+  <data name="SectionWithoutInterfaces" xml:space="preserve">
+    <value>PCAPNG {0}.{1} · {2} · 未提供接口</value>
+  </data>
+  <data name="SectionsAndInterfaces" xml:space="preserve">
+    <value>{0} 个 Section · {1} 个接口</value>
+  </data>
+  <data name="SenderHardwareAddress" xml:space="preserve">
+    <value>发送方硬件地址</value>
+  </data>
+  <data name="SenderIp" xml:space="preserve">
+    <value>发送方 IP</value>
+  </data>
+  <data name="SenderMac" xml:space="preserve">
+    <value>发送方 MAC</value>
+  </data>
+  <data name="SenderProtocolAddress" xml:space="preserve">
+    <value>发送方协议地址</value>
+  </data>
+  <data name="SequenceNumber" xml:space="preserve">
+    <value>序列号</value>
+  </data>
+  <data name="ShowFullBytes" xml:space="preserve">
+    <value>并排查看完整字节 ▾</value>
+  </data>
+  <data name="SingleByte" xml:space="preserve">
+    <value>单字节</value>
+  </data>
+  <data name="SourceAddress" xml:space="preserve">
+    <value>源地址</value>
+  </data>
+  <data name="SourceFileOffset" xml:space="preserve">
+    <value>{0} · 文件偏移 0x{1:X}</value>
+  </data>
+  <data name="SourceMac" xml:space="preserve">
+    <value>源 MAC</value>
+  </data>
+  <data name="SourcePort" xml:space="preserve">
+    <value>源端口</value>
+  </data>
+  <data name="StatusAtomicFragment" xml:space="preserve">
+    <value>✓ 原子分片</value>
+  </data>
+  <data name="StatusChecksumUnavailable" xml:space="preserve">
+    <value>· 校验不可用</value>
+  </data>
+  <data name="StatusConflict" xml:space="preserve">
+    <value>× 冲突</value>
+  </data>
+  <data name="StatusDiscarded" xml:space="preserve">
+    <value>× 已丢弃</value>
+  </data>
+  <data name="StatusDuplicateFragment" xml:space="preserve">
+    <value>↳ 重复分片</value>
+  </data>
+  <data name="StatusFragment" xml:space="preserve">
+    <value>↳ 分片</value>
+  </data>
+  <data name="StatusInvalidFields" xml:space="preserve">
+    <value>× 无效字段</value>
+  </data>
+  <data name="StatusMismatch" xml:space="preserve">
+    <value>! 不匹配</value>
+  </data>
+  <data name="StatusMissingFragments" xml:space="preserve">
+    <value>! 缺片</value>
+  </data>
+  <data name="StatusNoTimestamp" xml:space="preserve">
+    <value>· 无时间戳</value>
+  </data>
+  <data name="StatusNormal" xml:space="preserve">
+    <value>✓ 正常</value>
+  </data>
+  <data name="StatusReassembled" xml:space="preserve">
+    <value>✓ 已重组</value>
+  </data>
+  <data name="StatusReassemblyTimeout" xml:space="preserve">
+    <value>! 重组超时</value>
+  </data>
+  <data name="StatusResourceLimit" xml:space="preserve">
+    <value>! 资源限制</value>
+  </data>
+  <data name="StatusTruncated" xml:space="preserve">
+    <value>! 截断</value>
+  </data>
+  <data name="StatusUnknownItems" xml:space="preserve">
+    <value>· 含未知项</value>
+  </data>
+  <data name="StatusUnsupported" xml:space="preserve">
+    <value>· 未支持</value>
+  </data>
+  <data name="TargetHardwareAddress" xml:space="preserve">
+    <value>目标硬件地址</value>
+  </data>
+  <data name="TargetIp" xml:space="preserve">
+    <value>目标 IP</value>
+  </data>
+  <data name="TargetMac" xml:space="preserve">
+    <value>目标 MAC</value>
+  </data>
+  <data name="TargetProtocolAddress" xml:space="preserve">
+    <value>目标协议地址</value>
+  </data>
+  <data name="TcpHeaderExceedsSegment" xml:space="preserve">
+    <value>TCP 首部超出数据段长度</value>
+  </data>
+  <data name="TcpHeaderTooLong" xml:space="preserve">
+    <value>首部超过 IP 声明的 TCP 长度 {0}</value>
+  </data>
+  <data name="TcpOptions" xml:space="preserve">
+    <value>TCP 选项</value>
+  </data>
+  <data name="TcpOptionsMss" xml:space="preserve">
+    <value>TCP 选项 · MSS {0}</value>
+  </data>
+  <data name="TcpRequiredBytes" xml:space="preserve">
+    <value>需要 20 B · 已捕获 {0}</value>
+  </data>
+  <data name="TimeResolution" xml:space="preserve">
+    <value>时间分辨率</value>
+  </data>
+  <data name="TimedRecordRange" xml:space="preserve">
+    <value>{0} – {1}（{2:N0} 条有时间）</value>
+  </data>
+  <data name="Timestamp" xml:space="preserve">
+    <value>时间戳</value>
+  </data>
+  <data name="TitleBar" xml:space="preserve">
+    <value>PacketLab 窗口标题栏</value>
+  </data>
+  <data name="ToolNavigation" xml:space="preserve">
+    <value>工具导航</value>
+  </data>
+  <data name="TotalLength" xml:space="preserve">
+    <value>总长度</value>
+  </data>
+  <data name="TrafficAnalysis" xml:space="preserve">
+    <value>流量分析</value>
+  </data>
+  <data name="Trailing" xml:space="preserve">
+    <value>尾随</value>
+  </data>
+  <data name="Truncated" xml:space="preserve">
+    <value>截断</value>
+  </data>
+  <data name="TruncatedFragmentPayload" xml:space="preserve">
+    <value>分片载荷未完整捕获。</value>
+  </data>
+  <data name="TruncatedHeader" xml:space="preserve">
+    <value>首部截断</value>
+  </data>
+  <data name="TruncatedOptions" xml:space="preserve">
+    <value>选项截断</value>
+  </data>
+  <data name="TruncatedPayloadOrHeader" xml:space="preserve">
+    <value>载荷或首部截断</value>
+  </data>
+  <data name="TruncatedUdpPayload" xml:space="preserve">
+    <value>UDP 载荷截断</value>
+  </data>
+  <data name="UdpLength" xml:space="preserve">
+    <value>UDP 长度</value>
+  </data>
+  <data name="UdpLengthBeyondIpPayload" xml:space="preserve">
+    <value>UDP 长度超出 IP 载荷</value>
+  </data>
+  <data name="UdpLengthExceedsIpPayload" xml:space="preserve">
+    <value>UDP 长度超过 IP 声明的载荷 {0}</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>不可用</value>
+  </data>
+  <data name="UnavailableReason" xml:space="preserve">
+    <value>不可用 · {0}</value>
+  </data>
+  <data name="Undetermined" xml:space="preserve">
+    <value>无法确认</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>未知</value>
+  </data>
+  <data name="UnknownBytePosition" xml:space="preserve">
+    <value>位置未确认</value>
+  </data>
+  <data name="UnknownEtherType" xml:space="preserve">
+    <value>0x{0:X4} · 未知或未支持</value>
+  </data>
+  <data name="UnknownField" xml:space="preserve">
+    <value>字段无法确认</value>
+  </data>
+  <data name="UnknownOption" xml:space="preserve">
+    <value>未知选项</value>
+  </data>
+  <data name="UnknownValue" xml:space="preserve">
+    <value>{0} · 未知</value>
+  </data>
+  <data name="Unlimited" xml:space="preserve">
+    <value>无上限 · 0</value>
+  </data>
+  <data name="UnparsedBytes" xml:space="preserve">
+    <value>未解析字节</value>
+  </data>
+  <data name="UnparsedHeaderBytes" xml:space="preserve">
+    <value>未解析首部原值</value>
+  </data>
+  <data name="UnparsedIeeePayload" xml:space="preserve">
+    <value>802.3 载荷未解析</value>
+  </data>
+  <data name="UnparsedPayload" xml:space="preserve">
+    <value>未解析载荷</value>
+  </data>
+  <data name="UnrecognizedCapture" xml:space="preserve">
+    <value>无法识别抓包格式。</value>
+  </data>
+  <data name="Unsupported" xml:space="preserve">
+    <value>未支持</value>
+  </data>
+  <data name="UnsupportedEncapsulation" xml:space="preserve">
+    <value>{0} · 未支持的封装或协议</value>
+  </data>
+  <data name="UnsupportedLinkType" xml:space="preserve">
+    <value>未支持的链路类型</value>
+  </data>
+  <data name="UnsupportedPcapNg" xml:space="preserve">
+    <value>不支持 PCAPNG。</value>
+  </data>
+  <data name="UnsupportedPcapVersion" xml:space="preserve">
+    <value>不支持 PCAP 版本 {0}.{1}，需要 2.4。</value>
+  </data>
+  <data name="UnsupportedProtocolNumber" xml:space="preserve">
+    <value>协议 {0} · 未支持</value>
+  </data>
+  <data name="UnsupportedType" xml:space="preserve">
+    <value>类型 {0} · 未支持</value>
+  </data>
+  <data name="UnsupportedValue" xml:space="preserve">
+    <value>未支持 · {0}</value>
+  </data>
+  <data name="UpperLayerProtocol" xml:space="preserve">
+    <value>上层协议</value>
+  </data>
+  <data name="UrgentPointer" xml:space="preserve">
+    <value>紧急指针</value>
+  </data>
+  <data name="VersionAndHeaderSize" xml:space="preserve">
+    <value>{0} · {1} 首部</value>
+  </data>
+  <data name="VersionIhl" xml:space="preserve">
+    <value>版本 / IHL</value>
+  </data>
+  <data name="VersionTrafficFlow" xml:space="preserve">
+    <value>版本 / 流量类 / 流标签</value>
+  </data>
+  <data name="WindowScale" xml:space="preserve">
+    <value>窗口缩放</value>
+  </data>
+  <data name="WindowSize" xml:space="preserve">
+    <value>窗口</value>
+  </data>
+  <data name="ZeroChecksumNotAllowed" xml:space="preserve">
+    <value>此上下文禁止零校验和</value>
+  </data>
+</root>

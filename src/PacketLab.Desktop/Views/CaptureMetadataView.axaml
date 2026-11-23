@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:text="using:PacketLab.Desktop.Localization"
              xmlns:local="using:PacketLab.Desktop"
              x:Class="PacketLab.Desktop.CaptureMetadataView"
              x:DataType="local:CaptureMetadata">
@@ -39,9 +40,9 @@
               <TextBlock Text="{Binding Name}" FontFamily="{x:Static local:ViewStyle.Mono}" FontSize="20" FontWeight="SemiBold"
                          TextTrimming="CharacterEllipsis" />
               <TextBlock Text="{Binding Description}" Classes="detail-label" TextTrimming="CharacterEllipsis" />
-              <StackPanel><TextBlock Text="链路" Classes="detail-label" /><TextBlock Text="{Binding Link}" Classes="detail-value" /></StackPanel>
-              <StackPanel><TextBlock Text="字节序" Classes="detail-label" /><TextBlock Text="{Binding Order}" Classes="detail-value" /></StackPanel>
-              <StackPanel><TextBlock Text="时间分辨率" Classes="detail-label" /><TextBlock Text="{Binding Resolution}" Classes="detail-value" /></StackPanel>
+              <StackPanel><TextBlock Text="{x:Static text:Strings.Link}" Classes="detail-label" /><TextBlock Text="{Binding Link}" Classes="detail-value" /></StackPanel>
+              <StackPanel><TextBlock Text="{x:Static text:Strings.ByteOrder}" Classes="detail-label" /><TextBlock Text="{Binding Order}" Classes="detail-value" /></StackPanel>
+              <StackPanel><TextBlock Text="{x:Static text:Strings.TimeResolution}" Classes="detail-label" /><TextBlock Text="{Binding Resolution}" Classes="detail-value" /></StackPanel>
               <StackPanel><TextBlock Text="SnapLen" Classes="detail-label" /><TextBlock Text="{Binding SnapLength}" Classes="detail-value" /></StackPanel>
               <TextBlock Text="{Binding Extra}" Foreground="{x:Static local:ViewStyle.Soft}" FontFamily="{x:Static local:ViewStyle.Mono}"
                          FontSize="10" TextWrapping="Wrap" />

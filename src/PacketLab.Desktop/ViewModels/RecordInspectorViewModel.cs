@@ -1,3 +1,4 @@
+using PacketLab.Desktop.Localization;
 using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -42,11 +43,11 @@ internal sealed class RecordInspectorViewModel : ObservableObject
     public FragmentCoverage? Coverage { get; private set; }
     public FullBytePage? FullPage { get; private set; }
     public ByteSelection Selection { get; private set; } = new(null, null, null, "", "", "", "", null);
-    public string EvidenceMessage { get; private set; } = "正在读取协议字段…";
+    public string EvidenceMessage { get; private set; } = Strings.ReadingProtocolFields;
     public string? CoverageError { get; private set; }
     public string FullMessage { get; private set; } = "";
     public bool FullOpen => fullOpen;
-    public string ToggleLabel => fullOpen ? "收起完整字节 ▴" : "并排查看完整字节 ▾";
+    public string ToggleLabel => fullOpen ? Strings.HideFullBytes : Strings.ShowFullBytes;
 
     internal void Clear(bool resetFullBytes = false)
     {
@@ -77,7 +78,7 @@ internal sealed class RecordInspectorViewModel : ObservableObject
         FullPage = null;
         field = null;
         exact = null;
-        EvidenceMessage = "正在读取协议字段…";
+        EvidenceMessage = Strings.ReadingProtocolFields;
         CoverageError = null;
         FullMessage = "";
         OnPropertyChanged(nameof(Record));
@@ -111,7 +112,8 @@ internal sealed class RecordInspectorViewModel : ObservableObject
                 Evidence = null;
                 field = null;
                 exact = null;
-                EvidenceMessage = $"无法读取记录字节 · {exception.Message}";
+                var error = CaptureDiagnostics.ReadFailure(exception);
+                EvidenceMessage = UiText.Format(Strings.CannotReadRecordBytes, error);
                 OnPropertyChanged(nameof(Evidence));
                 UpdateSelection();
             }
@@ -134,16 +136,16 @@ internal sealed class RecordInspectorViewModel : ObservableObject
     {
         var name = (record, group, view.Summary) switch
         {
-            (< 0, _, _) => "目的端口",
-            (_, not null, _) => "标识符",
-            (_, _, { Protocol: Protocol.Arp }) => "目标 IP",
-            (_, _, { Issue: var issue }) when issue.HasFlag(PacketIssue.Mismatch) => "校验和",
-            (_, _, { Issue: var issue }) when issue.HasFlag(PacketIssue.Invalid) => "UDP 长度",
-            _ => "目的端口"
+            (< 0, _, _) => Strings.DestinationPort,
+            (_, not null, _) => Strings.Identification,
+            (_, _, { Protocol: Protocol.Arp }) => Strings.TargetIp,
+            (_, _, { Issue: var issue }) when issue.HasFlag(PacketIssue.Mismatch) => Strings.Checksum,
+            (_, _, { Issue: var issue }) when issue.HasFlag(PacketIssue.Invalid) => Strings.UdpLength,
+            _ => Strings.DestinationPort
         };
 
         return view.Fields.FirstOrDefault(item => item.Name == name)
-            ?? view.Fields.FirstOrDefault(item => item.Name == "目的端口")
+            ?? view.Fields.FirstOrDefault(item => item.Name == Strings.DestinationPort)
             ?? view.Fields[0];
     }
 
@@ -182,18 +184,18 @@ internal sealed class RecordInspectorViewModel : ObservableObject
     private void UpdateSelection()
     {
         var range = field?.Range;
-        var name = field is not null ? $"{field.Layer} / {field.Name}" : "原始字节";
+        var name = field is not null ? $"{field.Layer} / {field.Name}" : Strings.RawBytes;
         var bytes = Evidence?.Data.Bytes ?? [];
         (var rangeText, var raw) = (range, exact) switch
         {
             ({ } span, _) => ($"0x{span.Label} · {span.Length} B", PacketFields.Raw(bytes.AsSpan(span.Start, span.Length))),
             (null, { } index) => ($"0x{index:X4} · 1 B", bytes[index].ToString("X2")),
-            _ => ("位置未确认", "—")
+            _ => (Strings.UnknownBytePosition, "—")
         };
         var payload = PayloadOffset();
         var location = MakeLocation(payload);
 
-        Selection = new(field, exact, payload, name, rangeText, raw, field?.Value ?? "字段无法确认", location);
+        Selection = new(field, exact, payload, name, rangeText, raw, field?.Value ?? Strings.UnknownField, location);
         OnPropertyChanged(nameof(Selection));
     }
 
@@ -216,13 +218,13 @@ internal sealed class RecordInspectorViewModel : ObservableObject
         if (payload is { } offset)
         {
             var sources = data.Data.Lanes.Where(lane => lane.Covers(offset)).Select(lane =>
-                $"{(lane.Derived ? lane.Label : lane.Label + " 帧")} 0x{lane.RawIndex(offset):X4}");
+                $"{(lane.Derived ? lane.Label : UiText.Format(Strings.NamedFrame, lane.Label))} 0x{lane.RawIndex(offset):X4}");
             var labels = string.Join(" ↔ ", sources.Take(8));
 
-            return $"载荷 +{offset} B  ｜  {labels}  ｜  {raw}";
+            return UiText.Format(Strings.PayloadLocation, offset, labels, raw);
         }
 
-        var source = view.Record < 0 ? "重组 IP" : $"{Number(view.Record)} 帧";
+        var source = view.Record < 0 ? Strings.ReassembledIp : UiText.Format(Strings.NamedFrame, Number(view.Record));
 
         return $"{source} 0x{index:X4}  ｜  {raw}";
     }
@@ -254,7 +256,8 @@ internal sealed class RecordInspectorViewModel : ObservableObject
         {
             if (revision == recordRevision && current == capture)
             {
-                CoverageError = $"无法读取分片字节 · {exception.Message}";
+                var error = CaptureDiagnostics.ReadFailure(exception);
+                CoverageError = UiText.Format(Strings.CannotReadFragmentBytes, error);
                 OnPropertyChanged(nameof(Coverage));
             }
         }
@@ -263,20 +266,20 @@ internal sealed class RecordInspectorViewModel : ObservableObject
     private static CoverageSummary Summarize(FragmentGroup group, CoverageData data)
     {
         if (group.HasResult && group.DerivedSlice is { } slice)
-            return new($"完整覆盖 {slice.Length} B", $"重组 IP 数据报 {group.DerivedLength} B · {group.DerivedSummary.Transport}", RecordTone.Good);
+            return new(UiText.Format(Strings.CompleteCoverage, slice.Length), UiText.Format(Strings.ReassembledDatagramSummary, group.DerivedLength, group.DerivedSummary.Transport), RecordTone.Good);
         if (group.Status == IpReassemblyStatus.Conflict && data.Overlap.Count > 0)
         {
-            var same = data.Identical ? "重叠位置的字节相同。" : "重叠范围存在不同字节。";
-            var reason = group.Version == 6 ? "IPv6 重叠分片触发整组丢弃。" : GroupDiagnostic(group);
+            var same = data.Identical ? Strings.OverlapIdenticalBytes : Strings.OverlapDifferentBytes;
+            var reason = group.Version == 6 ? Strings.Ipv6OverlapDiscarded : GroupDiagnostic(group);
             var ranges = data.Overlap.Take(4).Select(range => range.Length == 1 ? $"{range.Start}" : $"{range.Start}–{range.End}");
-            var label = string.Join("、", ranges);
+            var label = string.Join(Strings.ListSeparator, ranges);
             if (data.Overlap.Count > 4)
-                label += $" 等 {data.Overlap.Count} 段";
+                label += UiText.Format(Strings.ReferenceGroupsSuffix, data.Overlap.Count);
 
-            return new("重组已丢弃", $"载荷 {label} B 重叠（斜纹）。{same}{reason}", RecordTone.Bad);
+            return new(Strings.ReassemblyDiscarded, UiText.Format(Strings.OverlapSummary, label, same, reason), RecordTone.Bad);
         }
 
-        return new("未生成重组数据报", GroupDiagnostic(group), RecordTone.Warn);
+        return new(Strings.NoReassembledDatagram, GroupDiagnostic(group), RecordTone.Warn);
     }
 
     private void ToggleFull()
@@ -310,7 +313,7 @@ internal sealed class RecordInspectorViewModel : ObservableObject
         var revision = ++fullRevision;
         fullPage = page;
         FullPage = null;
-        FullMessage = "正在读取完整字节…";
+        FullMessage = Strings.ReadingFullBytes;
         OnPropertyChanged(nameof(FullPage));
         try
         {
@@ -328,7 +331,8 @@ internal sealed class RecordInspectorViewModel : ObservableObject
         {
             if (revision == fullRevision)
             {
-                FullMessage = $"无法读取完整字节 · {exception.Message}";
+                var error = CaptureDiagnostics.ReadFailure(exception);
+                FullMessage = UiText.Format(Strings.CannotReadFullBytes, error);
                 OnPropertyChanged(nameof(FullPage));
             }
         }
@@ -349,8 +353,8 @@ internal sealed class RecordInspectorViewModel : ObservableObject
 
 internal sealed record EvidenceSource(int Record, PacketEvidence Data)
 {
-    public string Origin => Record < 0 ? "重组 IP 数据报" : $"原始记录 {Number(Record)}";
-    public string Coordinates => Record < 0 ? "重组 IP 起点" : "帧起点";
+    public string Origin => Record < 0 ? Strings.ReassembledIpDatagram : UiText.Format(Strings.OriginalRecord, Number(Record));
+    public string Coordinates => Record < 0 ? Strings.ReassembledIpOrigin : Strings.FrameOrigin;
 }
 
 internal sealed record FragmentCoverage(FragmentGroup Group, CoverageData Data, CoverageSummary Summary);

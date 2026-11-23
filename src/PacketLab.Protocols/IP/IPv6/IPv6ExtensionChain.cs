@@ -23,7 +23,12 @@ public enum IPv6DiagnosticCode
     UnsupportedNextHeader, FinalDestinationUnavailable, SourceAddressUnavailable
 }
 
-public sealed record IPv6Diagnostic(IPv6DiagnosticCode Code, int Offset, string Message);
+public readonly record struct IPv6DiagnosticArguments(long First, long Second = 0, long Third = 0);
+
+public sealed record IPv6Diagnostic(IPv6DiagnosticCode Code, int Offset, string Message)
+{
+    public IPv6DiagnosticArguments Arguments { get; init; }
+}
 
 public sealed record IPv6UpperLayer(byte Protocol, int Offset, uint DeclaredLength, ReadOnlyMemory<byte> Bytes,
     IPv6ChecksumContext ChecksumContext)

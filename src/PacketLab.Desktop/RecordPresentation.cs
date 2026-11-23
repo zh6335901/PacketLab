@@ -1,3 +1,4 @@
+using PacketLab.Desktop.Localization;
 using PacketLab.Analysis.IpReassembly;
 using System.Collections;
 using PacketLab.Protocols.IP.Reassembly;
@@ -8,23 +9,23 @@ internal enum RecordFilter { All, Diagnostics, Fragments }
 
 internal enum RecordTone { Good, Bad, Warn, Blue, Neutral }
 
-internal readonly record struct RecordStatus(string Label, RecordTone Tone)
+internal readonly record struct RecordStatus(string Label, RecordTone Tone, bool ShowBadge = true)
 {
     internal static RecordStatus ForGroup(FragmentGroup group) => group.Status switch
     {
-        IpReassemblyStatus.Complete => new("✓ 已重组", RecordTone.Good),
-        IpReassemblyStatus.Atomic => new("✓ 原子分片", RecordTone.Good),
-        IpReassemblyStatus.Conflict => new("× 冲突", RecordTone.Bad),
+        IpReassemblyStatus.Complete => new(Strings.StatusReassembled, RecordTone.Good),
+        IpReassemblyStatus.Atomic => new(Strings.StatusAtomicFragment, RecordTone.Good),
+        IpReassemblyStatus.Conflict => new(Strings.StatusConflict, RecordTone.Bad),
         IpReassemblyStatus.Discarded when group.Reason == IpReassemblyAnalysisReason.RecordAssociationLimit =>
-            new("! 资源限制", RecordTone.Warn),
-        IpReassemblyStatus.Discarded => new("× 已丢弃", RecordTone.Bad),
-        IpReassemblyStatus.Invalid => new("× 无效字段", RecordTone.Bad),
-        IpReassemblyStatus.Truncated => new("! 截断", RecordTone.Warn),
-        IpReassemblyStatus.ResourceLimit => new("! 资源限制", RecordTone.Warn),
-        IpReassemblyStatus.Incomplete => new("! 缺片", RecordTone.Warn),
-        IpReassemblyStatus.Expired => new("! 重组超时", RecordTone.Warn),
-        IpReassemblyStatus.Duplicate => new("↳ 重复分片", RecordTone.Blue),
-        _ => new("↳ 分片", RecordTone.Blue)
+            new(Strings.StatusResourceLimit, RecordTone.Warn),
+        IpReassemblyStatus.Discarded => new(Strings.StatusDiscarded, RecordTone.Bad),
+        IpReassemblyStatus.Invalid => new(Strings.StatusInvalidFields, RecordTone.Bad),
+        IpReassemblyStatus.Truncated => new(Strings.StatusTruncated, RecordTone.Warn),
+        IpReassemblyStatus.ResourceLimit => new(Strings.StatusResourceLimit, RecordTone.Warn),
+        IpReassemblyStatus.Incomplete => new(Strings.StatusMissingFragments, RecordTone.Warn),
+        IpReassemblyStatus.Expired => new(Strings.StatusReassemblyTimeout, RecordTone.Warn),
+        IpReassemblyStatus.Duplicate => new(Strings.StatusDuplicateFragment, RecordTone.Blue),
+        _ => new(Strings.StatusFragment, RecordTone.Blue, ShowBadge: false)
     };
 
     internal static RecordStatus ForRecord(CaptureRecord record, FragmentGroup? group, int index)
@@ -33,21 +34,23 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone)
         if (group is not null && IsOutcome(group, index))
             return ForGroup(group);
         if ((issue & (PacketIssue.Invalid | PacketIssue.InvalidCaptureLength | PacketIssue.InvalidTime)) != 0)
-            return new("× 无效字段", RecordTone.Bad);
+            return new(Strings.StatusInvalidFields, RecordTone.Bad);
         if (issue.HasFlag(PacketIssue.Truncated))
-            return new("! 截断", RecordTone.Warn);
+            return new(Strings.StatusTruncated, RecordTone.Warn);
         if (issue.HasFlag(PacketIssue.Mismatch))
-            return new("! 不匹配", RecordTone.Warn);
+            return new(Strings.StatusMismatch, RecordTone.Warn);
         if (issue.HasFlag(PacketIssue.Unsupported))
-            return new("· 未支持", RecordTone.Neutral);
+            return new(Strings.StatusUnsupported, RecordTone.Neutral);
         if (issue.HasFlag(PacketIssue.NoTime))
-            return new("· 无时间戳", RecordTone.Neutral);
+            return new(Strings.StatusNoTimestamp, RecordTone.Neutral);
         if (issue.HasFlag(PacketIssue.Unknown))
-            return new("· 含未知项", RecordTone.Neutral);
+            return new(Strings.StatusUnknownItems, RecordTone.Neutral);
         if (issue.HasFlag(PacketIssue.ChecksumUnavailable))
-            return new("· 校验不可用", RecordTone.Neutral);
+            return new(Strings.StatusChecksumUnavailable, RecordTone.Neutral);
 
-        return record.Fragment is null ? new("✓ 正常", RecordTone.Good) : new("↳ 分片", RecordTone.Blue);
+        return record.Fragment is null
+            ? new(Strings.StatusNormal, RecordTone.Good, ShowBadge: false)
+            : new(Strings.StatusFragment, RecordTone.Blue, ShowBadge: false);
     }
 
     private static bool IsOutcome(FragmentGroup group, int index) => group.Status switch
@@ -64,7 +67,7 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone)
     internal static string Title(CaptureRecord record, FragmentGroup? group, int index)
     {
         if (record.Kind == PacketLab.Pcap.PcapNgPacketKind.Simple && record.Summary is { Protocol: Protocol.Arp, Detail: 1 })
-            return "ARP 请求 · Simple Packet";
+            return Strings.ArpSimplePacket;
         if (record.Fragment is not { } fragment)
             return record.Summary.Title;
 
@@ -75,7 +78,7 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone)
     {
         var name = summary.IpVersion == 6 ? "IPv6" : "IPv4";
         if (group is { Failed: true } && index > group.Records[^1])
-            return $"{name} 分片组已丢弃";
+            return UiText.Format(Strings.FragmentGroupDiscarded, name);
 
         if (group is not null && IsOutcome(group, index))
         {
@@ -84,26 +87,26 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone)
         if (fragment.Offset == 0)
         {
             if (group?.Status == IpReassemblyStatus.Conflict)
-                return $"{name} 重叠组 · 首片";
+                return UiText.Format(Strings.OverlapFirstFragment, name);
 
-            return name == "IPv6" && summary.Detail > 1 ? "IPv6 首片 · 扩展链" : $"{name} 首片";
+            return name == "IPv6" && summary.Detail > 1 ? Strings.Ipv6FirstFragmentWithExtensions : UiText.Format(Strings.FirstFragmentOf, name);
         }
         if (!fragment.More && group is not null && group.Records[0] == index)
-            return $"{name} 尾片先到";
+            return UiText.Format(Strings.FinalFragmentFirst, name);
 
-        return $"{name} {(fragment.More ? "中间片" : "尾片")} · +{fragment.Offset} B";
+        return $"{name} {(fragment.More ? Strings.MiddleFragment : Strings.FinalFragment)} · +{fragment.Offset} B";
     }
 
     private static string OutcomeTitle(string name, FragmentSlice fragment, FragmentGroup group) => group.Status switch
     {
-        IpReassemblyStatus.Complete => $"{name} {(fragment.Offset == 0 ? "首片" : "尾片")} · 补齐数据报",
-        IpReassemblyStatus.Conflict => $"{name} 分片发生重叠",
-        IpReassemblyStatus.Incomplete when fragment.Offset == 0 => $"{name} 等待后续分片",
-        IpReassemblyStatus.Incomplete => $"{name} 缺片",
-        IpReassemblyStatus.Truncated => $"{name} 分片截断",
-        IpReassemblyStatus.ResourceLimit => "达到重组资源限制",
-        IpReassemblyStatus.Atomic => "IPv6 原子分片",
-        _ when group.Reason == IpReassemblyAnalysisReason.RecordAssociationLimit => "达到关联记录上限",
+        IpReassemblyStatus.Complete => UiText.Format(Strings.ReassemblyCompletion, name, (fragment.Offset == 0 ? Strings.FirstFragment : Strings.FinalFragment)),
+        IpReassemblyStatus.Conflict => UiText.Format(Strings.FragmentOverlap, name),
+        IpReassemblyStatus.Incomplete when fragment.Offset == 0 => UiText.Format(Strings.AwaitingMoreFragments, name),
+        IpReassemblyStatus.Incomplete => UiText.Format(Strings.MissingFragments, name),
+        IpReassemblyStatus.Truncated => UiText.Format(Strings.FragmentTruncated, name),
+        IpReassemblyStatus.ResourceLimit => Strings.ReassemblyLimitReached,
+        IpReassemblyStatus.Atomic => Strings.Ipv6AtomicFragment,
+        _ when group.Reason == IpReassemblyAnalysisReason.RecordAssociationLimit => Strings.AssociationLimitReached,
         _ => $"{name} {ForGroup(group).Label[2..]}"
     };
 
@@ -113,45 +116,58 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone)
         if (record.Fragment is { } fragment)
         {
             var flag = record.Summary.IpVersion == 4 ? "MF" : "M";
-            details.Add($"{flag} 为 {(fragment.More ? 1 : 0)}，片偏移为 {fragment.Offset} B。");
+            details.Add(UiText.Format(Strings.FragmentFlagAndOffset, flag, (fragment.More ? 1 : 0), fragment.Offset));
             if (group is not null)
             {
                 if (group.HasResult && group.DerivedSlice is { } slice)
-                    details.Add($"{Members(group.Records)} 共同形成 {slice.Length} B 的 IP 载荷。");
+                {
+                    var members = Members(group.Records);
+                    details.Add(UiText.Format(Strings.ReassembledPayloadMembers, members, slice.Length));
+                }
                 else
                     details.Add(GroupDiagnostic(group));
             }
         }
         var issue = record.Summary.Issue;
-        var messages = IssueMessages.Where(entry => issue.HasFlag(entry.Issue)).Select(entry => entry.Message);
-        details.AddRange(messages);
+        foreach (var flag in IssueFlags)
+        {
+            if (issue.HasFlag(flag))
+                details.Add(IssueMessage(flag));
+        }
 
         return details.Count == 0 ? $"{record.Summary.SourceAddress} → {record.Summary.DestinationAddress}" : string.Join(" ", details);
     }
 
-    private static readonly (PacketIssue Issue, string Message)[] IssueMessages =
+    private static ReadOnlySpan<PacketIssue> IssueFlags =>
     [
-        (PacketIssue.Truncated, "报文或协议首部未完整捕获。"),
-        (PacketIssue.Invalid, "存在无效的协议字段。"),
-        (PacketIssue.Mismatch, "捕获字节的校验和与计算值不匹配，可能与校验卸载有关。"),
-        (PacketIssue.ChecksumUnavailable, "无法验证校验和。"),
-        (PacketIssue.Unsupported, "封装或协议未支持，原始字节可供核对。"),
-        (PacketIssue.Unknown, "保留未知字段或选项的原值。"),
-        (PacketIssue.NoTime, "此记录未提供时间戳。"),
-        (PacketIssue.InvalidTime, "时间戳的小数部分超出范围，保留原值。"),
-        (PacketIssue.InvalidCaptureLength, "声明的原始长度小于捕获长度。")
+        PacketIssue.Truncated, PacketIssue.Invalid, PacketIssue.Mismatch, PacketIssue.ChecksumUnavailable,
+        PacketIssue.Unsupported, PacketIssue.Unknown, PacketIssue.NoTime, PacketIssue.InvalidTime, PacketIssue.InvalidCaptureLength
     ];
+
+    private static string IssueMessage(PacketIssue issue) => issue switch
+    {
+        PacketIssue.Truncated => Strings.IssueTruncated,
+        PacketIssue.Invalid => Strings.IssueInvalidFields,
+        PacketIssue.Mismatch => Strings.IssueChecksumMismatch,
+        PacketIssue.ChecksumUnavailable => Strings.IssueChecksumUnavailable,
+        PacketIssue.Unsupported => Strings.IssueUnsupportedProtocol,
+        PacketIssue.Unknown => Strings.IssueUnknownValues,
+        PacketIssue.NoTime => Strings.IssueNoTimestamp,
+        PacketIssue.InvalidTime => Strings.IssueInvalidTimestamp,
+        PacketIssue.InvalidCaptureLength => Strings.IssueInvalidCaptureLength,
+        _ => throw new ArgumentOutOfRangeException(nameof(issue))
+    };
 
     internal static string GroupDiagnostic(FragmentGroup group) => (group.Reason, group.Status) switch
     {
-        (IpReassemblyAnalysisReason.EndOfCapture, _) => "捕获结束时仍缺少分片。",
-        (IpReassemblyAnalysisReason.EndOfSection, _) => "Section 结束时仍缺少分片。",
-        (IpReassemblyAnalysisReason.Aborted, _) => "读取中止时，重组尚未完成。",
-        (IpReassemblyAnalysisReason.RecordAgeLimit, _) => "超过记录跨度限制，重组已结束。",
-        (IpReassemblyAnalysisReason.RecordAssociationLimit, _) => "超过关联记录数限制，重组已丢弃。",
-        (_, IpReassemblyStatus.Conflict) => "分片范围发生冲突，重组已丢弃。",
-        (_, IpReassemblyStatus.Truncated) => "分片载荷未完整捕获。",
-        _ => group.Message
+        (IpReassemblyAnalysisReason.EndOfCapture, _) => Strings.MissingAtEndOfCapture,
+        (IpReassemblyAnalysisReason.EndOfSection, _) => Strings.MissingAtEndOfSection,
+        (IpReassemblyAnalysisReason.Aborted, _) => Strings.ReassemblyAborted,
+        (IpReassemblyAnalysisReason.RecordAgeLimit, _) => Strings.RecordSpanLimit,
+        (IpReassemblyAnalysisReason.RecordAssociationLimit, _) => Strings.AssociationLimitDiscarded,
+        (_, IpReassemblyStatus.Conflict) => Strings.OverlappingFragmentRanges,
+        (_, IpReassemblyStatus.Truncated) => Strings.TruncatedFragmentPayload,
+        _ => Strings.ResourceManager.GetString($"Reassembly{group.DiagnosticCode}") ?? Strings.ReassemblyIncomplete
     };
 
     internal static string Number(int index) => $"#{index + 1:000}";
@@ -159,9 +175,9 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone)
     private static string Members(IReadOnlyList<int> records)
     {
         var names = records.Take(5).Select(Number);
-        var shown = string.Join("、", names);
+        var shown = string.Join(Strings.ListSeparator, names);
 
-        return records.Count > 5 ? $"{shown} 等 {records.Count} 条记录" : shown;
+        return records.Count > 5 ? UiText.Format(Strings.NamedRecordsAndTotal, shown, records.Count) : shown;
     }
 }
 

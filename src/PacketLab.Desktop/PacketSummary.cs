@@ -1,3 +1,4 @@
+using PacketLab.Desktop.Localization;
 using System.Buffers.Binary;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Arp;
@@ -55,7 +56,7 @@ internal readonly record struct PacketAddress(ulong High, ulong Low, AddressKind
             (byte)(Low >> 16),
                 (byte)(Low >> 8), (byte)Low).ToString(),
         AddressKind.IPv6 => new IPv6Address(High, Low).ToString(),
-        _ => "未知"
+        _ => Strings.Unknown
     };
 
     internal string Endpoint(ushort? port) => (Kind, port) switch
@@ -78,7 +79,7 @@ internal readonly record struct PacketSummary(PacketAddress Source, PacketAddres
 {
     internal string Name => Protocol switch
     {
-        Protocol.Raw => "原始",
+        Protocol.Raw => Strings.Raw,
         Protocol.Arp => "ARP",
         Protocol.Tcp => "TCP",
         Protocol.Udp => "UDP",
@@ -91,22 +92,22 @@ internal readonly record struct PacketSummary(PacketAddress Source, PacketAddres
 
     internal string Title => (Protocol, Issue, Detail) switch
     {
-        (Protocol.Raw, _, _) => "未支持的链路类型",
-        (Protocol.Ethernet, PacketIssue.Truncated, _) => "Ethernet 首部不足",
-        (Protocol.Arp, PacketIssue.Truncated, _) => "ARP 地址不完整",
-        (Protocol.Arp, _, 1) when Source.Low == 0 && Source.Kind == AddressKind.IPv4 => "ARP 地址探测",
-        (Protocol.Arp, _, 1) => "ARP 请求",
-        (Protocol.Arp, _, 2) => "ARP 应答",
-        (Protocol.Arp, _, _) => $"ARP 操作码 {Detail}",
-        (Protocol.Udp, _, _) when HasPorts && Issue.HasFlag(PacketIssue.Invalid) => "UDP 长度或校验和字段无效",
-        (_, _, _) when Issue.HasFlag(PacketIssue.Invalid) => $"{Name} 字段无效",
-        (Protocol.Udp, _, _) when HasPorts && Issue.HasFlag(PacketIssue.Truncated) => "UDP 载荷截断",
-        (_, _, _) when Issue.HasFlag(PacketIssue.Truncated) => $"{Name} {(Protocol is Protocol.Tcp or Protocol.Udp ? "载荷或首部截断" : "截断")}",
-        (_, _, _) when Issue.HasFlag(PacketIssue.Mismatch) => $"{Name} 校验和不匹配",
-        (Protocol.Tcp, _, > 0) => $"TCP 选项 · MSS {Detail}",
-        (Protocol.Udp, _, _) when IpVersion == 6 && Detail > 0 => "IPv6 扩展后承载 UDP",
+        (Protocol.Raw, _, _) => Strings.UnsupportedLinkType,
+        (Protocol.Ethernet, PacketIssue.Truncated, _) => Strings.EthernetHeaderTooShort,
+        (Protocol.Arp, PacketIssue.Truncated, _) => Strings.IncompleteArpAddress,
+        (Protocol.Arp, _, 1) when Source.Low == 0 && Source.Kind == AddressKind.IPv4 => Strings.ArpProbe,
+        (Protocol.Arp, _, 1) => Strings.ArpRequest,
+        (Protocol.Arp, _, 2) => Strings.ArpReply,
+        (Protocol.Arp, _, _) => UiText.Format(Strings.ArpOpcode, Detail),
+        (Protocol.Udp, _, _) when HasPorts && Issue.HasFlag(PacketIssue.Invalid) => Strings.InvalidUdpLengthOrChecksum,
+        (_, _, _) when Issue.HasFlag(PacketIssue.Invalid) => UiText.Format(Strings.InvalidProtocolField, Name),
+        (Protocol.Udp, _, _) when HasPorts && Issue.HasFlag(PacketIssue.Truncated) => Strings.TruncatedUdpPayload,
+        (_, _, _) when Issue.HasFlag(PacketIssue.Truncated) => $"{Name} {(Protocol is Protocol.Tcp or Protocol.Udp ? Strings.TruncatedPayloadOrHeader : Strings.Truncated)}",
+        (_, _, _) when Issue.HasFlag(PacketIssue.Mismatch) => UiText.Format(Strings.ProtocolChecksumMismatch, Name),
+        (Protocol.Tcp, _, > 0) => UiText.Format(Strings.TcpOptionsMss, Detail),
+        (Protocol.Udp, _, _) when IpVersion == 6 && Detail > 0 => Strings.Ipv6UdpAfterExtensions,
         (_, _, _) when HasPorts => $"{Name} {SourcePort} → {DestinationPort}",
-        (_, _, _) when Issue.HasFlag(PacketIssue.Unsupported) => $"{Name} · 未支持的封装或协议",
+        (_, _, _) when Issue.HasFlag(PacketIssue.Unsupported) => UiText.Format(Strings.UnsupportedEncapsulation, Name),
         _ => Name
     };
 

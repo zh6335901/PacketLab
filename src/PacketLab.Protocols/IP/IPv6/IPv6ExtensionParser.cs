@@ -56,8 +56,10 @@ internal static class IPv6ExtensionParser
                 if (next == 43 && bytes[3] != 0)
                 {
                     addressesKnown = false;
+                    var arguments = new IPv6DiagnosticArguments(bytes[2], bytes[3]);
                     Diagnose(IPv6DiagnosticCode.FinalDestinationUnavailable, offset,
-                        $"Routing Type {bytes[2]}, Segments Left {bytes[3]}; final destination and checksum context unavailable");
+                        $"Routing Type {arguments.First}, Segments Left {arguments.Second}; final destination and checksum context unavailable",
+                        arguments);
                 }
                 if (fragment is not null && ProcessFragment(fragment, length, declared, ref sawFragment) is { } result)
                     return Finish(declared, result);
@@ -70,8 +72,11 @@ internal static class IPv6ExtensionParser
         private int Available(uint? declared) =>
             (int)Math.Min((ulong)captured.Length, declared ?? (ulong)captured.Length);
 
-        private void Diagnose(IPv6DiagnosticCode code, int at, string message) =>
-            (diagnostics ??= ImmutableArray.CreateBuilder<IPv6Diagnostic>()).Add(new(code, 40 + at, message));
+        private void Diagnose(IPv6DiagnosticCode code, int at, string message, IPv6DiagnosticArguments arguments = default)
+        {
+            var diagnostic = new IPv6Diagnostic(code, 40 + at, message) { Arguments = arguments };
+            (diagnostics ??= ImmutableArray.CreateBuilder<IPv6Diagnostic>()).Add(diagnostic);
+        }
 
         private IPv6Packet Finish(uint? declared, IPv6ExtensionResult result)
         {
@@ -80,7 +85,8 @@ internal static class IPv6ExtensionParser
                 ? new IPv6Payload.KnownLength(length, captured[..end], captured[end..])
                 : new IPv6Payload.UndeterminedLength(captured);
             if (declared is uint expected && captured.Length < expected)
-                Diagnose(IPv6DiagnosticCode.PayloadTruncated, end, $"payload declared {expected} bytes, captured {captured.Length}");
+                Diagnose(IPv6DiagnosticCode.PayloadTruncated, end,
+                    $"payload declared {expected} bytes, captured {captured.Length}", new(expected, captured.Length));
             var chain = new IPv6ExtensionChain(
                 Headers: headers.ToImmutable(),
                 RemainingOffset: 40 + offset,
@@ -111,7 +117,7 @@ internal static class IPv6ExtensionParser
             if (next == 50)
                 Diagnose(IPv6DiagnosticCode.EncryptedEsp, offset, "ESP encrypted content; upper layer unavailable");
             else
-                Diagnose(IPv6DiagnosticCode.UnsupportedNextHeader, offset, $"unsupported Next Header {next}; upper layer unavailable");
+                Diagnose(IPv6DiagnosticCode.UnsupportedNextHeader, offset, $"unsupported Next Header {next}; upper layer unavailable", new(next));
 
             return new(IPv6PayloadFailure.Unsupported);
         }
@@ -120,15 +126,18 @@ internal static class IPv6ExtensionParser
         {
             if (declared is uint length && (ulong)offset + (uint)required > length)
             {
+                var declaredRemainder = length - (uint)offset;
                 Diagnose(IPv6DiagnosticCode.HeaderExceedsPayload, offset,
-                    $"header {next} requires {required} bytes, declared remainder {length - (uint)offset}");
+                    $"header {next} requires {required} bytes, declared remainder {declaredRemainder}", new(next, required, declaredRemainder));
 
                 return new(IPv6PayloadFailure.Invalid);
             }
-            if (Available(declared) - offset < required)
+
+            var capturedRemainder = Available(declared) - offset;
+            if (capturedRemainder < required)
             {
                 Diagnose(IPv6DiagnosticCode.HeaderTruncated, offset,
-                    $"header {next} requires {required} bytes, captured {Available(declared) - offset}");
+                    $"header {next} requires {required} bytes, captured {capturedRemainder}", new(next, required, capturedRemainder));
 
                 return new(IPv6PayloadFailure.Truncated);
             }
@@ -151,7 +160,8 @@ internal static class IPv6ExtensionParser
             };
             if (next == 51 && (length < 12 || length % 8 != 0))
             {
-                Diagnose(IPv6DiagnosticCode.InvalidHeaderLength, offset, $"AH length {length} must include 12 fixed bytes and be a multiple of 8");
+                Diagnose(IPv6DiagnosticCode.InvalidHeaderLength, offset,
+                    $"AH length {length} must include 12 fixed bytes and be a multiple of 8", new(length));
 
                 return new(IPv6PayloadFailure.Invalid);
             }

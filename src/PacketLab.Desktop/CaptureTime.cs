@@ -1,3 +1,4 @@
+using PacketLab.Desktop.Localization;
 using System.Globalization;
 using System.Numerics;
 using PacketLab.Analysis.Pcap;
@@ -53,9 +54,9 @@ internal readonly record struct CaptureTime(ulong Raw, byte Resolution, long Off
     internal string Format(bool date = false)
     {
         if (Kind == TimeKind.Missing)
-            return "未提供";
+            return Strings.NotProvided;
         if (Kind == TimeKind.Invalid)
-            return $"无效 · 秒 {Offset} / {(Resolution == 6 ? "微秒" : "纳秒")} {Raw}";
+            return UiText.Format(Strings.InvalidTimestampValue, Offset, (Resolution == 6 ? Strings.Microseconds : Strings.Nanoseconds), Raw);
 
         var timestamp = Timestamp;
         var units = timestamp.UnitsPerSecond;

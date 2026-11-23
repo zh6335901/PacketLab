@@ -32,7 +32,7 @@ public sealed class PcapNgReader
         var input = new PcapInput(stream);
         Span<byte> magic = stackalloc byte[4];
         if (input.ReadBlock(magic) is BlockReadResult.Incomplete)
-            return Error(0, input.Offset, "Truncated section block type; expected 4 bytes.");
+            return Error(0, input.Offset, new(PcapNgDiagnosticCode.TruncatedSectionBlockType));
 
         return Open(input, options ?? PcapNgReaderOptions.Default, magic);
     }
@@ -40,7 +40,7 @@ public sealed class PcapNgReader
     internal static PcapNgOpenResult Open(PcapInput input, PcapNgReaderOptions options, ReadOnlySpan<byte> magic)
     {
         if (BinaryPrimitives.ReadUInt32BigEndian(magic) != 0x0a0d0d0a)
-            return Error(0, 0, "Expected a PCAPNG Section Header Block.");
+            return Error(0, 0, new(PcapNgDiagnosticCode.ExpectedSectionHeader));
 
         var reader = new PcapNgReader(input, options);
         if (reader.OpenSection(magic) is { } error)
@@ -163,7 +163,7 @@ public sealed class PcapNgReader
         if (result is not PcapNgSection section)
             throw new InvalidOperationException("Uninitialized section result.");
         if (section.Length > long.MaxValue - input.Offset)
-            return block.Error(8, "Section length exceeds the supported stream offset range.");
+            return block.Error(8, new(PcapNgDiagnosticCode.SectionOffsetLimit));
 
         if (RetainMetadata(block, section.Options.Length) is { } limit)
             return limit;
@@ -199,7 +199,7 @@ public sealed class PcapNgReader
         metadataBytes += block.Body.Length + 256L + optionCount * 64L;
 
         return metadataBytes > options.MaxMetadataBytes
-            ? block.Error(0, $"Section/interface metadata exceeds the configured limit {options.MaxMetadataBytes} bytes.") : (PcapError?)null;
+            ? block.Error(0, new(PcapNgDiagnosticCode.MetadataLimit, options.MaxMetadataBytes)) : (PcapError?)null;
     }
 
     private BlockResult ReadBlock(ReadOnlySpan<byte> prefix)
@@ -216,11 +216,11 @@ public sealed class PcapNgReader
         if (section)
         {
             if (input.ReadBlock(header[8..]) is BlockReadResult.Incomplete)
-                return Error(offset, input.Offset, "Truncated section byte-order magic.");
+                return Error(offset, input.Offset, new(PcapNgDiagnosticCode.TruncatedSectionByteOrder));
 
             uint magic = BinaryPrimitives.ReadUInt32BigEndian(header[8..]);
             if (magic is not (0x1a2b3c4d or 0x4d3c2b1a))
-                return Error(offset, offset + 8, $"Invalid byte-order magic 0x{magic:X8}.");
+                return Error(offset, offset + 8, new(PcapNgDiagnosticCode.InvalidByteOrder, magic));
 
             blockOrder = magic == 0x1a2b3c4d ? PcapByteOrder.BigEndian : PcapByteOrder.LittleEndian;
             read = 12;
@@ -232,9 +232,9 @@ public sealed class PcapNgReader
         var bytes = new byte[(int)length - 8];
         header[8..read].CopyTo(bytes);
         if (input.ReadBlock(bytes.AsSpan(read - 8)) is BlockReadResult.Incomplete)
-            return Error(offset, input.Offset, $"Truncated block; expected {length} bytes.");
+            return Error(offset, input.Offset, new(PcapNgDiagnosticCode.TruncatedBlock, length));
         if (PcapNgParser.UInt32(bytes.AsSpan(bytes.Length - 4), blockOrder) != length)
-            return Error(offset, offset + length - 4, "Trailing block length does not match its header.");
+            return Error(offset, offset + length - 4, new(PcapNgDiagnosticCode.BlockLengthMismatch));
 
         return new PcapNgBlock(offset,
             PcapNgParser.UInt32(header, blockOrder), blockOrder,
@@ -244,11 +244,11 @@ public sealed class PcapNgReader
     private PcapError? ValidateBlockLength(long offset, uint length, bool section)
     {
         if (length < (section ? 28 : 12) || length % 4 != 0)
-            return Error(offset, offset + 4, $"Invalid block length {length}; expected an aligned length of at least {(section ? 28 : 12)}.");
+            return Error(offset, offset + 4, new(PcapNgDiagnosticCode.InvalidBlockLength, length, section ? 28 : 12));
         if (length > options.MaxBlockBytes)
-            return Error(offset, offset + 4, $"Block length {length} exceeds the configured limit {options.MaxBlockBytes} bytes.");
+            return Error(offset, offset + 4, new(PcapNgDiagnosticCode.BlockLengthLimit, length, options.MaxBlockBytes));
         if (sectionBoundary is KnownEnd(var end) && (section ? offset != end : offset >= end || length > end - offset))
-            return Error(offset, offset, "Block boundary does not match the declared section length.");
+            return Error(offset, offset, new(PcapNgDiagnosticCode.SectionBoundaryMismatch));
 
         return null;
     }
@@ -256,15 +256,15 @@ public sealed class PcapNgReader
     private BlockResult EndOrTruncated(long offset, int received)
     {
         if (received != 0)
-            return Error(offset, input.Offset, "Truncated block header.");
+            return Error(offset, input.Offset, new(PcapNgDiagnosticCode.TruncatedBlockHeader));
         if (sectionBoundary is KnownEnd(var end) && input.Offset != end)
-            return Error(offset, input.Offset, "EOF before the declared end of the section.");
+            return Error(offset, input.Offset, new(PcapNgDiagnosticCode.PrematureEndOfSection));
 
         return new PcapEndOfFile();
     }
 
-    private static PcapError Error(long blockOffset, long offset, string detail) =>
-        new PcapError.InvalidPcapNg(blockOffset, offset, null, detail);
+    private static PcapError Error(long blockOffset, long offset, PcapNgDiagnostic diagnostic) =>
+        new PcapError.InvalidPcapNg(blockOffset, offset, diagnostic);
 
     private PcapNgReadResult Fail(PcapError error)
     {
