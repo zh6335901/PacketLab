@@ -6,8 +6,9 @@ using Avalonia.Controls;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Avalonia.Media.Transformation;
+using PacketLab.Desktop.ViewModels;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.Views;
 
 internal sealed partial class ToolNavigationView : UserControl
 {

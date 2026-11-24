@@ -10,6 +10,8 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using PacketLab.Desktop.Controls;
+using PacketLab.Desktop.Views;
 
 namespace PacketLab.Desktop.E2ETests;
 

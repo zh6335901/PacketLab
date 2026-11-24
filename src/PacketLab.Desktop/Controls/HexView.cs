@@ -11,7 +11,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using static PacketLab.Desktop.ViewStyle;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.Controls;
 
 internal readonly record struct HexTint(IBrush Fill, IBrush Foreground, bool Overlap);
 

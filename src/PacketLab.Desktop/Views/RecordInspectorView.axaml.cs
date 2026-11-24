@@ -8,10 +8,12 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Media;
+using PacketLab.Desktop.Controls;
+using PacketLab.Desktop.ViewModels;
 using static PacketLab.Desktop.ViewStyle;
 using static PacketLab.Desktop.RecordStatus;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.Views;
 
 [SuppressMessage("Design", "PL0001", Justification = "Layout elements exist only for the currently displayed inspector panels.")]
 internal sealed partial class RecordInspectorView : UserControl

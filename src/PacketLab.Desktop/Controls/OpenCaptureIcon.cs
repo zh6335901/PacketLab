@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using static PacketLab.Desktop.ViewStyle;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.Controls;
 
 internal sealed class OpenCaptureIcon : Control
 {

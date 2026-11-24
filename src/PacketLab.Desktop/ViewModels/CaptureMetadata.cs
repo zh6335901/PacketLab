@@ -2,7 +2,7 @@ using PacketLab.Desktop.Localization;
 using PacketLab.Pcap;
 using PacketLab.Analyzers.Annotations;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.ViewModels;
 
 internal sealed record MetadataFact(string Name, string Value);
 internal sealed record InterfaceCard(string Id, string Name, string Description, string Link, string Order,

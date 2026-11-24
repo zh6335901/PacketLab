@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PacketLab.Analyzers.Annotations;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.ViewModels;
 
 [SuppressMessage("Design", "PL0001", Justification = "The active capture, pending operations and metadata popup have independent lifetimes.")]
 internal sealed class ExplorerViewModel : ObservableObject, IDisposable

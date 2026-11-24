@@ -1,11 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:text="using:PacketLab.Desktop.Localization"
+             xmlns:vm="using:PacketLab.Desktop.ViewModels"
              xmlns:local="using:PacketLab.Desktop"
-             x:Class="PacketLab.Desktop.CaptureMetadataView"
-             x:DataType="local:CaptureMetadata">
+             x:Class="PacketLab.Desktop.Views.CaptureMetadataView"
+             x:DataType="vm:CaptureMetadata">
   <UserControl.Resources>
-    <DataTemplate x:Key="FactTemplate" x:DataType="local:MetadataFact">
+    <DataTemplate x:Key="FactTemplate" x:DataType="vm:MetadataFact">
       <Border Padding="0,7" BorderBrush="{x:Static local:ViewStyle.Line}" BorderThickness="0,0,0,1">
         <Grid ColumnDefinitions="125,*">
           <TextBlock Text="{Binding Name}" FontSize="12" Foreground="{x:Static local:ViewStyle.Muted}" VerticalAlignment="Center" />
@@ -31,7 +32,7 @@
         <ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate>
       </ItemsControl.ItemsPanel>
       <ItemsControl.ItemTemplate>
-        <DataTemplate x:DataType="local:InterfaceCard">
+        <DataTemplate x:DataType="vm:InterfaceCard">
           <Border Background="{x:Static local:ViewStyle.Bg}" BorderBrush="{x:Static local:ViewStyle.Line}"
                   BorderThickness="1" CornerRadius="6" Padding="11" Margin="0,0,6,6">
             <StackPanel Spacing="4">

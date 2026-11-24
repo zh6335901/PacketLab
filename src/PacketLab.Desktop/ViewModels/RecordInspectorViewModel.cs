@@ -6,7 +6,7 @@ using PacketLab.Analyzers.Annotations;
 using PacketLab.Protocols.IP.Reassembly;
 using static PacketLab.Desktop.RecordStatus;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.ViewModels;
 
 [SuppressMessage("Design", "PL0001", Justification = "Evidence, coverage and the optional expanded comparison load independently for the selected record.")]
 internal sealed class RecordInspectorViewModel : ObservableObject

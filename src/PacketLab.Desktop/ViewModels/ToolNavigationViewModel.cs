@@ -2,7 +2,7 @@ using PacketLab.Desktop.Localization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.ViewModels;
 
 internal sealed class ToolNavigationViewModel : ObservableObject
 {

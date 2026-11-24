@@ -1,9 +1,10 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:text="using:PacketLab.Desktop.Localization"
-             xmlns:local="using:PacketLab.Desktop"
-             x:Class="PacketLab.Desktop.ToolNavigationView"
-             x:DataType="local:ToolNavigationViewModel"
+             xmlns:local="using:PacketLab.Desktop.Views"
+             xmlns:vm="using:PacketLab.Desktop.ViewModels"
+             x:Class="PacketLab.Desktop.Views.ToolNavigationView"
+             x:DataType="vm:ToolNavigationViewModel"
              Width="254" HorizontalAlignment="Left" ClipToBounds="True"
              Classes.compact="{Binding IsCompactDesktop}" Classes.narrow="{Binding IsNarrow}"
              AutomationProperties.Name="{x:Static text:Strings.ToolNavigation}">
@@ -214,7 +215,7 @@
         </Border>
         <ItemsControl ItemsSource="{Binding Groups}">
           <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="local:ToolGroup">
+            <DataTemplate x:DataType="vm:ToolGroup">
               <StackPanel Classes="nav-section">
                 <Button Classes="nav-button nav-group" Classes.folded="{Binding Folded}" Command="{Binding ToggleCommand}"
                         AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding ActionHint}">
@@ -231,7 +232,7 @@
                 <Border Classes="nav-entries" Classes.folded="{Binding !ItemsVisible}" IsEnabled="{Binding ItemsVisible}">
                   <ItemsControl ItemsSource="{Binding Entries}" VerticalAlignment="Top">
                     <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="local:ToolEntry">
+                      <DataTemplate x:DataType="vm:ToolEntry">
                         <Button Classes="nav-button tool-item" Classes.current="{Binding Available}" IsEnabled="{Binding Available}"
                                 Command="{Binding Command}" AutomationProperties.Name="{Binding Tooltip}"
                                 ToolTip.Tip="{Binding Tooltip}" ToolTip.ShowOnDisabled="True">

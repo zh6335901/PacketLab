@@ -13,9 +13,11 @@ using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using PacketLab.Desktop.Controls;
+using PacketLab.Desktop.ViewModels;
 using static PacketLab.Desktop.ViewStyle;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.Views;
 
 internal sealed partial class ExplorerWindow : Window
 {

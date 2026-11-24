@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.Views;
 
 internal sealed partial class CaptureMetadataView : UserControl
 {

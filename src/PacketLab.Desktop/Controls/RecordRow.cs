@@ -1,9 +1,10 @@
 using PacketLab.Desktop.Localization;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using PacketLab.Desktop.ViewModels;
 using static PacketLab.Desktop.ViewStyle;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.Controls;
 
 internal sealed class RecordRow : Border
 {

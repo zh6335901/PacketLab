@@ -1,10 +1,13 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:text="using:PacketLab.Desktop.Localization"
+        xmlns:controls="using:PacketLab.Desktop.Controls"
+        xmlns:views="using:PacketLab.Desktop.Views"
+        xmlns:vm="using:PacketLab.Desktop.ViewModels"
         xmlns:local="using:PacketLab.Desktop"
         xmlns:chrome="using:Avalonia.Controls.Chrome"
-        x:Class="PacketLab.Desktop.ExplorerWindow"
-        x:DataType="local:ExplorerViewModel"
+        x:Class="PacketLab.Desktop.Views.ExplorerWindow"
+        x:DataType="vm:ExplorerViewModel"
         Title="PacketLab · Packet Explorer" Icon="/Assets/PacketLab.ico"
         Width="1325" Height="885" MinWidth="480" MinHeight="530"
         ExtendClientAreaToDecorationsHint="True" WindowDecorations="BorderOnly"
@@ -133,11 +136,11 @@
     </Border>
 
     <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ClipToBounds="True">
-      <local:ToolNavigationView x:Name="ToolRail" ZIndex="2" DataContext="{Binding Navigation}" />
+      <views:ToolNavigationView x:Name="ToolRail" ZIndex="2" DataContext="{Binding Navigation}" />
       <Grid x:Name="ContentArea" Grid.Column="1">
         <Border x:Name="Landing" IsVisible="{Binding !Header.HasRecords}" Padding="20,28,20,100">
           <StackPanel MaxWidth="400" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <local:OpenCaptureIcon Width="54" Height="54" Margin="0,0,0,18" />
+            <controls:OpenCaptureIcon Width="54" Height="54" Margin="0,0,0,18" />
             <TextBlock Classes="landing" Text="{Binding Header.LandingTitle}" FontSize="24" LineHeight="32"
                        FontWeight="SemiBold" FontFamily="{x:Static local:ViewStyle.Display}" />
             <TextBlock Classes="landing" Text="{Binding Header.LandingHint}" Foreground="{x:Static local:ViewStyle.Muted}" Margin="0,7,0,0" />
@@ -252,7 +255,7 @@
                 </Grid>
               </Grid>
             </Border>
-            <local:RecordInspectorView Grid.Column="2" DataContext="{Binding Inspector}" />
+            <views:RecordInspectorView Grid.Column="2" DataContext="{Binding Inspector}" />
             <TextBlock Grid.Column="2" IsVisible="{Binding NoMatches}" Text="{x:Static text:Strings.NoRecordsWithFilters}"
                        FontSize="12" Foreground="{x:Static local:ViewStyle.Muted}" Margin="12" />
           </Grid>
@@ -283,7 +286,7 @@
             </Grid>
           </Border>
           <ScrollViewer x:Name="MetadataScroll">
-            <local:CaptureMetadataView DataContext="{Binding Metadata}" />
+            <views:CaptureMetadataView DataContext="{Binding Metadata}" />
           </ScrollViewer>
         </StackPanel>
       </Border>

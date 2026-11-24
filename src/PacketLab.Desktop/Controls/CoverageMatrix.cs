@@ -7,7 +7,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using static PacketLab.Desktop.ViewStyle;
 
-namespace PacketLab.Desktop;
+namespace PacketLab.Desktop.Controls;
 
 [TransportModel]
 internal readonly record struct CoverageHighlights(int? SelectedOffset, (int Lane, int? Offset)? Hover);
