@@ -11,6 +11,7 @@
   <ItemGroup>
     <AvaloniaResource Include="Assets/PacketLab.ico" />
     <EmbeddedResource Update="Localization/Strings.resx"
+                      Generator="MSBuild:Compile"
                       StronglyTypedLanguage="C#"
                       StronglyTypedNamespace="PacketLab.Desktop.Localization"
                       StronglyTypedClassName="Strings"
@@ -23,4 +24,8 @@
     <ProjectReference Include="../../analyzers/PacketLab.Analyzers.Annotations/PacketLab.Analyzers.Annotations.csproj" />
     <InternalsVisibleTo Include="PacketLab.Desktop.E2ETests" />
   </ItemGroup>
+  <Target Name="GenerateLocalizationForDesignTime"
+          BeforeTargets="CoreCompile"
+          DependsOnTargets="PrepareResourceNames;CoreResGen"
+          Condition="'$(DesignTimeBuild)' == 'true'" />
 </Project>
