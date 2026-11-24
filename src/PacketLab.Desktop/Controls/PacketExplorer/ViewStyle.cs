@@ -11,20 +11,24 @@ namespace PacketLab.Desktop.Controls.PacketExplorer;
 internal static class ViewStyle
 {
     public static readonly IBrush Bg = Brush("#1C1D1F");
-    public static readonly IBrush Top = Brush("#202327");
     public static readonly IBrush PanelBrush = Brush("#292A2D");
-    internal static readonly IBrush Lift = Brush("#333539");
     public static readonly IBrush Line = Brush("#46484C");
     public static readonly IBrush CardBorder = Brush("#414348");
     public static readonly IBrush Text = Brush("#F5F5F5");
     public static readonly IBrush Muted = Brush("#D0D2D6");
     public static readonly IBrush Soft = Brush("#AFB3BA");
     public static readonly IBrush Accent = Brush("#76B9ED");
-    internal static readonly IBrush Selected = Brush("#2B3946");
     public static readonly IBrush Warn = Brush("#F4CD89");
-    internal static readonly IBrush WarnBackground = Brush("#413727");
     public static readonly IBrush Bad = Brush("#FFB8B8");
     public static readonly IBrush BadBackground = Brush("#472E35");
+    public static readonly FontFamily Body = new("Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI");
+    public static readonly FontFamily Display = new("Segoe UI Variable Display, Segoe UI, Microsoft YaHei UI");
+    public static readonly FontFamily Mono = new("Cascadia Mono, Consolas, monospace");
+
+    internal static readonly IBrush Top = Brush("#202327");
+    internal static readonly IBrush Lift = Brush("#333539");
+    internal static readonly IBrush Selected = Brush("#2B3946");
+    internal static readonly IBrush WarnBackground = Brush("#413727");
     internal static readonly IBrush Blue = Brush("#A3D4F8");
     internal static readonly IBrush BlueBackground = Brush("#2A3C4D");
     internal static readonly IBrush Neutral = Brush("#D1CFDB");
@@ -35,9 +39,6 @@ internal static class ViewStyle
     internal static readonly IBrush Arp = Brush("#E9C797");
     internal static readonly IBrush Udp = Brush("#A5D9C2");
     internal static readonly IBrush IPv6 = Brush("#CEBEE9");
-    public static readonly FontFamily Body = new("Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI");
-    public static readonly FontFamily Display = new("Segoe UI Variable Display, Segoe UI, Microsoft YaHei UI");
-    public static readonly FontFamily Mono = new("Cascadia Mono, Consolas, monospace");
     internal static readonly FontWeight Demi = FontWeight.SemiBold;
 
     internal static SolidColorBrush Brush(string hex) => new(Color.Parse(hex));
