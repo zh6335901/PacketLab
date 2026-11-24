@@ -1,7 +1,3 @@
-using PacketLab.Desktop.Localization;
-using PacketLab.Analyzers.Annotations;
-using System.Globalization;
-using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -9,7 +5,11 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using PacketLab.Analyzers.Annotations;
+using PacketLab.Desktop.Localization;
 using PacketLab.Desktop.Models.PacketExplorer;
+using System.Globalization;
+using System.Runtime.CompilerServices;
 using static PacketLab.Desktop.Controls.PacketExplorer.ViewStyle;
 
 namespace PacketLab.Desktop.Controls.PacketExplorer;
@@ -37,8 +37,12 @@ internal sealed class HexView : Grid
         AutomationProperties.SetName(surface, compact ? Strings.FullBytes : Strings.HexAndAscii);
         bar = new ScrollBar
         {
-            Orientation = Orientation.Vertical, SmallChange = 1, LargeChange = visibleRows, ViewportSize = visibleRows,
-            Maximum = rows - visibleRows, IsVisible = rows > visibleRows
+            Orientation = Orientation.Vertical,
+            SmallChange = 1,
+            LargeChange = visibleRows,
+            ViewportSize = visibleRows,
+            Maximum = rows - visibleRows,
+            IsVisible = rows > visibleRows
         };
         bar.ValueChanged += (_, _) => surface.ScrollTo((int)bar.Value);
         ColumnDefinitions = new ColumnDefinitions("*,Auto");
@@ -228,10 +232,14 @@ internal sealed class HexSurface : Control
 
         var next = e.Key switch
         {
-            Key.Left => keyboardIndex - 1, Key.Right => keyboardIndex + 1,
-            Key.Up => keyboardIndex - columns, Key.Down => keyboardIndex + columns,
-            Key.Home => 0, Key.End => bytes.Length - 1,
-            Key.PageUp => keyboardIndex - columns * 12, Key.PageDown => keyboardIndex + columns * 12,
+            Key.Left => keyboardIndex - 1,
+            Key.Right => keyboardIndex + 1,
+            Key.Up => keyboardIndex - columns,
+            Key.Down => keyboardIndex + columns,
+            Key.Home => 0,
+            Key.End => bytes.Length - 1,
+            Key.PageUp => keyboardIndex - columns * 12,
+            Key.PageDown => keyboardIndex + columns * 12,
             _ => -1
         };
         if (next < 0 && e.Key is not (Key.Left or Key.Up or Key.PageUp))

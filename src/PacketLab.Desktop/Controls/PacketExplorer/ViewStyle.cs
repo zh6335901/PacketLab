@@ -1,10 +1,10 @@
 using Avalonia;
 using Avalonia.Controls;
-using Path = Avalonia.Controls.Shapes.Path;
 using Avalonia.Layout;
 using Avalonia.Media;
 using PacketLab.Desktop.Models.PacketExplorer;
 using PacketLab.Desktop.Services.PacketExplorer;
+using Path = Avalonia.Controls.Shapes.Path;
 
 namespace PacketLab.Desktop.Controls.PacketExplorer;
 
@@ -46,19 +46,31 @@ internal static class ViewStyle
     internal static TextBlock Label(string text, double size, IBrush? brush, bool mono, FontWeight weight) =>
         new()
         {
-            Text = text, FontFamily = mono ? Mono : Body, FontSize = size, Foreground = brush ?? Text,
-            FontWeight = weight, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis
+            Text = text,
+            FontFamily = mono ? Mono : Body,
+            FontSize = size,
+            Foreground = brush ?? Text,
+            FontWeight = weight,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
 
     internal static Border Card(Control child) => new()
     {
-        Child = child, Background = PanelBrush, BorderBrush = CardBorder, BorderThickness = new Thickness(1),
-        CornerRadius = new CornerRadius(8), ClipToBounds = true
+        Child = child,
+        Background = PanelBrush,
+        BorderBrush = CardBorder,
+        BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(8),
+        ClipToBounds = true
     };
 
     internal static Border LineBelow(Control child, Thickness padding) => new()
     {
-        Child = child, Padding = padding, BorderBrush = Line, BorderThickness = new Thickness(0, 0, 0, 1)
+        Child = child,
+        Padding = padding,
+        BorderBrush = Line,
+        BorderThickness = new Thickness(0, 0, 0, 1)
     };
 
     internal static Grid LayoutGrid(string columns, params Control[] children)
@@ -119,14 +131,23 @@ internal static class ViewStyle
 
     internal static Path Icon(string path, double size, IBrush? stroke) => new()
     {
-        Data = Geometry.Parse(path), Width = size, Height = size, Stretch = Stretch.Uniform,
-        Stroke = stroke ?? Accent, StrokeThickness = 1.4, StrokeLineCap = PenLineCap.Round,
-        StrokeJoin = PenLineJoin.Round, VerticalAlignment = VerticalAlignment.Center
+        Data = Geometry.Parse(path),
+        Width = size,
+        Height = size,
+        Stretch = Stretch.Uniform,
+        Stroke = stroke ?? Accent,
+        StrokeThickness = 1.4,
+        StrokeLineCap = PenLineCap.Round,
+        StrokeJoin = PenLineJoin.Round,
+        VerticalAlignment = VerticalAlignment.Center
     };
 
     internal static IBrush ProtocolBrush(Protocol protocol) => protocol switch
     {
-        Protocol.Arp => Arp, Protocol.Udp => Udp, Protocol.IPv6 => IPv6, _ => Blue
+        Protocol.Arp => Arp,
+        Protocol.Udp => Udp,
+        Protocol.IPv6 => IPv6,
+        _ => Blue
     };
 
     internal static (IBrush Foreground, IBrush Background) Palette(RecordTone tone) => tone switch
@@ -144,8 +165,11 @@ internal static class ViewStyle
 
         return new Border
         {
-            Background = background, CornerRadius = new CornerRadius(4), Padding = new Thickness(5, 0),
-            Child = Label(status.Label, size, foreground, weight: Demi, mono: false), VerticalAlignment = VerticalAlignment.Center,
+            Background = background,
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(5, 0),
+            Child = Label(status.Label, size, foreground, weight: Demi, mono: false),
+            VerticalAlignment = VerticalAlignment.Center,
             MinHeight = size == 10 ? 15 : 20
         };
     }

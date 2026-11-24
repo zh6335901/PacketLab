@@ -1,10 +1,10 @@
-using PacketLab.Desktop.Localization;
-using PacketLab.Analyzers.Annotations;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using PacketLab.Analyzers.Annotations;
+using PacketLab.Desktop.Localization;
 using PacketLab.Desktop.Models.PacketExplorer;
 using PacketLab.Desktop.Services.PacketExplorer;
 using static PacketLab.Desktop.Controls.PacketExplorer.ViewStyle;

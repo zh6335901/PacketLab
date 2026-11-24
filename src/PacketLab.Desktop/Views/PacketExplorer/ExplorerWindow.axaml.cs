@@ -1,6 +1,3 @@
-using PacketLab.Desktop.Localization;
-using System.ComponentModel;
-using System.Globalization;
 using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Automation;
@@ -14,9 +11,12 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using PacketLab.Desktop.Controls.PacketExplorer;
+using PacketLab.Desktop.Localization;
 using PacketLab.Desktop.ViewModels.PacketExplorer;
 using PacketLab.Desktop.ViewModels.Shell;
 using PacketLab.Desktop.Views.Shell;
+using System.ComponentModel;
+using System.Globalization;
 using static PacketLab.Desktop.Controls.PacketExplorer.ViewStyle;
 
 namespace PacketLab.Desktop.Views.PacketExplorer;
@@ -234,8 +234,12 @@ internal sealed partial class ExplorerWindow : Window
         var rule = new Border { Width = 1, Background = Line, HorizontalAlignment = HorizontalAlignment.Center };
         var handle = new Border
         {
-            Width = 3, Height = 32, Background = Muted, CornerRadius = new CornerRadius(3),
-            VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center
+            Width = 3,
+            Height = 32,
+            Background = Muted,
+            CornerRadius = new CornerRadius(3),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center
         };
         grip.Children.Add(rule);
         grip.Children.Add(handle);

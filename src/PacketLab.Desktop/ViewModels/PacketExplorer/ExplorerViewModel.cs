@@ -1,11 +1,11 @@
-using PacketLab.Desktop.Localization;
-using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PacketLab.Analyzers.Annotations;
+using PacketLab.Desktop.Localization;
 using PacketLab.Desktop.Models.PacketExplorer;
 using PacketLab.Desktop.Services.PacketExplorer;
 using PacketLab.Desktop.ViewModels.Shell;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PacketLab.Desktop.ViewModels.PacketExplorer;
 

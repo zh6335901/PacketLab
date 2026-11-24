@@ -1,8 +1,8 @@
+using PacketLab.Analysis.Pcap;
 using PacketLab.Desktop.Localization;
+using PacketLab.Pcap;
 using System.Globalization;
 using System.Numerics;
-using PacketLab.Analysis.Pcap;
-using PacketLab.Pcap;
 
 namespace PacketLab.Desktop.Models.PacketExplorer;
 

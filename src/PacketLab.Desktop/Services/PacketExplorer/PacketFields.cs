@@ -1,12 +1,10 @@
 using PacketLab.Desktop.Localization;
 using PacketLab.Desktop.Models.PacketExplorer;
-using PacketLab.Protocols;
 using PacketLab.Protocols.Arp;
 using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.IP;
 using PacketLab.Protocols.IP.IPv4;
 using PacketLab.Protocols.IP.IPv6;
-using PacketLab.Protocols.IP.Reassembly;
 using PacketLab.Protocols.Tcp;
 using PacketLab.Protocols.Udp;
 

@@ -1,11 +1,11 @@
-using PacketLab.Desktop.Localization;
-using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PacketLab.Analyzers.Annotations;
-using PacketLab.Protocols.IP.Reassembly;
+using PacketLab.Desktop.Localization;
 using PacketLab.Desktop.Models.PacketExplorer;
 using PacketLab.Desktop.Services.PacketExplorer;
+using PacketLab.Protocols.IP.Reassembly;
+using System.Diagnostics.CodeAnalysis;
 using static PacketLab.Desktop.Services.PacketExplorer.RecordStatus;
 
 namespace PacketLab.Desktop.ViewModels.PacketExplorer;
@@ -138,7 +138,7 @@ internal sealed class RecordInspectorViewModel : ObservableObject
     {
         var name = (record, group, view.Summary) switch
         {
-            (< 0, _, _) => Strings.DestinationPort,
+            ( < 0, _, _) => Strings.DestinationPort,
             (_, not null, _) => Strings.Identification,
             (_, _, { Protocol: Protocol.Arp }) => Strings.TargetIp,
             (_, _, { Issue: var issue }) when issue.HasFlag(PacketIssue.Mismatch) => Strings.Checksum,

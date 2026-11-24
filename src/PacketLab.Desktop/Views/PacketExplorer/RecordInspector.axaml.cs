@@ -1,6 +1,3 @@
-using PacketLab.Desktop.Localization;
-using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -9,9 +6,12 @@ using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Media;
 using PacketLab.Desktop.Controls.PacketExplorer;
-using PacketLab.Desktop.ViewModels.PacketExplorer;
+using PacketLab.Desktop.Localization;
 using PacketLab.Desktop.Models.PacketExplorer;
 using PacketLab.Desktop.Services.PacketExplorer;
+using PacketLab.Desktop.ViewModels.PacketExplorer;
+using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using static PacketLab.Desktop.Controls.PacketExplorer.ViewStyle;
 using static PacketLab.Desktop.Services.PacketExplorer.RecordStatus;
 
@@ -173,7 +173,9 @@ internal sealed partial class RecordInspector : UserControl
 
         return new Border
         {
-            Background = PanelBrush, BorderBrush = Accent, BorderThickness = new Thickness(0, 2, 0, 0),
+            Background = PanelBrush,
+            BorderBrush = Accent,
+            BorderThickness = new Thickness(0, 2, 0, 0),
             Child = LineBelow(grid, new Thickness(13, 12, 13, 14))
         };
     }
@@ -217,7 +219,8 @@ internal sealed partial class RecordInspector : UserControl
         AutomationProperties.SetAutomationId(hexView, byteViewId);
         var hexScroll = new ScrollViewer
         {
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = hexView
         };
         selectionDetails = new ContentControl
@@ -353,8 +356,10 @@ internal sealed partial class RecordInspector : UserControl
         var top = LayoutGrid("*,Auto", name, toggle);
         var scroll = new ScrollViewer
         {
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Margin = new Thickness(12, 4, 4, 4), MaxHeight = 288
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Margin = new Thickness(12, 4, 4, 4),
+            MaxHeight = 288
         };
         var map = new CoverageMatrix(data, model.ChooseEvidence);
         matrix = map;
@@ -435,7 +440,8 @@ internal sealed partial class RecordInspector : UserControl
     private Control MakeFullCard(CoverageData data, CoverageLane lane, byte[] bytes, int index)
     {
         var hex = new HexView(bytes, compact: true, offset => model!.ChooseEvidence(lane.Record, offset),
-            offset => CoverageMatrix.TintAt(data, lane, offset)) { MinWidth = 230 };
+            offset => CoverageMatrix.TintAt(data, lane, offset))
+        { MinWidth = 230 };
         fullViews.Add((lane, hex));
         var swatch = new Border { Width = 7, Height = 7, Background = CoverageMatrix.Swatch(index) };
         var laneLabel = LaneLabel(lane);
@@ -450,8 +456,12 @@ internal sealed partial class RecordInspector : UserControl
 
         return new Border
         {
-            Background = Bg, BorderBrush = Line, BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(4), Padding = new Thickness(8), MinWidth = 248,
+            Background = Bg,
+            BorderBrush = Line,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(8),
+            MinWidth = 248,
             Child = Vertical(3, button, origin, hex)
         };
     }

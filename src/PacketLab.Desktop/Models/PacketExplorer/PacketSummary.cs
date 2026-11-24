@@ -1,5 +1,4 @@
 using PacketLab.Desktop.Localization;
-using System.Buffers.Binary;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Arp;
 using PacketLab.Protocols.Ethernet;
@@ -8,6 +7,7 @@ using PacketLab.Protocols.IP.IPv4;
 using PacketLab.Protocols.IP.IPv6;
 using PacketLab.Protocols.Tcp;
 using PacketLab.Protocols.Udp;
+using System.Buffers.Binary;
 
 namespace PacketLab.Desktop.Models.PacketExplorer;
 
@@ -284,8 +284,14 @@ internal readonly record struct PacketSummary(PacketAddress Source, PacketAddres
 
     internal static FragmentSlice? Fragment(ProtocolDecodeResult decoding) => decoding.Value switch
     {
-        EthernetDecodeResult { Value: DecodedEthernet { Payload.Value: IPv4DecodeResult
-            { Value: DecodedIPv4 { Payload.Value: IPv4FragmentPayload fragment } ip } } } =>
+        EthernetDecodeResult
+        {
+            Value: DecodedEthernet
+            {
+                Payload.Value: IPv4DecodeResult
+                { Value: DecodedIPv4 { Payload.Value: IPv4FragmentPayload fragment } ip }
+            }
+        } =>
             new(ip.Packet.Header.FragmentOffsetBytes, 14 + ip.Packet.Header.HeaderLength, fragment.Bytes.Length, fragment.MoreFragments),
         EthernetDecodeResult { Value: DecodedEthernet { Payload.Value: IPv6DecodeResult { Value: DecodedIPv6 ip } } } =>
             IPv6FragmentSlice(ip),

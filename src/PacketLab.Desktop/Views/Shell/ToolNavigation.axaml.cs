@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
 using Avalonia.Controls;
@@ -7,6 +5,7 @@ using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Avalonia.Media.Transformation;
 using PacketLab.Desktop.ViewModels.Shell;
+using System.Runtime.InteropServices;
 
 namespace PacketLab.Desktop.Views.Shell;
 

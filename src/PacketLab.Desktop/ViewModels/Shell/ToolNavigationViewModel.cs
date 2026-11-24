@@ -1,6 +1,6 @@
-using PacketLab.Desktop.Localization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PacketLab.Desktop.Localization;
 
 namespace PacketLab.Desktop.ViewModels.Shell;
 

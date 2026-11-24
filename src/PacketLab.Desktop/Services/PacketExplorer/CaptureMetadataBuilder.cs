@@ -72,13 +72,17 @@ internal static class CaptureMetadataBuilder
 
     private static string ResolutionName(byte resolution) => resolution switch
     {
-        6 => "1 μs", 9 => "1 ns", 0 => "1 s",
+        6 => "1 μs",
+        9 => "1 ns",
+        0 => "1 s",
         _ => $"{((resolution & 0x80) == 0 ? 10 : 2)}⁻^({resolution & 0x7f}) s"
     };
 
     private static string LinkName(ushort link) => link switch
     {
-        1 => "Ethernet · 1", 101 => "Raw IP · 101", _ => UIText.Format(Strings.UnsupportedType, link)
+        1 => "Ethernet · 1",
+        101 => "Raw IP · 101",
+        _ => UIText.Format(Strings.UnsupportedType, link)
     };
 
     private static string OrderName(PcapByteOrder order) => order == PcapByteOrder.LittleEndian ? Strings.LittleEndian : Strings.BigEndian;
