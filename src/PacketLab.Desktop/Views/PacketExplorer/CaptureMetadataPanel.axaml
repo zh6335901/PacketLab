@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:text="using:PacketLab.Desktop.Localization"
+             xmlns:models="using:PacketLab.Desktop.Models.PacketExplorer"
+             xmlns:controls="using:PacketLab.Desktop.Controls.PacketExplorer"
+             x:Class="PacketLab.Desktop.Views.PacketExplorer.CaptureMetadataPanel"
+             x:DataType="models:CaptureMetadata">
+  <UserControl.Resources>
+    <DataTemplate x:Key="FactTemplate" x:DataType="models:MetadataFact">
+      <Border Padding="0,7" BorderBrush="{x:Static controls:ViewStyle.Line}" BorderThickness="0,0,0,1">
+        <Grid ColumnDefinitions="125,*">
+          <TextBlock Text="{Binding Name}" FontSize="12" Foreground="{x:Static controls:ViewStyle.Muted}" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+  <UserControl.Styles>
+    <Style Selector="TextBlock.detail-label">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{x:Static controls:ViewStyle.Muted}" />
+    </Style>
+    <Style Selector="TextBlock.detail-value">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontFamily" Value="{x:Static controls:ViewStyle.Mono}" />
+    </Style>
+  </UserControl.Styles>
+  <StackPanel>
+    <ItemsControl ItemsSource="{Binding CaptureFacts}" ItemTemplate="{StaticResource FactTemplate}" />
+    <ItemsControl ItemsSource="{Binding Interfaces}" IsVisible="{Binding HasInterfaces}" Margin="0,13,0,11">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="models:InterfaceCard">
+          <Border Background="{x:Static controls:ViewStyle.Bg}" BorderBrush="{x:Static controls:ViewStyle.Line}"
+                  BorderThickness="1" CornerRadius="6" Padding="11" Margin="0,0,6,6">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding Id}" FontFamily="{x:Static controls:ViewStyle.Mono}" FontSize="10"
+                         Foreground="{x:Static controls:ViewStyle.Accent}" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Name}" FontFamily="{x:Static controls:ViewStyle.Mono}" FontSize="20" FontWeight="SemiBold"
+                         TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding Description}" Classes="detail-label" TextTrimming="CharacterEllipsis" />
+              <StackPanel><TextBlock Text="{x:Static text:Strings.Link}" Classes="detail-label" /><TextBlock Text="{Binding Link}" Classes="detail-value" /></StackPanel>
+              <StackPanel><TextBlock Text="{x:Static text:Strings.ByteOrder}" Classes="detail-label" /><TextBlock Text="{Binding Order}" Classes="detail-value" /></StackPanel>
+              <StackPanel><TextBlock Text="{x:Static text:Strings.TimeResolution}" Classes="detail-label" /><TextBlock Text="{Binding Resolution}" Classes="detail-value" /></StackPanel>
+              <StackPanel><TextBlock Text="SnapLen" Classes="detail-label" /><TextBlock Text="{Binding SnapLength}" Classes="detail-value" /></StackPanel>
+              <TextBlock Text="{Binding Extra}" Foreground="{x:Static controls:ViewStyle.Soft}" FontFamily="{x:Static controls:ViewStyle.Mono}"
+                         FontSize="10" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <ItemsControl ItemsSource="{Binding SectionsWithoutInterfaces}" ItemTemplate="{StaticResource FactTemplate}" />
+    <TextBlock Text="{Binding RecordTitle}" IsVisible="{Binding HasRecord}" FontSize="12" FontWeight="SemiBold" Margin="0,5" />
+    <ItemsControl ItemsSource="{Binding RecordFacts}" ItemTemplate="{StaticResource FactTemplate}" />
+    <TextBlock Text="{Binding Path}" Foreground="{x:Static controls:ViewStyle.Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,12,0,0" />
+  </StackPanel>
+</UserControl>

@@ -10,8 +10,9 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using PacketLab.Desktop.Controls;
-using PacketLab.Desktop.Views;
+using PacketLab.Desktop.Controls.PacketExplorer;
+using PacketLab.Desktop.Views.PacketExplorer;
+using PacketLab.Desktop.Views.Shell;
 
 namespace PacketLab.Desktop.E2ETests;
 
@@ -32,7 +33,7 @@ public sealed class ExploreCaptureTests
         var result = await WithExplorer(async window =>
         {
             await SelectFixtureFragment(window);
-            var rail = Find<ToolNavigationView>(window)!;
+            var rail = Find<ToolNavigation>(window)!;
             var simulator = ButtonNamed(window, "Network Simulator · 规划中");
             var section = simulator.GetVisualAncestors().OfType<Border>().Single(border => border.Classes.Contains("nav-entries"));
             Click(window, ButtonNamed(window, "网络实验"));
@@ -64,7 +65,7 @@ public sealed class ExploreCaptureTests
         {
             window.Width = 620;
             await SelectFixtureFragment(window);
-            var rail = Find<ToolNavigationView>(window)!;
+            var rail = Find<ToolNavigation>(window)!;
             await WaitFor(() => !rail.IsHitTestVisible);
             var toggle = ButtonNamed(window, "打开工具导航");
 

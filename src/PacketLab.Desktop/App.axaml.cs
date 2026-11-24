@@ -2,7 +2,7 @@ using System.Globalization;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using PacketLab.Desktop.Views;
+using PacketLab.Desktop.Views.PacketExplorer;
 
 namespace PacketLab.Desktop;
 
