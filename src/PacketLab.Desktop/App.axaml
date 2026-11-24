@@ -3,7 +3,11 @@
              x:Class="PacketLab.Desktop.App"
              RequestedThemeVariant="Dark">
   <Application.Styles>
-    <FluentTheme />
+    <Fluent2Theme>
+      <Fluent2Theme.Palettes>
+        <ColorPaletteResources x:Key="Dark" Accent="#76B9ED" />
+      </Fluent2Theme.Palettes>
+    </Fluent2Theme>
     <Style Selector="Button.explorer">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
@@ -58,6 +62,12 @@
       <Setter Property="Padding" Value="0" />
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="ListBox.records ListBoxItem /template/ Panel">
+      <Setter Property="Margin" Value="0" />
+    </Style>
+    <Style Selector="ListBox.records ListBoxItem /template/ Rectangle#SelectionIndicator">
+      <Setter Property="Margin" Value="4,0,0,0" />
     </Style>
     <Style Selector="ListBox.records ListBoxItem /template/ ContentPresenter">
       <Setter Property="Background" Value="Transparent" />

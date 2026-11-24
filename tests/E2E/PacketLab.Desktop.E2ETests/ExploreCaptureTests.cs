@@ -303,6 +303,27 @@ public sealed class ExploreCaptureTests
     }
 
     [Test]
+    public async Task Arrow_keys_scroll_the_focused_protocol_field_list()
+    {
+        var offset = await WithExplorer(async window =>
+        {
+            await SelectFixtureFragment(window);
+            await WaitFor(() => Text(window, "IPv4 / 标识符"));
+            var fields = ProtocolFields(window);
+            await WaitFor(() => fields.Extent.Height > fields.Viewport.Height && fields.Viewport.Height > 0);
+            fields.Focus(NavigationMethod.Tab);
+            var initialOffset = fields.Offset.Y;
+
+            window.KeyPress(Key.Down, RawInputModifiers.None, PhysicalKey.ArrowDown, null);
+            await WaitFor(() => fields.Offset.Y > initialOffset);
+
+            return fields.Offset.Y - initialOffset;
+        });
+
+        await Assert.That(offset).IsGreaterThan(0);
+    }
+
+    [Test]
     public async Task An_initially_selected_field_below_the_viewport_is_scrolled_into_view()
     {
         var offset = await WithExplorer(async window =>

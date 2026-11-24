@@ -195,7 +195,10 @@ internal sealed partial class RecordInspectorView : UserControl
             button.MinHeight = 24;
             layerTabs.Children.Add(button);
         }
-        var fields = new ScrollViewer { Content = new StackPanel(), VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var fields = new ScrollViewer
+        {
+            Content = new StackPanel(), Focusable = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
         fieldScroll = fields;
         AutomationProperties.SetName(fields, Strings.CurrentProtocolFields);
 

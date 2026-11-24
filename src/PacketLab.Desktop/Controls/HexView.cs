@@ -1,6 +1,7 @@
 using PacketLab.Desktop.Localization;
 using PacketLab.Analyzers.Annotations;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -74,10 +75,8 @@ internal sealed class HexSurface : Control
 {
     private static readonly Typeface Typeface = new(Mono);
     private static readonly string[] Hex = Enumerable.Range(0, 256).Select(value => value.ToString("X2")).ToArray();
-    private static readonly FormattedText[] Bytes = Hex.Select(word => MakeText(word, 12, Text)).ToArray();
-    private static readonly FormattedText[] MarkedBytes = Hex.Select(word => MakeText(word, 12, PanelBrush)).ToArray();
-    private static readonly FormattedText[] Ascii = Enumerable.Range(0, 256).Select(value => MakeText(ToAscii(value), 12, Muted)).ToArray();
-    private static readonly FormattedText[] MarkedAscii = Enumerable.Range(0, 256).Select(value => MakeText(ToAscii(value), 12, PanelBrush)).ToArray();
+    // Formatted text can retain typefaces owned by the current application's font manager.
+    private static readonly ConditionalWeakTable<FontManager, ByteTextCache> TextCaches = new();
     private readonly byte[] bytes;
     private readonly Action<int> onPicked;
     private readonly int columns;
@@ -132,6 +131,7 @@ internal sealed class HexSurface : Control
 
     public override void Render(DrawingContext context)
     {
+        var textCache = TextCaches.GetValue(FontManager.Current, static _ => new ByteTextCache());
         var area = new Rect(Bounds.Size);
         context.FillRectangle(background, area);
         var width = CellWidth;
@@ -181,14 +181,14 @@ internal sealed class HexSurface : Control
 
                 var byteText = (selected, tint) switch
                 {
-                    (true, _) => MarkedBytes[byteValue],
+                    (true, _) => textCache.MarkedBytes[byteValue],
                     (false, { } tone) => MakeText(Hex[byteValue], 12, tone.Foreground),
-                    _ => Bytes[byteValue]
+                    _ => textCache.Bytes[byteValue]
                 };
                 Center(context, byteText,
                     x + width / 2,
                         y + 3);
-                Center(context, selected ? MarkedAscii[byteValue] : Ascii[byteValue],
+                Center(context, selected ? textCache.MarkedAscii[byteValue] : textCache.Ascii[byteValue],
                     asciiX + asciiCell / 2,
                         y + 3);
             }
@@ -262,4 +262,12 @@ internal sealed class HexSurface : Control
 
     internal static void Center(DrawingContext context, FormattedText text, double x, double y) =>
         context.DrawText(text, new Point(x - text.Width / 2, y));
+
+    private sealed class ByteTextCache
+    {
+        internal readonly FormattedText[] Bytes = Hex.Select(word => MakeText(word, 12, Text)).ToArray();
+        internal readonly FormattedText[] MarkedBytes = Hex.Select(word => MakeText(word, 12, PanelBrush)).ToArray();
+        internal readonly FormattedText[] Ascii = Enumerable.Range(0, 256).Select(value => MakeText(ToAscii(value), 12, Muted)).ToArray();
+        internal readonly FormattedText[] MarkedAscii = Enumerable.Range(0, 256).Select(value => MakeText(ToAscii(value), 12, PanelBrush)).ToArray();
+    }
 }

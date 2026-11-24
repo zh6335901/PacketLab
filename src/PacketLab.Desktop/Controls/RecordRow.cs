@@ -7,7 +7,6 @@ namespace PacketLab.Desktop;
 
 internal sealed class RecordRow : Border
 {
-    private readonly Border edge = new() { Width = 3, HorizontalAlignment = HorizontalAlignment.Left, Background = Accent };
     private readonly TextBlock number;
     private readonly TextBlock fragment;
     private readonly TextBlock time;
@@ -47,7 +46,6 @@ internal sealed class RecordRow : Border
         text.Margin = new Avalonia.Thickness(23, 2, 10, 2);
         text.VerticalAlignment = VerticalAlignment.Center;
         var layer = new Grid();
-        layer.Children.Add(edge);
         layer.Children.Add(fragment);
         layer.Children.Add(text);
         Child = layer;
@@ -76,7 +74,6 @@ internal sealed class RecordRow : Border
             _ => null
         };
         Background = parentBackground;
-        edge.IsVisible = isSelected;
         number.Foreground = isSelected ? Accent : Text;
         fragment.Foreground = linked ? Accent : Muted;
     }
