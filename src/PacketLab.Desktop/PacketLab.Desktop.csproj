@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <ApplicationIcon>Assets/PacketLab.ico</ApplicationIcon>
     <TargetFramework>net11.0</TargetFramework>
     <IsAotCompatible>true</IsAotCompatible>
     <PublishAot>true</PublishAot>
@@ -8,6 +9,7 @@
     <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
   <ItemGroup>
+    <AvaloniaResource Include="Assets/PacketLab.ico" />
     <EmbeddedResource Update="Localization/Strings.resx"
                       StronglyTypedLanguage="C#"
                       StronglyTypedNamespace="PacketLab.Desktop.Localization"
