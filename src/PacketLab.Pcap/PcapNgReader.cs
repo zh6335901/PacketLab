@@ -23,7 +23,7 @@ public sealed class PcapNgReader
         this.options = options;
     }
 
-    public static PcapNgOpenResult Open(Stream stream, PcapNgReaderOptions? options = null)
+    public static PcapNgOpenResult Open(Stream stream, PcapNgReaderOptions? options)
     {
         ArgumentNullException.ThrowIfNull(stream);
         if (!stream.CanRead)
@@ -32,7 +32,7 @@ public sealed class PcapNgReader
         var input = new PcapInput(stream);
         Span<byte> magic = stackalloc byte[4];
         if (input.ReadBlock(magic) is BlockReadResult.Incomplete)
-            return Error(0, input.Offset, new(PcapNgDiagnosticCode.TruncatedSectionBlockType));
+            return Error(0, input.Offset, new(PcapNgDiagnosticCode.TruncatedSectionBlockType, FirstArgument: 0, SecondArgument: 0));
 
         return Open(input, options ?? PcapNgReaderOptions.Default, magic);
     }
@@ -40,7 +40,7 @@ public sealed class PcapNgReader
     internal static PcapNgOpenResult Open(PcapInput input, PcapNgReaderOptions options, ReadOnlySpan<byte> magic)
     {
         if (BinaryPrimitives.ReadUInt32BigEndian(magic) != 0x0a0d0d0a)
-            return Error(0, 0, new(PcapNgDiagnosticCode.ExpectedSectionHeader));
+            return Error(0, 0, new(PcapNgDiagnosticCode.ExpectedSectionHeader, FirstArgument: 0, SecondArgument: 0));
 
         var reader = new PcapNgReader(input, options);
         if (reader.OpenSection(magic) is { } error)
@@ -163,7 +163,7 @@ public sealed class PcapNgReader
         if (result is not PcapNgSection section)
             throw new InvalidOperationException("Uninitialized section result.");
         if (section.Length > long.MaxValue - input.Offset)
-            return block.Error(8, new(PcapNgDiagnosticCode.SectionOffsetLimit));
+            return block.Error(8, new(PcapNgDiagnosticCode.SectionOffsetLimit, FirstArgument: 0, SecondArgument: 0));
 
         if (RetainMetadata(block, section.Options.Length) is { } limit)
             return limit;
@@ -199,7 +199,7 @@ public sealed class PcapNgReader
         metadataBytes += block.Body.Length + 256L + optionCount * 64L;
 
         return metadataBytes > options.MaxMetadataBytes
-            ? block.Error(0, new(PcapNgDiagnosticCode.MetadataLimit, options.MaxMetadataBytes)) : (PcapError?)null;
+            ? block.Error(0, new(PcapNgDiagnosticCode.MetadataLimit, options.MaxMetadataBytes, SecondArgument: 0)) : (PcapError?)null;
     }
 
     private BlockResult ReadBlock(ReadOnlySpan<byte> prefix)
@@ -216,11 +216,11 @@ public sealed class PcapNgReader
         if (section)
         {
             if (input.ReadBlock(header[8..]) is BlockReadResult.Incomplete)
-                return Error(offset, input.Offset, new(PcapNgDiagnosticCode.TruncatedSectionByteOrder));
+                return Error(offset, input.Offset, new(PcapNgDiagnosticCode.TruncatedSectionByteOrder, FirstArgument: 0, SecondArgument: 0));
 
             uint magic = BinaryPrimitives.ReadUInt32BigEndian(header[8..]);
             if (magic is not (0x1a2b3c4d or 0x4d3c2b1a))
-                return Error(offset, offset + 8, new(PcapNgDiagnosticCode.InvalidByteOrder, magic));
+                return Error(offset, offset + 8, new(PcapNgDiagnosticCode.InvalidByteOrder, magic, SecondArgument: 0));
 
             blockOrder = magic == 0x1a2b3c4d ? PcapByteOrder.BigEndian : PcapByteOrder.LittleEndian;
             read = 12;
@@ -232,9 +232,9 @@ public sealed class PcapNgReader
         var bytes = new byte[(int)length - 8];
         header[8..read].CopyTo(bytes);
         if (input.ReadBlock(bytes.AsSpan(read - 8)) is BlockReadResult.Incomplete)
-            return Error(offset, input.Offset, new(PcapNgDiagnosticCode.TruncatedBlock, length));
+            return Error(offset, input.Offset, new(PcapNgDiagnosticCode.TruncatedBlock, length, SecondArgument: 0));
         if (PcapNgParser.UInt32(bytes.AsSpan(bytes.Length - 4), blockOrder) != length)
-            return Error(offset, offset + length - 4, new(PcapNgDiagnosticCode.BlockLengthMismatch));
+            return Error(offset, offset + length - 4, new(PcapNgDiagnosticCode.BlockLengthMismatch, FirstArgument: 0, SecondArgument: 0));
 
         return new PcapNgBlock(offset,
             PcapNgParser.UInt32(header, blockOrder), blockOrder,
@@ -248,7 +248,7 @@ public sealed class PcapNgReader
         if (length > options.MaxBlockBytes)
             return Error(offset, offset + 4, new(PcapNgDiagnosticCode.BlockLengthLimit, length, options.MaxBlockBytes));
         if (sectionBoundary is KnownEnd(var end) && (section ? offset != end : offset >= end || length > end - offset))
-            return Error(offset, offset, new(PcapNgDiagnosticCode.SectionBoundaryMismatch));
+            return Error(offset, offset, new(PcapNgDiagnosticCode.SectionBoundaryMismatch, FirstArgument: 0, SecondArgument: 0));
 
         return null;
     }
@@ -256,9 +256,9 @@ public sealed class PcapNgReader
     private BlockResult EndOrTruncated(long offset, int received)
     {
         if (received != 0)
-            return Error(offset, input.Offset, new(PcapNgDiagnosticCode.TruncatedBlockHeader));
+            return Error(offset, input.Offset, new(PcapNgDiagnosticCode.TruncatedBlockHeader, FirstArgument: 0, SecondArgument: 0));
         if (sectionBoundary is KnownEnd(var end) && input.Offset != end)
-            return Error(offset, input.Offset, new(PcapNgDiagnosticCode.PrematureEndOfSection));
+            return Error(offset, input.Offset, new(PcapNgDiagnosticCode.PrematureEndOfSection, FirstArgument: 0, SecondArgument: 0));
 
         return new PcapEndOfFile();
     }

@@ -49,7 +49,7 @@ public sealed class PacketInspection : IDisposable
 
     private static IpReassemblyAnalyzer CreateReassemblyAt(ulong timestamp)
     {
-        var analyzer = new IpReassemblyAnalyzer();
+        var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
         analyzer.AdvanceTime(timestamp);
 
         return analyzer;

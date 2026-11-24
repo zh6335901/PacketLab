@@ -7,22 +7,22 @@ namespace PacketLab.Desktop.Services.PacketExplorer;
 
 internal enum RecordTone { Good, Bad, Warn, Blue, Neutral }
 
-internal readonly record struct RecordStatus(string Label, RecordTone Tone, bool ShowBadge = true)
+internal readonly record struct RecordStatus(string Label, RecordTone Tone, bool ShowBadge)
 {
     internal static RecordStatus ForGroup(FragmentGroup group) => group.Status switch
     {
-        IpReassemblyStatus.Complete => new(Strings.StatusReassembled, RecordTone.Good),
-        IpReassemblyStatus.Atomic => new(Strings.StatusAtomicFragment, RecordTone.Good),
-        IpReassemblyStatus.Conflict => new(Strings.StatusConflict, RecordTone.Bad),
+        IpReassemblyStatus.Complete => new(Strings.StatusReassembled, RecordTone.Good, ShowBadge: true),
+        IpReassemblyStatus.Atomic => new(Strings.StatusAtomicFragment, RecordTone.Good, ShowBadge: true),
+        IpReassemblyStatus.Conflict => new(Strings.StatusConflict, RecordTone.Bad, ShowBadge: true),
         IpReassemblyStatus.Discarded when group.Reason == IpReassemblyAnalysisReason.RecordAssociationLimit =>
-            new(Strings.StatusResourceLimit, RecordTone.Warn),
-        IpReassemblyStatus.Discarded => new(Strings.StatusDiscarded, RecordTone.Bad),
-        IpReassemblyStatus.Invalid => new(Strings.StatusInvalidFields, RecordTone.Bad),
-        IpReassemblyStatus.Truncated => new(Strings.StatusTruncated, RecordTone.Warn),
-        IpReassemblyStatus.ResourceLimit => new(Strings.StatusResourceLimit, RecordTone.Warn),
-        IpReassemblyStatus.Incomplete => new(Strings.StatusMissingFragments, RecordTone.Warn),
-        IpReassemblyStatus.Expired => new(Strings.StatusReassemblyTimeout, RecordTone.Warn),
-        IpReassemblyStatus.Duplicate => new(Strings.StatusDuplicateFragment, RecordTone.Blue),
+            new(Strings.StatusResourceLimit, RecordTone.Warn, ShowBadge: true),
+        IpReassemblyStatus.Discarded => new(Strings.StatusDiscarded, RecordTone.Bad, ShowBadge: true),
+        IpReassemblyStatus.Invalid => new(Strings.StatusInvalidFields, RecordTone.Bad, ShowBadge: true),
+        IpReassemblyStatus.Truncated => new(Strings.StatusTruncated, RecordTone.Warn, ShowBadge: true),
+        IpReassemblyStatus.ResourceLimit => new(Strings.StatusResourceLimit, RecordTone.Warn, ShowBadge: true),
+        IpReassemblyStatus.Incomplete => new(Strings.StatusMissingFragments, RecordTone.Warn, ShowBadge: true),
+        IpReassemblyStatus.Expired => new(Strings.StatusReassemblyTimeout, RecordTone.Warn, ShowBadge: true),
+        IpReassemblyStatus.Duplicate => new(Strings.StatusDuplicateFragment, RecordTone.Blue, ShowBadge: true),
         _ => new(Strings.StatusFragment, RecordTone.Blue, ShowBadge: false)
     };
 
@@ -32,19 +32,19 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone, bool
         if (group is not null && IsOutcome(group, index))
             return ForGroup(group);
         if ((issue & (PacketIssue.Invalid | PacketIssue.InvalidCaptureLength | PacketIssue.InvalidTime)) != 0)
-            return new(Strings.StatusInvalidFields, RecordTone.Bad);
+            return new(Strings.StatusInvalidFields, RecordTone.Bad, ShowBadge: true);
         if (issue.HasFlag(PacketIssue.Truncated))
-            return new(Strings.StatusTruncated, RecordTone.Warn);
+            return new(Strings.StatusTruncated, RecordTone.Warn, ShowBadge: true);
         if (issue.HasFlag(PacketIssue.Mismatch))
-            return new(Strings.StatusMismatch, RecordTone.Warn);
+            return new(Strings.StatusMismatch, RecordTone.Warn, ShowBadge: true);
         if (issue.HasFlag(PacketIssue.Unsupported))
-            return new(Strings.StatusUnsupported, RecordTone.Neutral);
+            return new(Strings.StatusUnsupported, RecordTone.Neutral, ShowBadge: true);
         if (issue.HasFlag(PacketIssue.NoTime))
-            return new(Strings.StatusNoTimestamp, RecordTone.Neutral);
+            return new(Strings.StatusNoTimestamp, RecordTone.Neutral, ShowBadge: true);
         if (issue.HasFlag(PacketIssue.Unknown))
-            return new(Strings.StatusUnknownItems, RecordTone.Neutral);
+            return new(Strings.StatusUnknownItems, RecordTone.Neutral, ShowBadge: true);
         if (issue.HasFlag(PacketIssue.ChecksumUnavailable))
-            return new(Strings.StatusChecksumUnavailable, RecordTone.Neutral);
+            return new(Strings.StatusChecksumUnavailable, RecordTone.Neutral, ShowBadge: true);
 
         return record.Fragment is null
             ? new(Strings.StatusNormal, RecordTone.Good, ShowBadge: false)

@@ -22,7 +22,7 @@ public class IpReassemblyBenchmarks
     public void Prepare()
     {
         bool ipv6 = Sequence == FragmentSequence.IPv6Two;
-        var udp = PacketSamples.Udp(2040, true, ipv6 ? PacketSamples.IPv6AddressSum : PacketSamples.IPv4AddressSum);
+        var udp = PacketSamples.Udp(2040, true, ipv6 ? PacketSamples.IPv6AddressSum : PacketSamples.IPv4AddressSum, ipv6: false);
         int count = Sequence switch
         {
             FragmentSequence.IPv4Two or FragmentSequence.IPv6Two => 2,
@@ -37,7 +37,7 @@ public class IpReassemblyBenchmarks
             bool more = i < count - 1;
             var part = udp.AsSpan(offset, partLength);
             fragments[i] = ipv6 ? PacketSamples.IPv6Fragment(part, offset, more)
-                : PacketSamples.IPv4(part, offset: offset, more: more);
+                : PacketSamples.IPv4(part, offset: offset, more: more, optionBytes: 0, identification: 1);
         }
         if (Sequence is FragmentSequence.IPv4SixteenOutOfOrder or FragmentSequence.IPv4ManyOutOfOrder)
         {
@@ -46,7 +46,7 @@ public class IpReassemblyBenchmarks
             fragments[1] = last;
         }
 
-        using var probe = new IpFragmentReassembler();
+        using var probe = new IpFragmentReassembler(IpReassemblyOptions.Default);
         foreach (var fragment in fragments.AsSpan()[..^1])
         {
             if (probe.Process(fragment)?.Status != IpReassemblyStatus.Pending)
@@ -67,7 +67,7 @@ public class IpReassemblyBenchmarks
             !datagram.Payload.Span.SequenceEqual(udp.AsSpan(8)))
             throw new InvalidDataException("UDP payload or checksum changed during reassembly.");
 
-        reassembler = new();
+        reassembler = new(IpReassemblyOptions.Default);
     }
 
     [Benchmark]
@@ -95,12 +95,12 @@ public class ReassemblyClockBenchmarks
     [GlobalSetup]
     public void Prepare()
     {
-        reassembler = new();
-        var udp = PacketSamples.Udp(2040, true, PacketSamples.IPv4AddressSum);
+        reassembler = new(IpReassemblyOptions.Default);
+        var udp = PacketSamples.Udp(2040, true, PacketSamples.IPv4AddressSum, ipv6: false);
         var ids = new HashSet<long>();
         for (int i = 0; i < PendingDatagrams; i++)
         {
-            var first = PacketSamples.IPv4(udp.AsSpan(0, 1024), identification: i, more: true);
+            var first = PacketSamples.IPv4(udp.AsSpan(0, 1024), identification: i, more: true, optionBytes: 0, offset: 0);
             if (reassembler.Process(first) is not { Status: IpReassemblyStatus.Pending } update ||
                 !ids.Add(update.DatagramId))
                 throw new InvalidDataException("Expected a distinct pending datagram for each first fragment.");

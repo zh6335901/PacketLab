@@ -24,7 +24,7 @@ internal static class PcapNgParser
     internal static SectionResult Section(PcapNgBlock block, long number, int maxOptions)
     {
         if (block.Body.Length < 16)
-            return block.Error(0, new(PcapNgDiagnosticCode.ShortSectionHeader));
+            return block.Error(0, new(PcapNgDiagnosticCode.ShortSectionHeader, FirstArgument: 0, SecondArgument: 0));
 
         var major = block.UInt16(4);
         var minor = block.UInt16(6);
@@ -33,7 +33,7 @@ internal static class PcapNgParser
 
         var length = block.Int64(8);
         if (length < -1 || (length >= 0 && length % 4 != 0))
-            return block.Error(8, new(PcapNgDiagnosticCode.InvalidSectionLength, length));
+            return block.Error(8, new(PcapNgDiagnosticCode.InvalidSectionLength, length, SecondArgument: 0));
 
         return Options(block, 16, maxOptions) switch
         {
@@ -46,7 +46,7 @@ internal static class PcapNgParser
     internal static InterfaceResult Interface(PcapNgBlock block, PcapNgSection section, uint id, int maxOptions)
     {
         if (block.Body.Length < 8)
-            return block.Error(0, new(PcapNgDiagnosticCode.ShortInterfaceDescription));
+            return block.Error(0, new(PcapNgDiagnosticCode.ShortInterfaceDescription, FirstArgument: 0, SecondArgument: 0));
 
         var optionResult = Options(block, 8, maxOptions);
         if (optionResult is PcapError error)
@@ -83,9 +83,9 @@ internal static class PcapNgParser
             if (length is { } required && option.Value.Length != required)
                 return block.Error(8, new(PcapNgDiagnosticCode.ShortInterfaceOption, option.Code, required));
             if (option.Code is >= 2 and <= 18 and not (4 or 5) && !seen.Add(option.Code))
-                return block.Error(8, new(PcapNgDiagnosticCode.DuplicateInterfaceOption, option.Code));
+                return block.Error(8, new(PcapNgDiagnosticCode.DuplicateInterfaceOption, option.Code, SecondArgument: 0));
             if (option.Code == 11 && option.Value.IsEmpty)
-                return block.Error(8, new(PcapNgDiagnosticCode.MissingInterfaceFilterType));
+                return block.Error(8, new(PcapNgDiagnosticCode.MissingInterfaceFilterType, FirstArgument: 0, SecondArgument: 0));
         }
 
         return null;
@@ -96,11 +96,11 @@ internal static class PcapNgParser
         var simple = block.Type == 3;
         var headerLength = simple ? 4 : 20;
         if (block.Body.Length < headerLength)
-            return block.Error(0, new(PcapNgDiagnosticCode.ShortPacketBlock, headerLength));
+            return block.Error(0, new(PcapNgDiagnosticCode.ShortPacketBlock, headerLength, SecondArgument: 0));
 
         uint id = block.Type switch { 3 => 0, 2 => block.UInt16(0), _ => block.UInt32(0) };
         if (id >= interfaces.Count)
-            return block.Error(0, new(PcapNgDiagnosticCode.UndefinedInterface, id));
+            return block.Error(0, new(PcapNgDiagnosticCode.UndefinedInterface, id, SecondArgument: 0));
 
         var captureInterface = interfaces[(int)id];
         uint original = block.UInt32(simple ? 0 : 16);
@@ -110,11 +110,11 @@ internal static class PcapNgParser
 
         int padded = (int)(((long)captured + 3) & ~3L);
         if (padded > block.Body.Length - headerLength)
-            return block.Error(headerLength, new(PcapNgDiagnosticCode.PacketDataExceedsBlock));
+            return block.Error(headerLength, new(PcapNgDiagnosticCode.PacketDataExceedsBlock, FirstArgument: 0, SecondArgument: 0));
 
         int optionsStart = headerLength + padded;
         if (simple && optionsStart != block.Body.Length)
-            return block.Error(optionsStart, new(PcapNgDiagnosticCode.ExtraSimplePacketBytes));
+            return block.Error(optionsStart, new(PcapNgDiagnosticCode.ExtraSimplePacketBytes, FirstArgument: 0, SecondArgument: 0));
 
         var optionResult = Options(block, optionsStart, maxOptions);
         if (optionResult is PcapError error)
@@ -184,7 +184,7 @@ internal static class PcapNgParser
         while (position < block.Body.Length)
         {
             if (block.Body.Length - position < 4)
-                return block.Error(position, new(PcapNgDiagnosticCode.IncompleteOptionHeader));
+                return block.Error(position, new(PcapNgDiagnosticCode.IncompleteOptionHeader, FirstArgument: 0, SecondArgument: 0));
 
             ushort code = block.UInt16(position);
             ushort length = block.UInt16(position + 2);
@@ -192,17 +192,17 @@ internal static class PcapNgParser
             if (code == 0)
             {
                 if (length != 0 || position != block.Body.Length)
-                    return block.Error(position - 4, new(PcapNgDiagnosticCode.InvalidEndOfOptions));
+                    return block.Error(position - 4, new(PcapNgDiagnosticCode.InvalidEndOfOptions, FirstArgument: 0, SecondArgument: 0));
 
                 return options.ToImmutable();
             }
 
             int padded = (length + 3) & ~3;
             if (padded > block.Body.Length - position)
-                return block.Error(position - 2, new(PcapNgDiagnosticCode.OptionExceedsBlock, code));
+                return block.Error(position - 2, new(PcapNgDiagnosticCode.OptionExceedsBlock, code, SecondArgument: 0));
 
             if (options.Count >= maxOptions)
-                return block.Error(position - 4, new(PcapNgDiagnosticCode.OptionCountLimit, maxOptions));
+                return block.Error(position - 4, new(PcapNgDiagnosticCode.OptionCountLimit, maxOptions, SecondArgument: 0));
 
             options.Add(new PcapNgOption(code, block.Body.Slice(position, length)));
             position += padded;

@@ -23,7 +23,7 @@ internal sealed partial class App : Application
 
             var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             var preferences = Path.Combine(local, "PacketLab", "explorer-list-width.txt");
-            desktop.MainWindow = new ExplorerWindow(desktop.Args?.FirstOrDefault(), preferences);
+            desktop.MainWindow = new ExplorerWindow(desktop.Args?.FirstOrDefault(), preferences, chooseFile: null);
         }
 
         base.OnFrameworkInitializationCompleted();

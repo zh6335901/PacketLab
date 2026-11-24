@@ -111,9 +111,9 @@ internal sealed partial class RecordInspector : UserControl
         inspectionContent.IsVisible = true;
         recordHeading.Content = MakeRecordHeading(row);
         var status = ForRecord(row.Record, row.Group, row.Index);
-        var why = Label(Describe(row.Record, row.Group), 12, Muted);
+        var why = Label(Describe(row.Record, row.Group), 12, Muted, mono: false, weight: FontWeight.Normal);
         why.TextWrapping = Avalonia.Media.TextWrapping.Wrap;
-        var explanation = LayoutGrid("Auto,*", Badge(status), why);
+        var explanation = LayoutGrid("Auto,*", Badge(status, size: 11), why);
         explanation.ColumnSpacing = 9;
         explanation.VerticalAlignment = VerticalAlignment.Top;
         recordExplanation.Content = explanation;
@@ -141,11 +141,11 @@ internal sealed partial class RecordInspector : UserControl
     {
         var anchor = row.Record;
         var summary = anchor.Summary;
-        var name = Label(RecordStatus.Title(anchor, row.Group, row.Index), 20, weight: Demi);
+        var name = Label(RecordStatus.Title(anchor, row.Group, row.Index), 20, weight: Demi, brush: null, mono: false);
         name.FontFamily = Display;
         name.LineHeight = 28;
-        var detailText = UIText.Format(Strings.RecordDetails, anchor.Time.Format(), anchor.Context, anchor.Length, anchor.OriginalLength);
-        var details = Label(detailText, 11, Muted, mono: true);
+        var detailText = UIText.Format(Strings.RecordDetails, anchor.Time.Format(date: false), anchor.Context, anchor.Length, anchor.OriginalLength);
+        var details = Label(detailText, 11, Muted, mono: true, weight: FontWeight.Normal);
         details.LineHeight = 16;
         var fileLocation = UIText.Format(Strings.RecordLocationTooltip, anchor.Time.Format(date: true), anchor.Block, anchor.DataOffset);
         ToolTip.SetTip(details, fileLocation);
@@ -154,7 +154,7 @@ internal sealed partial class RecordInspector : UserControl
         marker.LineHeight = 16;
         var main = Vertical(5, marker, name, details);
         var ends = Horizontal(10, Endpoint(Strings.SourceAddress, summary.SourceAddress),
-            Label("→", 14, Muted),
+            Label("→", 14, Muted, mono: false, weight: FontWeight.Normal),
             Endpoint(Strings.DestinationAddress, summary.DestinationAddress));
         ends.HorizontalAlignment = HorizontalAlignment.Right;
         var grid = new Grid();
@@ -179,7 +179,7 @@ internal sealed partial class RecordInspector : UserControl
     }
 
     private static Control Endpoint(string name, string value) =>
-        Vertical(1, Label(name, 10, Muted), Label(value, 12, mono: true));
+        Vertical(1, Label(name, 10, Muted, mono: false, weight: FontWeight.Normal), Label(value, 12, mono: true, brush: null, weight: FontWeight.Normal));
 
     private void BuildEvidence(EvidenceSource source)
     {
@@ -191,7 +191,7 @@ internal sealed partial class RecordInspector : UserControl
         foreach (var layer in view.Fields.Select(item => item.Layer).Distinct())
         {
             var first = view.Fields.First(item => item.Layer == layer);
-            var button = CommandButton(Label(layer, 11, Muted, mono: true), model!.ChooseFieldCommand, layer, first);
+            var button = CommandButton(Label(layer, 11, Muted, mono: true, weight: FontWeight.Normal), model!.ChooseFieldCommand, layer, first);
             button.Classes.Add("layer");
             button.Padding = new Thickness(7, 3);
             button.MinHeight = 24;
@@ -204,7 +204,7 @@ internal sealed partial class RecordInspector : UserControl
         var fieldContent = Vertical(0, fieldHeader, tabBorder, fieldList);
         var fieldCard = Card(fieldContent);
         var bytesHeader = PanelHeading("M8 3L2 10L8 17 M16 3L22 10L16 17 M14 1L10 19", UIText.Format(Strings.EvidenceBytes, origin), $"{view.Bytes.Length} B · {coordinates}");
-        hexView = new HexView(view.Bytes, compact: false, model!.PickByteCommand.Execute)
+        hexView = new HexView(view.Bytes, compact: false, model!.PickByteCommand.Execute, tintAt: null)
         {
             Margin = new Thickness(12, 7, 12, 7),
             MinWidth = 354
@@ -243,8 +243,8 @@ internal sealed partial class RecordInspector : UserControl
 
     private static Control PanelHeading(string glyph, string name, string hint)
     {
-        var heading = Horizontal(8, Icon(glyph), Label(name, 14, weight: Demi));
-        var bar = LayoutGrid("*,Auto", heading, Label(hint, 10, Muted, mono: true));
+        var heading = Horizontal(8, Icon(glyph, size: 16, stroke: null), Label(name, 14, weight: Demi, brush: null, mono: false));
+        var bar = LayoutGrid("*,Auto", heading, Label(hint, 10, Muted, mono: true, weight: FontWeight.Normal));
         bar.ColumnSpacing = 6;
         bar.MinHeight = 38;
 
@@ -263,11 +263,11 @@ internal sealed partial class RecordInspector : UserControl
             button.Classes.Set("selected", (button.Content as TextBlock)?.Text == layer);
         foreach (var item in source.Data.Fields.Where(item => item.Layer == layer))
         {
-            var name = Label(item.Name, 12);
+            var name = Label(item.Name, 12, brush: null, mono: false, weight: FontWeight.Normal);
             name.TextWrapping = TextWrapping.Wrap;
-            var value = Label(item.Value, 12, mono: true);
+            var value = Label(item.Value, 12, mono: true, brush: null, weight: FontWeight.Normal);
             value.TextWrapping = TextWrapping.Wrap;
-            var range = Label(item.Range?.Label ?? "—", 10, Soft, mono: true);
+            var range = Label(item.Range?.Label ?? "—", 10, Soft, mono: true, weight: FontWeight.Normal);
             range.TextAlignment = TextAlignment.Right;
             var cells = LayoutGrid("1*,1.7*,70", name, value, range);
             cells.ColumnSpacing = 7;
@@ -337,10 +337,10 @@ internal sealed partial class RecordInspector : UserControl
         var group = coverage.Group;
         var data = coverage.Data;
         var status = ForGroup(group);
-        var name = Horizontal(9, Label(Strings.FragmentCoverage, 16, weight: Demi),
-            Label(group.Identity, 12, Muted, mono: true),
-            Badge(status));
-        toggle = CommandButton(Label(model!.ToggleLabel), model.ToggleFullCommand, model.ToggleLabel);
+        var name = Horizontal(9, Label(Strings.FragmentCoverage, 16, weight: Demi, brush: null, mono: false),
+            Label(group.Identity, 12, Muted, mono: true, weight: FontWeight.Normal),
+            Badge(status, size: 11));
+        toggle = CommandButton(Label(model!.ToggleLabel, size: 12, brush: null, mono: false, weight: FontWeight.Normal), model.ToggleFullCommand, model.ToggleLabel, parameter: null);
         toggle.Classes.Add("outline");
         var top = LayoutGrid("*,Auto", name, toggle);
         var scroll = new ScrollViewer
@@ -355,12 +355,12 @@ internal sealed partial class RecordInspector : UserControl
         scroll.SizeChanged += (_, _) => map.SetViewport(scroll.Offset, scroll.Viewport);
         var summaryData = coverage.Summary;
         var (brush, _) = Palette(summaryData.Tone);
-        var detailLabel = Label(summaryData.Message, 12, Muted);
+        var detailLabel = Label(summaryData.Message, 12, Muted, mono: false, weight: FontWeight.Normal);
         detailLabel.TextWrapping = TextWrapping.Wrap;
-        var summary = LayoutGrid("Auto,*", Label(summaryData.Title, 12, brush, weight: Demi), detailLabel);
+        var summary = LayoutGrid("Auto,*", Label(summaryData.Title, 12, brush, weight: Demi, mono: false), detailLabel);
         summary.ColumnSpacing = 12;
         var summaryBorder = new Border { BorderBrush = Line, BorderThickness = new Thickness(0, 1, 0, 0), Child = summary, Padding = new Thickness(12, 6) };
-        locationLabel = Label("", 11, mono: true);
+        locationLabel = Label("", 11, mono: true, brush: null, weight: FontWeight.Normal);
         locationLabel.Margin = new Thickness(12, 5);
         locationLabel.TextWrapping = TextWrapping.Wrap;
         locationLabel.IsVisible = false;
@@ -378,7 +378,7 @@ internal sealed partial class RecordInspector : UserControl
             return;
 
         var label = model.ToggleLabel;
-        toggle.Content = Label(label, 12, model.FullOpen ? Accent : Text);
+        toggle.Content = Label(label, 12, model.FullOpen ? Accent : Text, mono: false, weight: FontWeight.Normal);
         toggle.Classes.Set("selected", model.FullOpen);
         AutomationProperties.SetName(toggle, label);
         fullSlot.IsVisible = model.FullOpen;
@@ -411,9 +411,9 @@ internal sealed partial class RecordInspector : UserControl
             Grid.SetColumn(card, n);
             cards.Children.Add(card);
         }
-        var previous = CommandButton(Label(Strings.PreviousGroup), model!.PreviousPageCommand, Strings.PreviousGroup);
-        var next = CommandButton(Label(Strings.NextGroup), model.NextPageCommand, Strings.NextGroup);
-        var pageControls = Horizontal(4, previous, Label(page.Caption, 11, Muted), next);
+        var previous = CommandButton(Label(Strings.PreviousGroup, size: 12, brush: null, mono: false, weight: FontWeight.Normal), model!.PreviousPageCommand, Strings.PreviousGroup, parameter: null);
+        var next = CommandButton(Label(Strings.NextGroup, size: 12, brush: null, mono: false, weight: FontWeight.Normal), model.NextPageCommand, Strings.NextGroup, parameter: null);
+        var pageControls = Horizontal(4, previous, Label(page.Caption, 11, Muted, mono: false, weight: FontWeight.Normal), next);
         pageControls.IsVisible = page.HasPages;
         var scroll = new ScrollViewer { Content = cards, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto };
         var content = Vertical(6, pageControls, scroll);
@@ -429,12 +429,12 @@ internal sealed partial class RecordInspector : UserControl
         fullViews.Add((lane, hex));
         var swatch = new Border { Width = 7, Height = 7, Background = CoverageMatrix.Swatch(index) };
         var laneLabel = LaneLabel(lane);
-        var heading = Horizontal(8, swatch, Label(laneLabel, 13, mono: true, weight: Demi));
-        var title = LayoutGrid("*,Auto", heading, Label($"{bytes.Length} B", 10, Muted));
+        var heading = Horizontal(8, swatch, Label(laneLabel, 13, mono: true, weight: Demi, brush: null));
+        var title = LayoutGrid("*,Auto", heading, Label($"{bytes.Length} B", 10, Muted, mono: false, weight: FontWeight.Normal));
         var button = CommandButton(title, model!.ChooseSourceCommand, laneLabel, lane.Record);
         button.HorizontalAlignment = HorizontalAlignment.Stretch;
         button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
-        var origin = Label(UIText.Format(Strings.FragmentStartsAt, (lane.Derived ? "IP" : Strings.Frame), lane.Slice.Start), 10, Muted);
+        var origin = Label(UIText.Format(Strings.FragmentStartsAt, (lane.Derived ? "IP" : Strings.Frame), lane.Slice.Start), 10, Muted, mono: false, weight: FontWeight.Normal);
 
         return new Border
         {

@@ -10,7 +10,7 @@ public class ReadPcapFileTests
         // Arrange
         var path = Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", "multiple.pcap");
         using var stream = File.OpenRead(path);
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new AssertionException("Expected a PCAP reader.");
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new AssertionException("Expected a PCAP reader.");
 
         for (int i = 0; i < 3; i++) reader.ReadNext();
 
@@ -34,7 +34,7 @@ public class ReadPcapFileTests
         {
             using (var stream = File.OpenRead(path))
             {
-                var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new AssertionException("Expected a PCAP reader.");
+                var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new AssertionException("Expected a PCAP reader.");
                 for (int i = 0; i < 4; i++) reader.ReadNext();
             }
 

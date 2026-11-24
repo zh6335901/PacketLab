@@ -577,7 +577,7 @@ public sealed class ExploreCaptureTests
     {
         var previousCulture = CultureInfo.CurrentUICulture;
         CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(culture);
-        var window = new ExplorerWindow(file, chooseFile: chooseFile);
+        var window = new ExplorerWindow(file, chooseFile: chooseFile, preferencesPath: null);
         window.Show();
         try
         {

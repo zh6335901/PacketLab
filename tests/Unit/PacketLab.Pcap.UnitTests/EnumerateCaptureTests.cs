@@ -12,7 +12,7 @@ public class EnumerateCaptureTests
     public async Task Pcap_enumeration_yields_packets_without_an_eof_item_and_leaves_stream_open()
     {
         using var stream = new MemoryStream([.. PcapHeader, .. PcapRecord, .. PcapRecord]);
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
 
         var packets = reader.ReadPackets().ToArray();
 
@@ -26,7 +26,7 @@ public class EnumerateCaptureTests
     public async Task Pcap_enumeration_yields_a_terminal_error_after_preceding_packets()
     {
         using var stream = new MemoryStream([.. PcapHeader, .. PcapRecord, 1]);
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
 
         var results = reader.ReadPackets().ToArray();
 
@@ -40,7 +40,7 @@ public class EnumerateCaptureTests
     public async Task Pcapng_enumeration_consumes_trailing_metadata_without_an_eof_item()
     {
         using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet([1]), .. Section(true), .. Interface(true)]);
-        var reader = PcapNgReader.Open(stream) is PcapNgReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapNgReader.Open(stream, PcapNgReaderOptions.Default) is PcapNgReader opened ? opened : throw new InvalidOperationException();
 
         var result = reader.ReadPackets().Single();
 
@@ -55,7 +55,7 @@ public class EnumerateCaptureTests
     public async Task Pcapng_enumeration_yields_a_terminal_error_instead_of_silently_ending()
     {
         using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet([1]), 1]);
-        var reader = PcapNgReader.Open(stream) is PcapNgReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapNgReader.Open(stream, PcapNgReaderOptions.Default) is PcapNgReader opened ? opened : throw new InvalidOperationException();
 
         var results = reader.ReadPackets().ToArray();
 

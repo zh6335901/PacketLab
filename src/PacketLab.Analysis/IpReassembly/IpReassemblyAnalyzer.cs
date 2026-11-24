@@ -12,9 +12,9 @@ public sealed class IpReassemblyAnalyzer : IDisposable
     private readonly Dictionary<long, Association> associations = [];
     private bool disposed;
 
-    public IpReassemblyAnalyzer(IpReassemblyAnalysisOptions? options = null)
+    public IpReassemblyAnalyzer(IpReassemblyAnalysisOptions? options)
     {
-        this.options = options ?? new();
+        this.options = options ?? IpReassemblyAnalysisOptions.Default;
         reassembler = new(this.options.Reassembly);
     }
 

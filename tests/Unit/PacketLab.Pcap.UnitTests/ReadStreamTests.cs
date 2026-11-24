@@ -15,7 +15,7 @@ public class ReadStreamTests
             int cut = 40 + received;
             using var stream = new MemoryStream([.. prefix, .. PcapSamples.Single("little-micro")[..cut]]);
             stream.Position = prefix.Length;
-            var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+            var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
 
             // Act
             var result = reader.ReadNext();
@@ -34,11 +34,11 @@ public class ReadStreamTests
             var bytes = Convert.FromHexString(PcapSamples.Multiple);
             var capture = bytes[..(selector.Item % (bytes.Length + 1))];
             using var baseline = new MemoryStream(capture);
-            var expected = PcapReader.Open(baseline);
+            var expected = PcapReader.Open(baseline, PcapReaderOptions.Default);
             using var stream = new ProbeStream(capture) { ChunkSizes = [1, .. sizes.Select(size => 1 + size % 16)] };
 
             // Act
-            var actual = PcapReader.Open(stream);
+            var actual = PcapReader.Open(stream, PcapReaderOptions.Default);
 
             // Assert
             return (expected, actual) switch
@@ -58,8 +58,8 @@ public class ReadStreamTests
             var capture = bytes[..(24 + selector.Item % (bytes.Length - 23))];
             using var baseline = new MemoryStream(capture);
             using var stream = new ProbeStream(capture) { ChunkSizes = [1, .. sizes.Select(size => 1 + size % 16)] };
-            var regular = PcapReader.Open(baseline) is PcapReader r ? r : throw new InvalidOperationException();
-            var chunked = PcapReader.Open(stream) is PcapReader c ? c : throw new InvalidOperationException();
+            var regular = PcapReader.Open(baseline, PcapReaderOptions.Default) is PcapReader r ? r : throw new InvalidOperationException();
+            var chunked = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader c ? c : throw new InvalidOperationException();
             for (int i = 0; i < preceding % 5; i++)
             {
                 regular.ReadNext();
@@ -90,7 +90,7 @@ public class ReadStreamTests
         using var stream = new ProbeStream(PcapSamples.Single("little-micro")) { FailAt = 11 };
 
         // Act
-        Action act = () => PcapReader.Open(stream);
+        Action act = () => PcapReader.Open(stream, PcapReaderOptions.Default);
 
         // Assert
         var exception = await Assert.That(act).Throws<IOException>();
@@ -105,7 +105,7 @@ public class ReadStreamTests
     {
         // Arrange
         using var stream = new ProbeStream(PcapSamples.Single("little-micro")) { FailAt = failAt };
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
 
         // Act
         Action act = () => reader.ReadNext();
@@ -123,7 +123,7 @@ public class ReadStreamTests
     {
         // Arrange
         using var stream = new ProbeStream(PcapSamples.Single("little-micro")) { FailAt = failAt };
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
         try { reader.ReadNext(); } catch (IOException) { }
         var calls = stream.ReadCalls;
         stream.FailAt = null;
@@ -149,7 +149,7 @@ public class ReadStreamTests
             FailAt = 41,
             Failure = disposed ? new ObjectDisposedException("source") : new UnauthorizedAccessException("denied")
         };
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
         var reader = openResult is PcapReader opened ? opened : throw new InvalidOperationException();
 
         // Act
@@ -195,7 +195,7 @@ public class ReadStreamTests
         var bytes = PcapSamples.Single("little-micro");
         stream.Write(bytes.AsSpan(0, 41));
         stream.Position = 0;
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
         var error = reader.ReadNext() is PcapError initial ? initial : throw new InvalidOperationException();
         var expectedError = new PcapError.IncompletePacketData(40, 1, 3, 1);
         stream.Write(bytes.AsSpan(41));

@@ -51,7 +51,7 @@ internal sealed class RecordInspectorViewModel : ObservableObject
     public bool FullOpen => fullOpen;
     public string ToggleLabel => fullOpen ? Strings.HideFullBytes : Strings.ShowFullBytes;
 
-    internal void Clear(bool resetFullBytes = false)
+    internal void Clear(bool resetFullBytes)
     {
         capture = null;
         Reset(null);
@@ -190,7 +190,7 @@ internal sealed class RecordInspectorViewModel : ObservableObject
         var bytes = Evidence?.Data.Bytes ?? [];
         (var rangeText, var raw) = (range, exact) switch
         {
-            ({ } span, _) => ($"0x{span.Label} · {span.Length} B", PacketFields.Raw(bytes.AsSpan(span.Start, span.Length))),
+            ({ } span, _) => ($"0x{span.Label} · {span.Length} B", PacketFields.Raw(bytes.AsSpan(span.Start, span.Length), separator: " ")),
             (null, { } index) => ($"0x{index:X4} · 1 B", bytes[index].ToString("X2")),
             _ => (Strings.UnknownBytePosition, "—")
         };

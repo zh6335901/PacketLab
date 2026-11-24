@@ -42,8 +42,8 @@ public class IPv4ParserBenchmarks
     [GlobalSetup]
     public void Prepare()
     {
-        var udp = PacketSamples.Udp(32, true, PacketSamples.IPv4AddressSum);
-        packet = PacketSamples.IPv4(udp, optionBytes: HeaderLength - 20);
+        var udp = PacketSamples.Udp(32, true, PacketSamples.IPv4AddressSum, ipv6: false);
+        packet = PacketSamples.IPv4(udp, optionBytes: HeaderLength - 20, identification: 1, offset: 0, more: false);
         if (Parse() is not IPv4Packet { ChecksumStatus: IPv4ChecksumStatus.Match } parsed ||
             parsed.Header.HeaderLength != HeaderLength || !parsed.Payload.Span.SequenceEqual(udp))
             throw new InvalidDataException("Unexpected IPv4 header or payload.");
@@ -64,7 +64,7 @@ public class IPv6ParserBenchmarks
     [GlobalSetup]
     public void Prepare()
     {
-        var udp = PacketSamples.Udp(32, true, PacketSamples.IPv6AddressSum);
+        var udp = PacketSamples.Udp(32, true, PacketSamples.IPv6AddressSum, ipv6: false);
         packet = WithExtensions ? PacketSamples.IPv6WithExtensions(udp) : PacketSamples.IPv6(udp, 17);
         if (Parse() is not IPv6Packet parsed || !parsed.Extensions.Diagnostics.IsEmpty ||
             parsed.Extensions.Headers.Length != (WithExtensions ? 2 : 0) ||

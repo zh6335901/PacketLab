@@ -30,7 +30,7 @@ internal sealed partial class PacketFields(byte[] bytes)
         }
 
         if (record.Time.Kind != TimeKind.Present)
-            view.Add(Strings.Capture, Strings.Timestamp, record.Time.Format());
+            view.Add(Strings.Capture, Strings.Timestamp, record.Time.Format(date: false));
         if (record.Length != record.OriginalLength)
             view.Add(Strings.Capture, Strings.CapturedOriginalLength, $"{record.Length} / {record.OriginalLength} B");
 
@@ -56,7 +56,10 @@ internal sealed partial class PacketFields(byte[] bytes)
         return new(bytes, summary, fields);
     }
 
-    private void Add(string layer, string name, string value, int start = -1, int length = 0)
+    private void Add(string layer, string name, string value) =>
+        fields.Add(new(layer, name, value, null));
+
+    private void Add(string layer, string name, string value, int start, int length)
     {
         ByteRange? range = start >= 0 && length > 0 && start <= bytes.Length - length ? new(start, length) : null;
         fields.Add(new(layer, name, value, range));
@@ -169,7 +172,7 @@ internal sealed partial class PacketFields(byte[] bytes)
             (false, true) => Strings.SenderIp,
             (false, false) => Strings.SenderProtocolAddress
         };
-        var text = isIp ? address.ToString() : Raw(value);
+        var text = isIp ? address.ToString() : Raw(value, separator: " ");
         Add("ARP", name, text, start, value.Length);
     }
 
@@ -200,7 +203,7 @@ internal sealed partial class PacketFields(byte[] bytes)
                 Add("IPv4", Strings.DestinationAddress, header.Destination.ToString(),
                     start + 16, 4);
                 if (!header.Options.IsEmpty)
-                    Add(Strings.Ipv4Options, Strings.RawOptionBytes, Raw(header.Options.Span),
+                    Add(Strings.Ipv4Options, Strings.RawOptionBytes, Raw(header.Options.Span, separator: " "),
                         start + 20, header.Options.Length);
 
                 Transport(ip.Payload.Value, start + header.HeaderLength);
@@ -226,7 +229,7 @@ internal sealed partial class PacketFields(byte[] bytes)
                 break;
         }
 
-        return new(default, default, PacketIssue.Invalid, Protocol.IPv4);
+        return new(default, default, PacketIssue.Invalid, Protocol.IPv4, SourcePort: 0, DestinationPort: 0, HasPorts: false, Detail: 0, IpVersion: 0);
     }
 
     private PacketSummary IPv6(IPv6DecodeResult result, int start)
@@ -238,7 +241,7 @@ internal sealed partial class PacketFields(byte[] bytes)
             if (result.Value is IPv6ParseResult.IncompleteHeader failure)
                 Add("IPv6", Strings.TruncatedHeader, UIText.Format(Strings.RequiredAndCapturedBytes, failure.RequiredLength, failure.CapturedLength));
 
-            return new(default, default, PacketIssue.Invalid, Protocol.IPv6);
+            return new(default, default, PacketIssue.Invalid, Protocol.IPv6, SourcePort: 0, DestinationPort: 0, HasPorts: false, Detail: 0, IpVersion: 0);
         }
 
         var header = ip.Header;
@@ -302,7 +305,7 @@ internal sealed partial class PacketFields(byte[] bytes)
 
         Add(layer, Strings.ExtensionLength, Size(extension.Length),
             start + 1, 1);
-        Add(layer, Strings.ExtensionData, Raw(extension.Bytes.Span[2..]),
+        Add(layer, Strings.ExtensionData, Raw(extension.Bytes.Span[2..], separator: " "),
             start + 2,
                 extension.Length - 2);
     }
@@ -401,7 +404,7 @@ internal sealed partial class PacketFields(byte[] bytes)
         }
     }
 
-    internal static string Raw(ReadOnlySpan<byte> bytes, string separator = " ")
+    internal static string Raw(ReadOnlySpan<byte> bytes, string separator)
     {
         if (bytes.IsEmpty)
             return "—";

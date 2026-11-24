@@ -95,7 +95,7 @@ internal sealed class CaptureIndex : IDisposable
                 var packet = (PcapPacket)result.Value!;
                 var time = CaptureTime.From(packet.Timestamp);
                 var decoding = PcapAnalysis.Decode(header, packet);
-                var record = AddPacket(packet.DataOffset, packet.Data.Length, packet.OriginalLength, time, decoding);
+                var record = AddPacket(packet.DataOffset, packet.Data.Length, packet.OriginalLength, time, decoding, iface: null, kind: default, comment: null);
                 ReportProgress(record, null);
             }
         }
@@ -146,7 +146,7 @@ internal sealed class CaptureIndex : IDisposable
         }
 
         private int AddPacket(long offset, int length, uint original, CaptureTime time, ProtocolDecodeResult decoding,
-            PcapNgInterface? iface = null, PcapNgPacketKind? kind = null, string? comment = null)
+            PcapNgInterface? iface, PcapNgPacketKind? kind, string? comment)
         {
             var summary = PacketSummary.From(decoding);
             var issue = time.Kind switch

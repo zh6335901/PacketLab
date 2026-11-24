@@ -52,7 +52,7 @@ internal sealed partial class PacketFields
     private void TcpPartial(ReadOnlySpan<byte> available, int start)
     {
         if (!available.IsEmpty)
-            Add("TCP", Strings.UnparsedHeaderBytes, Raw(available), start, available.Length);
+            Add("TCP", Strings.UnparsedHeaderBytes, Raw(available, separator: " "), start, available.Length);
 
         Add("TCP", Strings.ChecksumStatus, Strings.Unavailable);
     }
@@ -113,7 +113,7 @@ internal sealed partial class PacketFields
                 TcpOptionValue.NoOperation => ("NOP", Strings.SingleByte),
                 TcpOptionValue.End => ("EOL", Strings.EndOfOptions),
                 TcpOptionValue.Invalid invalid => (Strings.InvalidOption, $"{kind} · {TcpOptionReason(invalid.Reason)} · {invalid.AvailableLength}/{invalid.RequiredLength} B"),
-                _ => (Strings.UnknownOption, $"{kind} · {Raw(option.Bytes.Span)}")
+                _ => (Strings.UnknownOption, $"{kind} · {Raw(option.Bytes.Span, separator: " ")}")
             };
             Add(Strings.TcpOptions, name, value, start + option.Offset, option.Bytes.Length);
         }
@@ -177,7 +177,7 @@ internal sealed partial class PacketFields
     {
         Add("UDP", Strings.Diagnostics, reason);
         if (!available.IsEmpty)
-            Add("UDP", Strings.UnparsedHeaderBytes, Raw(available), start, available.Length);
+            Add("UDP", Strings.UnparsedHeaderBytes, Raw(available, separator: " "), start, available.Length);
 
         Add("UDP", Strings.ChecksumStatus, Strings.Unavailable);
     }

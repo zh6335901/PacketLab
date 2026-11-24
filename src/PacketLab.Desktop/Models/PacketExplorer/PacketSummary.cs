@@ -74,8 +74,8 @@ internal readonly record struct FragmentSlice(int Offset, int Start, int Length,
 }
 
 internal readonly record struct PacketSummary(PacketAddress Source, PacketAddress Destination, PacketIssue Issue,
-    Protocol Protocol, ushort SourcePort = 0, ushort DestinationPort = 0, bool HasPorts = false,
-    ushort Detail = 0, byte IpVersion = 0)
+    Protocol Protocol, ushort SourcePort, ushort DestinationPort, bool HasPorts,
+    ushort Detail, byte IpVersion)
 {
     internal string Name => Protocol switch
     {
@@ -116,12 +116,12 @@ internal readonly record struct PacketSummary(PacketAddress Source, PacketAddres
         EthernetDecodeResult { Value: DecodedEthernet ethernet } => FromEthernet(ethernet),
         EthernetDecodeResult { Value: EthernetParseResult.Ieee8023Length frame } => new(
             PacketAddress.From(frame.Source),
-                PacketAddress.From(frame.Destination), PacketIssue.Unsupported, Protocol.Ethernet),
+                PacketAddress.From(frame.Destination), PacketIssue.Unsupported, Protocol.Ethernet, SourcePort: 0, DestinationPort: 0, HasPorts: false, Detail: 0, IpVersion: 0),
         EthernetDecodeResult { Value: EthernetParseResult.InvalidLengthOrType frame } => new(
             PacketAddress.From(frame.Source),
-                PacketAddress.From(frame.Destination), PacketIssue.Invalid, Protocol.Ethernet),
-        EthernetDecodeResult => new(default, default, PacketIssue.Truncated, Protocol.Ethernet),
-        _ => new(default, default, PacketIssue.Unsupported, Protocol.Raw)
+                PacketAddress.From(frame.Destination), PacketIssue.Invalid, Protocol.Ethernet, SourcePort: 0, DestinationPort: 0, HasPorts: false, Detail: 0, IpVersion: 0),
+        EthernetDecodeResult => new(default, default, PacketIssue.Truncated, Protocol.Ethernet, SourcePort: 0, DestinationPort: 0, HasPorts: false, Detail: 0, IpVersion: 0),
+        _ => new(default, default, PacketIssue.Unsupported, Protocol.Raw, SourcePort: 0, DestinationPort: 0, HasPorts: false, Detail: 0, IpVersion: 0)
     };
 
     private static PacketSummary FromEthernet(DecodedEthernet ethernet)
@@ -136,15 +136,15 @@ internal readonly record struct PacketSummary(PacketAddress Source, PacketAddres
                 AddressOrMac(PacketAddress.FromArp(arp.TargetProtocolAddress.Span, arp.ProtocolType), destination),
                 arp.Operation is 1 or 2 && arp.HardwareType == 1 && arp.ProtocolType == 0x0800 &&
                     arp.HardwareAddressLength == 6 && arp.ProtocolAddressLength == 4 ? PacketIssue.None : PacketIssue.Unknown,
-                Protocol.Arp, Detail: arp.Operation),
-            ArpParseResult => new(source, destination, PacketIssue.Truncated, Protocol.Arp),
+                Protocol.Arp, Detail: arp.Operation, SourcePort: 0, DestinationPort: 0, HasPorts: false, IpVersion: 0),
+            ArpParseResult => new(source, destination, PacketIssue.Truncated, Protocol.Arp, SourcePort: 0, DestinationPort: 0, HasPorts: false, Detail: 0, IpVersion: 0),
             IPv4DecodeResult { Value: DecodedIPv4 ipv4 } => FromIPv4(ipv4),
             IPv6DecodeResult { Value: DecodedIPv6 ipv6 } => FromIPv6(ipv6),
             IPv4DecodeResult ipv4 => new(source, destination, ipv4.Value is IPv4ParseResult.IncompleteHeader
-                ? PacketIssue.Truncated : PacketIssue.Invalid, Protocol.IPv4),
+                ? PacketIssue.Truncated : PacketIssue.Invalid, Protocol.IPv4, SourcePort: 0, DestinationPort: 0, HasPorts: false, Detail: 0, IpVersion: 0),
             IPv6DecodeResult ipv6 => new(source, destination, ipv6.Value is IPv6ParseResult.IncompleteHeader
-                ? PacketIssue.Truncated : PacketIssue.Invalid, Protocol.IPv6),
-            _ => new(source, destination, PacketIssue.Unsupported, Protocol.Ethernet)
+                ? PacketIssue.Truncated : PacketIssue.Invalid, Protocol.IPv6, SourcePort: 0, DestinationPort: 0, HasPorts: false, Detail: 0, IpVersion: 0),
+            _ => new(source, destination, PacketIssue.Unsupported, Protocol.Ethernet, SourcePort: 0, DestinationPort: 0, HasPorts: false, Detail: 0, IpVersion: 0)
         };
     }
 
@@ -160,7 +160,7 @@ internal readonly record struct PacketSummary(PacketAddress Source, PacketAddres
             issue |= PacketIssue.Invalid;
         var summary = new PacketSummary(PacketAddress.From(header.Source),
             PacketAddress.From(header.Destination),
-            issue, Protocol.IPv4, IpVersion: 4);
+            issue, Protocol.IPv4, IpVersion: 4, SourcePort: 0, DestinationPort: 0, HasPorts: false, Detail: 0);
 
         return WithTransport(summary, ip.Payload.Value);
     }
@@ -182,7 +182,7 @@ internal readonly record struct PacketSummary(PacketAddress Source, PacketAddres
         }
         var summary = new PacketSummary(PacketAddress.From(ip.Header.Source),
             PacketAddress.From(ip.Header.Destination),
-            issue, Protocol.IPv6, Detail: (ushort)ip.Extensions.Length, IpVersion: 6);
+            issue, Protocol.IPv6, Detail: (ushort)ip.Extensions.Length, IpVersion: 6, SourcePort: 0, DestinationPort: 0, HasPorts: false);
 
         return WithTransport(summary, ip.Payload.Value);
     }

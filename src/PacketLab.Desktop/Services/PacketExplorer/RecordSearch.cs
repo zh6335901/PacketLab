@@ -47,6 +47,6 @@ internal static class RecordSearch
             RecordStatus.ForRecord(record, group, index).Label, group?.Identity);
 
         return text.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-            (query.Contains(':') && record.Time.Format().Contains(query, StringComparison.OrdinalIgnoreCase));
+            (query.Contains(':') && record.Time.Format(date: false).Contains(query, StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -2,7 +2,7 @@ using System.Collections;
 
 namespace PacketLab.Desktop.ViewModels.PacketExplorer;
 
-internal sealed class RecordItems(int count, int[]? filtered = null) : IList
+internal sealed class RecordItems(int count, int[]? filtered) : IList
 {
     public int Count => filtered?.Length ?? count;
     public bool IsReadOnly => true;

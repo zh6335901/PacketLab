@@ -16,7 +16,7 @@ public sealed class IpFragmentReassembler : IDisposable
     private long nextId;
     private bool disposed;
 
-    public IpFragmentReassembler(IpReassemblyOptions? options = null) => this.options = options ?? new();
+    public IpFragmentReassembler(IpReassemblyOptions? options) => this.options = options ?? IpReassemblyOptions.Default;
 
     // The caller supplies IP bytes, without a link-layer header. IDs are local to this instance.
     public IpReassemblyUpdate? Process(ReadOnlyMemory<byte> ipPacket)
@@ -79,7 +79,7 @@ public sealed class IpFragmentReassembler : IDisposable
             }
 
             (events ??= ImmutableArray.CreateBuilder<IpReassemblyUpdate>())
-                .Add(Event(state, IpReassemblyStatus.Expired, IpReassemblyDiagnosticCode.TimedOut));
+                .Add(Event(state, IpReassemblyStatus.Expired, IpReassemblyDiagnosticCode.TimedOut, packet: null));
             Remove(key, state);
         }
         oldestStartTime = nextOldest;
@@ -96,7 +96,7 @@ public sealed class IpFragmentReassembler : IDisposable
             if (state.Id != datagramId)
                 continue;
 
-            var result = Event(state, IpReassemblyStatus.Expired, IpReassemblyDiagnosticCode.ExpiredByCaller);
+            var result = Event(state, IpReassemblyStatus.Expired, IpReassemblyDiagnosticCode.ExpiredByCaller, packet: null);
             Remove(key, state);
 
             return result;
@@ -146,7 +146,7 @@ public sealed class IpFragmentReassembler : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         var events = datagrams.Values.Where(x => x.Buffer is Collecting)
-            .Select(x => Event(x, IpReassemblyStatus.Incomplete, IpReassemblyDiagnosticCode.MissingFragments)).ToImmutableArray();
+            .Select(x => Event(x, IpReassemblyStatus.Incomplete, IpReassemblyDiagnosticCode.MissingFragments, packet: null)).ToImmutableArray();
         datagrams.Clear();
         bufferedBytes = 0;
 
@@ -169,7 +169,7 @@ public sealed class IpFragmentReassembler : IDisposable
         {
             state = new Datagram(fragment, datagramId, clock);
             if (datagrams.Count >= options.MaxDatagrams)
-                return Event(state, IpReassemblyStatus.ResourceLimit, IpReassemblyDiagnosticCode.DatagramTableLimit);
+                return Event(state, IpReassemblyStatus.ResourceLimit, IpReassemblyDiagnosticCode.DatagramTableLimit, packet: null);
 
             // Starts are monotonic. Removing the oldest entry can only cause an extra early scan.
             if (datagrams.Count == 0)
@@ -177,7 +177,7 @@ public sealed class IpFragmentReassembler : IDisposable
             datagrams.Add(fragment.Key, state);
         }
         if (state.Buffer is Discarded discarded)
-            return Event(state, discarded.Status, IpReassemblyDiagnosticCode.AlreadyDiscarded);
+            return Event(state, discarded.Status, IpReassemblyDiagnosticCode.AlreadyDiscarded, packet: null);
 
         var buffer = state.Buffer is Collecting collecting ? collecting : throw new InvalidOperationException();
 
@@ -188,9 +188,9 @@ public sealed class IpFragmentReassembler : IDisposable
     {
         var state = new Datagram(fragment, datagramId, clock);
         if (Validate(fragment) is { } invalid)
-            return Event(state, invalid.Status, invalid.Code);
+            return Event(state, invalid.Status, invalid.Code, packet: null);
 
-        var packet = BuildPacket(fragment.Prefix, fragment, fragment.Bytes.Span);
+        var packet = BuildPacket(fragment.Prefix, fragment, fragment.Bytes.Span, congestionExperienced: false);
         var decodedPacket = Decode(packet, fragment.Key.Version);
 
         return Event(state, IpReassemblyStatus.Atomic, IpReassemblyDiagnosticCode.AtomicFragment, decodedPacket);
@@ -209,7 +209,7 @@ public sealed class IpFragmentReassembler : IDisposable
             if (part.Offset == fragment.Offset && part.More == fragment.More &&
                 part.Bytes.AsSpan().SequenceEqual(fragment.Bytes.Span))
             {
-                return Event(state, IpReassemblyStatus.Duplicate, IpReassemblyDiagnosticCode.DuplicateIgnored);
+                return Event(state, IpReassemblyStatus.Duplicate, IpReassemblyDiagnosticCode.DuplicateIgnored, packet: null);
             }
 
             return Fail(state, IpReassemblyStatus.Conflict, IpReassemblyDiagnosticCode.OverlapDiscarded);
@@ -245,7 +245,7 @@ public sealed class IpFragmentReassembler : IDisposable
             }
         }
 
-        return Event(state, IpReassemblyStatus.Pending, IpReassemblyDiagnosticCode.AwaitingFragments);
+        return Event(state, IpReassemblyStatus.Pending, IpReassemblyDiagnosticCode.AwaitingFragments, packet: null);
     }
 
     private (IpReassemblyStatus Status, IpReassemblyDiagnosticCode Code)? ValidateForDatagram(
@@ -351,7 +351,7 @@ public sealed class IpFragmentReassembler : IDisposable
 
     private IpReassemblyUpdate Fail(Datagram state, IpReassemblyStatus status, IpReassemblyDiagnosticCode code)
     {
-        var update = Event(state, status, code);
+        var update = Event(state, status, code, packet: null);
         if (state.Buffer is Collecting buffer)
             bufferedBytes -= buffer.Bytes;
         // A bounded tombstone prevents later fragments from reviving an ambiguous datagram.
@@ -368,7 +368,7 @@ public sealed class IpFragmentReassembler : IDisposable
     }
 
     private static IpReassemblyUpdate Event(Datagram state, IpReassemblyStatus status, IpReassemblyDiagnosticCode code,
-        ReassembledIpPacket? packet = null)
+        ReassembledIpPacket? packet)
     {
         IpReassemblyOutcome outcome = packet switch
         {
@@ -492,7 +492,7 @@ public sealed class IpFragmentReassembler : IDisposable
         if (fragment.NextHeader == 0)
             return false;
 
-        var packet = BuildPacket(fragment.Prefix, fragment, fragment.Bytes.Span);
+        var packet = BuildPacket(fragment.Prefix, fragment, fragment.Bytes.Span, congestionExperienced: false);
         if (IPv6Parser.Parse(packet) is not IPv6Packet parsed)
             return false;
         if (parsed.Extensions.Headers.Any(x => x.Type == 44))
@@ -517,7 +517,7 @@ public sealed class IpFragmentReassembler : IDisposable
     }
 
     private static byte[] BuildPacket(ReadOnlyMemory<byte> prefix, Fragment fragment, ReadOnlySpan<byte> payload,
-        bool congestionExperienced = false)
+        bool congestionExperienced)
     {
         var bytes = new byte[prefix.Length + payload.Length];
         prefix.Span.CopyTo(bytes);

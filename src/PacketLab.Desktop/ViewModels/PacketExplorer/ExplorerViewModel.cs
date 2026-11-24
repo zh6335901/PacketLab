@@ -25,7 +25,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
     private bool disposed;
     private int loadRevision;
     private string? openError;
-    private RecordItems items = new(0);
+    private RecordItems items = new(0, filtered: null);
     private CaptureMetadata? metadata;
 
     internal ExplorerViewModel(Func<Task<string?>> chooseFile)
@@ -86,7 +86,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
         set
         {
             if (SetProperty(ref query, value))
-                _ = RefreshAsync(debounce: true);
+                _ = RefreshAsync(debounce: true, refreshSelection: false);
         }
     }
 
@@ -188,7 +188,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
         snapshot = next;
         UpdateHeader();
         if (!loading || filter == RecordFilter.All && string.IsNullOrWhiteSpace(query))
-            return RefreshAsync(refreshSelection: !loading);
+            return RefreshAsync(refreshSelection: !loading, debounce: false);
 
         return Task.CompletedTask;
     }
@@ -228,7 +228,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
     {
         filter = requested;
         NotifyFilter();
-        _ = RefreshAsync();
+        _ = RefreshAsync(debounce: false, refreshSelection: false);
     }
 
     private void ClearFilter()
@@ -236,7 +236,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
         filter = RecordFilter.All;
         SetProperty(ref query, "", nameof(Query));
         NotifyFilter();
-        _ = RefreshAsync();
+        _ = RefreshAsync(debounce: false, refreshSelection: false);
     }
 
     private void NotifyFilter()
@@ -246,7 +246,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(FragmentsSelected));
     }
 
-    private async Task RefreshAsync(bool debounce = false, bool refreshSelection = false)
+    private async Task RefreshAsync(bool debounce, bool refreshSelection)
     {
         filterCancellation?.Cancel();
         using var cancellation = new CancellationTokenSource();
@@ -259,7 +259,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
         try
         {
             if (mode == RecordFilter.All && text.Length == 0 || current is null)
-                ApplyItems(new RecordItems(count), refreshSelection);
+                ApplyItems(new RecordItems(count, filtered: null), refreshSelection);
             else
             {
                 if (debounce)
@@ -291,7 +291,7 @@ internal sealed class ExplorerViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(FooterCount));
         OnPropertyChanged(nameof(NoMatches));
         if (index < 0)
-            Inspector.Clear();
+            Inspector.Clear(resetFullBytes: false);
         else if (index != selected || refreshSelection || Inspector.Record is null)
             SelectRecord(index);
 

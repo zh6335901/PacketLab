@@ -10,7 +10,7 @@ namespace PacketLab.Analyzers;
 public sealed class OptionalParameterAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor Rule = new(
-        "PL0014", "Avoid optional parameters",
+        "PL0015", "Avoid optional parameters",
         "Make parameter '{0}' required so callers pass an explicit value",
         "Design", DiagnosticSeverity.Warning, isEnabledByDefault: true);
 

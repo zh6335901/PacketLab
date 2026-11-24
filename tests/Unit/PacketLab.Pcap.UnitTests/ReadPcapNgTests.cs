@@ -168,7 +168,7 @@ public class ReadPcapNgTests
             int cut = 1 + selector % (file.Length - 1);
             if (cut is 28 or 48) return true;
             using var stream = new MemoryStream(file[..cut]);
-            var opened = PcapNgReader.Open(stream);
+            var opened = PcapNgReader.Open(stream, PcapNgReaderOptions.Default);
             if (opened is PcapError openError) return openError.Offset == cut;
             if (opened is not PcapNgReader reader) return false;
             var result = reader.ReadNext();
@@ -226,7 +226,7 @@ public class ReadPcapNgTests
     {
         using var stream = new MemoryStream(Section(length: length));
 
-        var result = PcapNgReader.Open(stream);
+        var result = PcapNgReader.Open(stream, PcapNgReaderOptions.Default);
 
         await Assert.That(result is PcapError error && error.Offset == 16).IsTrue();
     }
@@ -272,7 +272,7 @@ public class ReadPcapNgTests
     public async Task Packet_limit_is_enforced_for_pcapng()
     {
         using var stream = new MemoryStream([.. Section(), .. Interface(), .. Packet([1, 2])]);
-        var reader = PcapNgReader.Open(stream, new PcapNgReaderOptions(1)) is PcapNgReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapNgReader.Open(stream, new PcapNgReaderOptions(1, maxBlockBytes: 32 * 1024 * 1024, maxMetadataBytes: 64 * 1024 * 1024, maxOptionsPerBlock: 65536)) is PcapNgReader opened ? opened : throw new InvalidOperationException();
 
         var result = reader.ReadNext();
 
@@ -283,7 +283,7 @@ public class ReadPcapNgTests
     public async Task Metadata_limit_bounds_retained_sections_and_interfaces()
     {
         using var stream = new MemoryStream([.. Section(), .. Interface()]);
-        var reader = PcapNgReader.Open(stream, options: new(maxMetadataBytes: 300)) is PcapNgReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapNgReader.Open(stream, options: new(maxMetadataBytes: 300, maxPacketBytes: 16777216, maxBlockBytes: 32 * 1024 * 1024, maxOptionsPerBlock: 65536)) is PcapNgReader opened ? opened : throw new InvalidOperationException();
 
         var result = reader.ReadNext();
 
@@ -322,7 +322,7 @@ public class ReadPcapNgTests
     public async Task Many_empty_options_are_bounded_before_large_object_allocation()
     {
         using var stream = new MemoryStream([.. Section(), .. Interface(options: [.. Option(1, []), .. Option(1, [])])]);
-        var reader = PcapNgReader.Open(stream, options: new(maxOptionsPerBlock: 1)) is PcapNgReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapNgReader.Open(stream, options: new(maxOptionsPerBlock: 1, maxPacketBytes: 16777216, maxBlockBytes: 32 * 1024 * 1024, maxMetadataBytes: 64 * 1024 * 1024)) is PcapNgReader opened ? opened : throw new InvalidOperationException();
 
         var result = reader.ReadNext();
 
@@ -338,7 +338,7 @@ public class ReadPcapNgTests
         U32(value).CopyTo(bytes, offset);
         using var stream = new MemoryStream(bytes);
 
-        var result = PcapNgReader.Open(stream);
+        var result = PcapNgReader.Open(stream, PcapNgReaderOptions.Default);
 
         await Assert.That(result is PcapError error && error.Offset == offset).IsTrue();
     }
@@ -377,7 +377,7 @@ public class ReadPcapNgTests
         await Assert.That(result is PcapError error && error.Offset == 36 && error.RecordNumber == 1).IsTrue();
     }
 
-    private static PcapNgReader Open(Stream stream) => PcapNgReader.Open(stream) is PcapNgReader reader
+    private static PcapNgReader Open(Stream stream) => PcapNgReader.Open(stream, PcapNgReaderOptions.Default) is PcapNgReader reader
         ? reader : throw new InvalidOperationException("Expected capture reader.");
     private static PcapNgPacket Read(PcapNgReader reader) => reader.ReadNext() is PcapNgPacket packet
         ? packet : throw new InvalidOperationException("Expected PCAPNG packet.");

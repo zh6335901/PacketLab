@@ -42,7 +42,7 @@ internal static class ViewStyle
 
     internal static SolidColorBrush Brush(string hex) => new(Color.Parse(hex));
 
-    internal static TextBlock Label(string text, double size = 12, IBrush? brush = null, bool mono = false, FontWeight weight = FontWeight.Normal) =>
+    internal static TextBlock Label(string text, double size, IBrush? brush, bool mono, FontWeight weight) =>
         new()
         {
             Text = text, FontFamily = mono ? Mono : Body, FontSize = size, Foreground = brush ?? Text,
@@ -92,7 +92,7 @@ internal static class ViewStyle
 
     internal static TextBlock Notice(string text)
     {
-        var label = Label(text, 12, Muted);
+        var label = Label(text, 12, Muted, mono: false, weight: FontWeight.Normal);
         label.TextWrapping = TextWrapping.Wrap;
         label.Margin = new Thickness(12);
 
@@ -107,7 +107,7 @@ internal static class ViewStyle
         return label;
     }
 
-    internal static Button CommandButton(Control content, System.Windows.Input.ICommand command, string tooltip, object? parameter = null)
+    internal static Button CommandButton(Control content, System.Windows.Input.ICommand command, string tooltip, object? parameter)
     {
         var button = new Button { Content = content, Command = command, CommandParameter = parameter, Classes = { "explorer" } };
         ToolTip.SetTip(button, tooltip);
@@ -116,7 +116,7 @@ internal static class ViewStyle
         return button;
     }
 
-    internal static Path Icon(string path, double size = 16, IBrush? stroke = null) => new()
+    internal static Path Icon(string path, double size, IBrush? stroke) => new()
     {
         Data = Geometry.Parse(path), Width = size, Height = size, Stretch = Stretch.Uniform,
         Stroke = stroke ?? Accent, StrokeThickness = 1.4, StrokeLineCap = PenLineCap.Round,
@@ -137,14 +137,14 @@ internal static class ViewStyle
         _ => (Neutral, NeutralBackground)
     };
 
-    internal static Border Badge(RecordStatus status, double size = 11)
+    internal static Border Badge(RecordStatus status, double size)
     {
         var (foreground, background) = Palette(status.Tone);
 
         return new Border
         {
             Background = background, CornerRadius = new CornerRadius(4), Padding = new Thickness(5, 0),
-            Child = Label(status.Label, size, foreground, weight: Demi), VerticalAlignment = VerticalAlignment.Center,
+            Child = Label(status.Label, size, foreground, weight: Demi, mono: false), VerticalAlignment = VerticalAlignment.Center,
             MinHeight = size == 10 ? 15 : 20
         };
     }

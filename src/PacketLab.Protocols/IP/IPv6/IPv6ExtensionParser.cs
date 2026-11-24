@@ -56,7 +56,7 @@ internal static class IPv6ExtensionParser
                 if (next == 43 && bytes[3] != 0)
                 {
                     addressesKnown = false;
-                    var arguments = new IPv6DiagnosticArguments(bytes[2], bytes[3]);
+                    var arguments = new IPv6DiagnosticArguments(bytes[2], bytes[3], Third: 0);
                     Diagnose(IPv6DiagnosticCode.FinalDestinationUnavailable, offset,
                         $"Routing Type {arguments.First}, Segments Left {arguments.Second}; final destination and checksum context unavailable",
                         arguments);
@@ -72,7 +72,7 @@ internal static class IPv6ExtensionParser
         private int Available(uint? declared) =>
             (int)Math.Min((ulong)captured.Length, declared ?? (ulong)captured.Length);
 
-        private void Diagnose(IPv6DiagnosticCode code, int at, string message, IPv6DiagnosticArguments arguments = default)
+        private void Diagnose(IPv6DiagnosticCode code, int at, string message, IPv6DiagnosticArguments arguments)
         {
             var diagnostic = new IPv6Diagnostic(code, 40 + at, message) { Arguments = arguments };
             (diagnostics ??= ImmutableArray.CreateBuilder<IPv6Diagnostic>()).Add(diagnostic);
@@ -86,7 +86,7 @@ internal static class IPv6ExtensionParser
                 : new IPv6Payload.UndeterminedLength(captured);
             if (declared is uint expected && captured.Length < expected)
                 Diagnose(IPv6DiagnosticCode.PayloadTruncated, end,
-                    $"payload declared {expected} bytes, captured {captured.Length}", new(expected, captured.Length));
+                    $"payload declared {expected} bytes, captured {captured.Length}", new(expected, captured.Length, Third: 0));
             var chain = new IPv6ExtensionChain(
                 Headers: headers.ToImmutable(),
                 RemainingOffset: 40 + offset,
@@ -115,9 +115,9 @@ internal static class IPv6ExtensionParser
         private IPv6PayloadUnavailable UnsupportedHeader()
         {
             if (next == 50)
-                Diagnose(IPv6DiagnosticCode.EncryptedEsp, offset, "ESP encrypted content; upper layer unavailable");
+                Diagnose(IPv6DiagnosticCode.EncryptedEsp, offset, "ESP encrypted content; upper layer unavailable", arguments: default);
             else
-                Diagnose(IPv6DiagnosticCode.UnsupportedNextHeader, offset, $"unsupported Next Header {next}; upper layer unavailable", new(next));
+                Diagnose(IPv6DiagnosticCode.UnsupportedNextHeader, offset, $"unsupported Next Header {next}; upper layer unavailable", new(next, Second: 0, Third: 0));
 
             return new(IPv6PayloadFailure.Unsupported);
         }
@@ -161,7 +161,7 @@ internal static class IPv6ExtensionParser
             if (next == 51 && (length < 12 || length % 8 != 0))
             {
                 Diagnose(IPv6DiagnosticCode.InvalidHeaderLength, offset,
-                    $"AH length {length} must include 12 fixed bytes and be a multiple of 8", new(length));
+                    $"AH length {length} must include 12 fixed bytes and be a multiple of 8", new(length, Second: 0, Third: 0));
 
                 return new(IPv6PayloadFailure.Invalid);
             }
@@ -188,7 +188,7 @@ internal static class IPv6ExtensionParser
             if (next != 0 || offset == 0)
                 return null;
 
-            Diagnose(IPv6DiagnosticCode.InvalidHopByHopPosition, offset, "Hop-by-Hop must immediately follow the fixed header");
+            Diagnose(IPv6DiagnosticCode.InvalidHopByHopPosition, offset, "Hop-by-Hop must immediately follow the fixed header", arguments: default);
             offset += length;
 
             return new(IPv6PayloadFailure.Invalid);
@@ -200,7 +200,7 @@ internal static class IPv6ExtensionParser
             var options = ReadOptions(bytes, firstHopByHop, header.PayloadLength);
             if (options is OptionsResult.Invalid error)
             {
-                Diagnose(error.Code, offset + error.Offset, error.Message);
+                Diagnose(error.Code, offset + error.Offset, error.Message, arguments: default);
 
                 return new(IPv6PayloadFailure.Invalid);
             }
@@ -208,13 +208,13 @@ internal static class IPv6ExtensionParser
             if (options.Value is OptionsResult.Regular { HasHomeAddress: true } or OptionsResult.Jumbo { HasHomeAddress: true })
             {
                 addressesKnown = false;
-                Diagnose(IPv6DiagnosticCode.SourceAddressUnavailable, offset, "Home Address option semantics unsupported; checksum context unavailable");
+                Diagnose(IPv6DiagnosticCode.SourceAddressUnavailable, offset, "Home Address option semantics unsupported; checksum context unavailable", arguments: default);
             }
             if (declared is null)
             {
                 if (options is not OptionsResult.Jumbo jumbo)
                 {
-                    Diagnose(IPv6DiagnosticCode.MissingJumboPayload, offset, "zero Payload Length with Hop-by-Hop requires a Jumbo Payload option");
+                    Diagnose(IPv6DiagnosticCode.MissingJumboPayload, offset, "zero Payload Length with Hop-by-Hop requires a Jumbo Payload option", arguments: default);
 
                     return new(IPv6PayloadFailure.Invalid);
                 }
@@ -230,9 +230,9 @@ internal static class IPv6ExtensionParser
             if (declared > ushort.MaxValue || sawFragment)
             {
                 if (sawFragment)
-                    Diagnose(IPv6DiagnosticCode.DuplicateFragment, offset, "duplicate Fragment header");
+                    Diagnose(IPv6DiagnosticCode.DuplicateFragment, offset, "duplicate Fragment header", arguments: default);
                 else
-                    Diagnose(IPv6DiagnosticCode.JumboFragment, offset, "Jumbo Payload cannot be combined with a Fragment header");
+                    Diagnose(IPv6DiagnosticCode.JumboFragment, offset, "Jumbo Payload cannot be combined with a Fragment header", arguments: default);
                 offset += length;
 
                 return new IPv6PayloadUnavailable(IPv6PayloadFailure.Invalid);
@@ -242,7 +242,7 @@ internal static class IPv6ExtensionParser
             if (fragment.IsAtomic)
                 return null;
 
-            Diagnose(IPv6DiagnosticCode.ReassemblyRequired, offset, "fragment requires reassembly; complete upper layer unavailable");
+            Diagnose(IPv6DiagnosticCode.ReassemblyRequired, offset, "fragment requires reassembly; complete upper layer unavailable", arguments: default);
             offset += length;
 
             return new IPv6FragmentPayload(fragment, declared!.Value - (uint)offset, captured[offset..Available(declared)]);

@@ -72,9 +72,9 @@ public sealed class PcapPacket
 public sealed class PcapReaderOptions
 {
     public const int DefaultMaxPacketBytes = 16 * 1024 * 1024;
-    public static PcapReaderOptions Default { get; } = new();
+    public static PcapReaderOptions Default { get; } = new(DefaultMaxPacketBytes);
 
-    public PcapReaderOptions(int maxPacketBytes = DefaultMaxPacketBytes)
+    public PcapReaderOptions(int maxPacketBytes)
     {
         if (maxPacketBytes <= 0 || maxPacketBytes > Array.MaxLength)
             throw new ArgumentOutOfRangeException(nameof(maxPacketBytes),

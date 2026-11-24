@@ -20,7 +20,7 @@ public partial class ReassembleIpTests
     public async Task A_first_fragment_completes_a_datagram_after_a_duplicated_tail(int version)
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var tail = Fragment(version, 16, false, Payload[16..]);
         reassembler.Process(tail);
         reassembler.Process(tail);
@@ -69,7 +69,7 @@ public partial class ReassembleIpTests
     {
         // Arrange
         byte[][] fragments = [Fragment(version, 0, true, Payload[..8]), Fragment(version, 8, true, Payload[8..16]), Fragment(version, 16, false, Payload[16..])];
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(fragments[first]);
         reassembler.Process(fragments[second]);
 
@@ -195,7 +195,7 @@ public partial class ReassembleIpTests
     private static IpReassemblyUpdate Deliver(byte[][] fragments, int[] order, int? duplicateAfter)
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         for (int i = 0; i < order.Length - 1; i++)
         {
             var fragment = fragments[order[i]];

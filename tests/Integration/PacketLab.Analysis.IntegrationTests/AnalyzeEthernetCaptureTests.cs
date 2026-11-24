@@ -16,7 +16,7 @@ public class AnalyzeEthernetCaptureTests
     {
         // Arrange
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened
             : throw new InvalidOperationException($"Expected a PCAP reader for {sample}.");
         var snapshots = new List<RecordSnapshot>();
 

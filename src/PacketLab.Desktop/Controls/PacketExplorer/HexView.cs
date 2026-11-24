@@ -23,7 +23,7 @@ internal sealed class HexView : Grid
     private readonly int columns;
     private readonly int visibleRows;
 
-    internal HexView(byte[] bytes, bool compact, Action<int> onPicked, Func<int, HexTint?>? tintAt = null)
+    internal HexView(byte[] bytes, bool compact, Action<int> onPicked, Func<int, HexTint?>? tintAt)
     {
         columns = compact ? 8 : 16;
         var rows = (bytes.Length + columns - 1) / columns;

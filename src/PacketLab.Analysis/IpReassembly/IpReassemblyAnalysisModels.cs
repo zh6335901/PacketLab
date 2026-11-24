@@ -7,7 +7,7 @@ public enum IpReassemblyAnalysisReason { Protocol, EndOfCapture, Aborted, Record
 
 // Protocol outcomes are preserved; capture-specific reasons and record associations are added here.
 public sealed record IpReassemblyEvent(long DatagramNumber, ImmutableArray<long> RecordNumbers,
-    IpReassemblyUpdate Reassembly, IpReassemblyAnalysisReason Reason = IpReassemblyAnalysisReason.Protocol)
+    IpReassemblyUpdate Reassembly, IpReassemblyAnalysisReason Reason)
 {
     public int IpVersion => Reassembly.IpVersion;
     public uint Identification => Reassembly.Identification;
@@ -17,12 +17,15 @@ public sealed record IpReassemblyEvent(long DatagramNumber, ImmutableArray<long>
 
 public sealed class IpReassemblyAnalysisOptions
 {
-    public IpReassemblyAnalysisOptions(IpReassemblyOptions? reassembly = null,
-        int maxRecordsPerDatagram = 1024, int maxRecordAge = 100000)
+    public static IpReassemblyAnalysisOptions Default { get; } =
+        new(IpReassemblyOptions.Default, maxRecordsPerDatagram: 1024, maxRecordAge: 100_000);
+
+    public IpReassemblyAnalysisOptions(IpReassemblyOptions? reassembly,
+        int maxRecordsPerDatagram, int maxRecordAge)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRecordsPerDatagram);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRecordAge);
-        Reassembly = reassembly ?? new();
+        Reassembly = reassembly ?? IpReassemblyOptions.Default;
         MaxRecordsPerDatagram = maxRecordsPerDatagram;
         MaxRecordAge = maxRecordAge;
     }

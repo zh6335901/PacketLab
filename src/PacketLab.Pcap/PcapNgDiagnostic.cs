@@ -37,7 +37,7 @@ public enum PcapNgDiagnosticCode
     OptionCountLimit
 }
 
-public readonly record struct PcapNgDiagnostic(PcapNgDiagnosticCode Code, long FirstArgument = 0, long SecondArgument = 0)
+public readonly record struct PcapNgDiagnostic(PcapNgDiagnosticCode Code, long FirstArgument, long SecondArgument)
 {
     internal string Detail => Code switch
     {

@@ -51,7 +51,7 @@ internal readonly record struct CaptureTime(ulong Raw, byte Resolution, long Off
         return (left.UnixTimeNumerator * right.UnitsPerSecond).CompareTo(right.UnixTimeNumerator * left.UnitsPerSecond);
     }
 
-    internal string Format(bool date = false)
+    internal string Format(bool date)
     {
         if (Kind == TimeKind.Missing)
             return Strings.NotProvided;

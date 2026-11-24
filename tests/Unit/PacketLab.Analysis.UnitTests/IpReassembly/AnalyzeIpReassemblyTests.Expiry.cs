@@ -10,7 +10,7 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Advancing_time_and_adding_fragments_do_not_implicitly_expire_state()
     {
-        using var analyzer = new IpReassemblyAnalyzer(new(maxRecordAge: 2));
+        using var analyzer = new IpReassemblyAnalyzer(new(maxRecordAge: 2, reassembly: IpReassemblyOptions.Default, maxRecordsPerDatagram: 1024));
         var first = IPv4Fragment(0, true, Payload[..16]);
         var tail = IPv4Fragment(16, false, Payload[16..]);
         analyzer.AddIPv4Fragment(1, first.Bytes, first.Packet, first.Payload);
@@ -28,7 +28,7 @@ public partial class AnalyzeIpReassemblyTests
         {
             var times = delays.Take(24).Select(t => t % 60).Append(59).Order().ToArray();
             var first = IPv4Fragment(0, true, Payload[..16]);
-            using var analyzer = new IpReassemblyAnalyzer();
+            using var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
             analyzer.AdvanceTime((ulong)start * 1_000_000_000);
             analyzer.AddIPv4Fragment(1, first.Bytes, first.Packet, first.Payload);
             for (int i = 0; i < times.Length; i++)
@@ -50,7 +50,7 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Record_age_expiry_removes_associations_without_advancing_time()
     {
-        using var analyzer = new IpReassemblyAnalyzer(new(maxRecordAge: 2));
+        using var analyzer = new IpReassemblyAnalyzer(new(maxRecordAge: 2, reassembly: IpReassemblyOptions.Default, maxRecordsPerDatagram: 1024));
         var first = IPv4Fragment(0, true, Payload[..16]);
         var tail = IPv4Fragment(16, false, Payload[16..]);
         analyzer.AddIPv4Fragment(1, first.Bytes, first.Packet, first.Payload);
@@ -74,7 +74,7 @@ public partial class AnalyzeIpReassemblyTests
             uint low = high - 1 - decrease.Item % high;
             var first = IPv4Fragment(0, true, Payload[..16]);
             var tail = IPv4Fragment(16, false, Payload[16..]);
-            using var analyzer = new IpReassemblyAnalyzer();
+            using var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
             analyzer.AdvanceTime((ulong)high * 1_000_000_000);
             analyzer.AddIPv4Fragment(1, first.Bytes, first.Packet, first.Payload);
 
@@ -87,7 +87,7 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Expiry_releases_discarded_record_associations_before_reusing_the_identity()
     {
-        using var analyzer = new IpReassemblyAnalyzer(new(maxRecordsPerDatagram: 1));
+        using var analyzer = new IpReassemblyAnalyzer(new(maxRecordsPerDatagram: 1, reassembly: IpReassemblyOptions.Default, maxRecordAge: 100000));
         var first = IPv4Fragment(0, true, Payload[..16]);
         analyzer.AddIPv4Fragment(1, first.Bytes, first.Packet, first.Payload);
         analyzer.AddIPv4Fragment(2, first.Bytes, first.Packet, first.Payload);

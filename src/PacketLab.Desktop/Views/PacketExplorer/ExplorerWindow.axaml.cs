@@ -31,8 +31,8 @@ internal sealed partial class ExplorerWindow : Window
     private readonly bool animate = NavigationMotion.Enabled;
     private GridLength savedListWidth;
 
-    internal ExplorerWindow(string? file, string? preferencesPath = null,
-        Func<FilePickerOpenOptions, Task<string?>>? chooseFile = null)
+    internal ExplorerWindow(string? file, string? preferencesPath,
+        Func<FilePickerOpenOptions, Task<string?>>? chooseFile)
     {
         this.preferencesPath = preferencesPath ?? "";
         savedListWidth = ReadWidth(preferencesPath) is { } width ? new GridLength(width) : GridLength.Auto;

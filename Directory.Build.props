@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);IDE0130;PL0014</WarningsNotAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);IDE0130</WarningsNotAsErrors>
   </PropertyGroup>
   <ItemGroup>
     <CompilerVisibleProperty Include="RootNamespace" />

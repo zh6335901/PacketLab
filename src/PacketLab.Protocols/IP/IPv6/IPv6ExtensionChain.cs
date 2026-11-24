@@ -10,7 +10,7 @@ public sealed record IPv6Fragment(ushort Offset, bool MoreFragments, uint Identi
 
 // Offsets are measured from the start of the IPv6 fixed header.
 public sealed record IPv6ExtensionHeader(byte Type, byte NextHeader, int Offset, ReadOnlyMemory<byte> Bytes,
-    IPv6Fragment? Fragment = null)
+    IPv6Fragment? Fragment)
 {
     public int Length => Bytes.Length;
 }
@@ -23,7 +23,7 @@ public enum IPv6DiagnosticCode
     UnsupportedNextHeader, FinalDestinationUnavailable, SourceAddressUnavailable
 }
 
-public readonly record struct IPv6DiagnosticArguments(long First, long Second = 0, long Third = 0);
+public readonly record struct IPv6DiagnosticArguments(long First, long Second, long Third);
 
 public sealed record IPv6Diagnostic(IPv6DiagnosticCode Code, int Offset, string Message)
 {

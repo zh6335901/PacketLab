@@ -18,7 +18,7 @@ public sealed class AnalyzeOptionalParametersTests
         var diagnostics = await Analyze(source, "Reader.cs");
 
         var warning = diagnostics.Single();
-        await Assert.That(warning.Id).IsEqualTo("PL0014");
+        await Assert.That(warning.Id).IsEqualTo("PL0015");
         await Assert.That(warning.Severity).IsEqualTo(DiagnosticSeverity.Warning);
         await Assert.That(warning.Location.SourceTree!.GetText().ToString(warning.Location.SourceSpan)).IsEqualTo(expectedLocation);
     }
@@ -37,7 +37,7 @@ public sealed class AnalyzeOptionalParametersTests
         var diagnostics = await Analyze(source, "Reader.cs");
 
         var warning = diagnostics.Single();
-        await Assert.That(warning.Id).IsEqualTo("PL0014");
+        await Assert.That(warning.Id).IsEqualTo("PL0015");
         await Assert.That(warning.Location.SourceTree!.GetText().ToString(warning.Location.SourceSpan)).IsEqualTo("limit");
     }
 
