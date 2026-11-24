@@ -144,12 +144,13 @@
             <controls:OpenCaptureIcon Width="54" Height="54" Margin="0,0,0,18" />
             <TextBlock Classes="landing" Text="{Binding Header.LandingTitle}" FontSize="24" LineHeight="32"
                        FontWeight="SemiBold" FontFamily="{x:Static controls:ViewStyle.Display}" />
-            <TextBlock Classes="landing" Text="{Binding Header.LandingHint}" Foreground="{x:Static controls:ViewStyle.Muted}" Margin="0,7,0,0" />
+            <TextBlock Classes="landing" AutomationProperties.AutomationId="CaptureLandingHint"
+                       Text="{Binding Header.LandingHint}" Foreground="{x:Static controls:ViewStyle.Muted}" Margin="0,7,0,0" />
             <Button Classes="choose-capture" HorizontalAlignment="Center" Margin="0,23,0,0" Command="{Binding ChooseFileCommand}"
                     AutomationProperties.AutomationId="OpenCaptureButton" AutomationProperties.Name="{Binding Header.LandingAction}">
               <TextBlock Text="{Binding Header.LandingAction}" Classes="landing" LineHeight="18" Foreground="#102333" FontWeight="SemiBold" />
             </Button>
-            <TextBlock Classes="landing" Text="{Binding Header.Error}" IsVisible="{Binding Header.HasError}"
+            <TextBlock Classes="landing" AutomationProperties.AutomationId="LandingCaptureError" Text="{Binding Header.Error}" IsVisible="{Binding Header.HasError}"
                        Foreground="{x:Static controls:ViewStyle.Bad}" Margin="0,14,0,0" />
           </StackPanel>
         </Border>
@@ -205,7 +206,8 @@
                   BorderBrush="{x:Static controls:ViewStyle.Bad}" BorderThickness="1" Padding="10,7" Margin="0,0,0,8">
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
               <TextBlock Text="{x:Static text:Strings.FileReadError}" Foreground="{x:Static controls:ViewStyle.Bad}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-              <TextBlock Grid.Column="1" Text="{Binding Header.Error}" Foreground="{x:Static controls:ViewStyle.Bad}" FontSize="12" TextWrapping="Wrap" />
+              <TextBlock Grid.Column="1" AutomationProperties.AutomationId="WorkbenchCaptureError"
+                         Text="{Binding Header.Error}" Foreground="{x:Static controls:ViewStyle.Bad}" FontSize="12" TextWrapping="Wrap" />
             </Grid>
           </Border>
 

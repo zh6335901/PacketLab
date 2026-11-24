@@ -213,6 +213,8 @@ internal sealed partial class RecordInspector : UserControl
             Margin = new Thickness(12, 7, 12, 7),
             MinWidth = 354
         };
+        var byteViewId = source.Record < 0 ? "ReassembledEvidenceBytes" : FormattableString.Invariant($"RecordEvidenceBytes-{source.Record + 1}");
+        AutomationProperties.SetAutomationId(hexView, byteViewId);
         var hexScroll = new ScrollViewer
         {
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
@@ -222,6 +224,7 @@ internal sealed partial class RecordInspector : UserControl
         {
             ContentTemplate = (IDataTemplate)Resources["SelectionDetails"]!
         };
+        AutomationProperties.SetAutomationId(selectionDetails, "ByteSelectionDetails");
         var byteCard = Card(Vertical(0, bytesHeader, hexScroll, selectionDetails));
         var panels = new Grid { ColumnSpacing = 10, RowSpacing = 10 };
         panels.Children.Add(fieldCard);
@@ -361,11 +364,13 @@ internal sealed partial class RecordInspector : UserControl
         var summaryData = coverage.Summary;
         var (brush, _) = Palette(summaryData.Tone);
         var detailLabel = Label(summaryData.Message, 12, Muted, mono: false, weight: FontWeight.Normal);
+        AutomationProperties.SetAutomationId(detailLabel, "FragmentCoverageSummary");
         detailLabel.TextWrapping = TextWrapping.Wrap;
         var summary = LayoutGrid("Auto,*", Label(summaryData.Title, 12, brush, weight: Demi, mono: false), detailLabel);
         summary.ColumnSpacing = 12;
         var summaryBorder = new Border { BorderBrush = Line, BorderThickness = new Thickness(0, 1, 0, 0), Child = summary, Padding = new Thickness(12, 6) };
         locationLabel = Label("", 11, mono: true, brush: null, weight: FontWeight.Normal);
+        AutomationProperties.SetAutomationId(locationLabel, "FragmentByteLocation");
         locationLabel.Margin = new Thickness(12, 5);
         locationLabel.TextWrapping = TextWrapping.Wrap;
         locationLabel.IsVisible = false;

@@ -18,7 +18,8 @@
           <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8" Margin="12,2,12,9">
             <TextBlock Text="{Binding Raw}" FontFamily="{x:Static controls:ViewStyle.Mono}" FontSize="11" Foreground="{x:Static controls:ViewStyle.Muted}" />
             <TextBlock Grid.Column="1" Text="→" FontSize="11" Foreground="{x:Static controls:ViewStyle.Muted}" />
-            <TextBlock Grid.Column="2" Text="{Binding Value}" FontFamily="{x:Static controls:ViewStyle.Mono}" FontSize="11"
+            <TextBlock Grid.Column="2" AutomationProperties.AutomationId="SelectedFieldValue"
+                       Text="{Binding Value}" FontFamily="{x:Static controls:ViewStyle.Mono}" FontSize="11"
                        FontWeight="SemiBold" TextWrapping="Wrap" />
           </Grid>
         </StackPanel>

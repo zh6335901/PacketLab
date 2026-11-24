@@ -26,7 +26,8 @@ internal sealed class HexView : Grid
     internal HexView(byte[] bytes, bool compact, Action<int> onPicked, Func<int, HexTint?>? tintAt)
     {
         columns = compact ? 8 : 16;
-        var rows = (bytes.Length + columns - 1) / columns;
+        ByteCount = bytes.Length;
+        var rows = (ByteCount + columns - 1) / columns;
         visibleRows = Math.Min(rows, compact ? 18 : 12);
         surface = new HexSurface(bytes, compact, onPicked, Reveal, tintAt)
         {
@@ -51,6 +52,8 @@ internal sealed class HexView : Grid
             e.Handled = bar.Value != previous;
         };
     }
+
+    internal int ByteCount { get; }
 
     internal void SetSelection(ByteRange? range, int? exact, bool reveal)
     {

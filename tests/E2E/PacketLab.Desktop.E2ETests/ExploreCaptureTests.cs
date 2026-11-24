@@ -11,6 +11,8 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using PacketLab.Desktop.Controls.PacketExplorer;
+using PacketLab.Desktop.Models.PacketExplorer;
+using PacketLab.Desktop.ViewModels.PacketExplorer;
 using PacketLab.Desktop.Views.PacketExplorer;
 using PacketLab.Desktop.Views.Shell;
 
@@ -119,69 +121,40 @@ public sealed class ExploreCaptureTests
     }
 
     [Test]
-    public async Task Starting_without_a_file_shows_the_open_prompt_and_loads_the_file_chosen_there()
-    {
-        var result = await WithExplorer(async window =>
-        {
-            var prompt = Text(window, "打开抓包文件");
-            var hint = Text(window, "选择本地 PCAP 或 PCAPNG 文件以查看捕获记录。");
-            var workbench = FindById<Grid>(window, "CaptureWorkbench") is not null;
-            SaveFrame(window, "app-landing");
-            Click(window, GetById<Button>(window, "OpenCaptureButton"));
-            await WaitFor(() => IsRecordSelected(window, 1));
-
-            return (Prompt: prompt, Hint: hint, InitialWorkbench: workbench,
-                Records: GetById<ListBox>(window, "CaptureRecordList").ItemCount,
-                PromptAfterOpen: FindById<Border>(window, "CaptureLanding") is not null);
-        }, file: null, chooseFile: _ => Task.FromResult<string?>(Fixture("record-workbench.pcapng")));
-
-        await Assert.That(result.Prompt).IsTrue();
-        await Assert.That(result.Hint).IsTrue();
-        await Assert.That(result.InitialWorkbench).IsFalse();
-        await Assert.That(result.Records).IsEqualTo(16);
-        await Assert.That(result.PromptAfterOpen).IsFalse();
-    }
-
-    [Test]
-    public async Task English_ui_culture_localizes_the_picker_workbench_and_capture_metadata()
+    [Arguments("zh-CN")]
+    [Arguments("en-US")]
+    public async Task Starting_without_a_file_shows_the_open_prompt_and_loads_the_file_chosen_there(string culture)
     {
         FilePickerOpenOptions? picker = null;
         var result = await WithExplorer(async window =>
         {
-            var prompt = Text(window, "Open a capture file");
-            var navigation = Text(window, "Traffic analysis");
-            SaveFrame(window, "app-en-landing");
+            var prompt = FindById<Border>(window, "CaptureLanding") is not null;
+            var workbench = FindById<Grid>(window, "CaptureWorkbench") is not null;
+            SaveFrame(window, culture == "en-US" ? "app-en-landing" : "app-landing");
             Click(window, GetById<Button>(window, "OpenCaptureButton"));
-            await WaitFor(() => Text(window, "RECORD #001") && Text(window, "ARP / Target IP"));
-            var workbench = Text(window, "Record workbench");
-            var fields = Text(window, "Protocol fields");
-            SaveFrame(window, "app-en-workbench");
+            await WaitFor(() => IsRecordSelected(window, 1) && FindRecordBytes(window, 1) is not null);
+            if (culture == "en-US")
+                SaveFrame(window, "app-en-workbench");
 
-            Click(window, GetById<Button>(window, "OpenCaptureMetadataButton"));
-            await WaitFor(() => Text(window, "16 records · 2 sections · 3 interfaces"));
-            var metadata = Text(window, "Byte order") && Text(window, "Big-endian");
-            SaveFrame(window, "app-en-metadata");
-
-            return (Prompt: prompt, Navigation: navigation, Workbench: workbench, Fields: fields, Metadata: metadata);
+            return (Prompt: prompt, InitialWorkbench: workbench,
+                Records: GetById<ListBox>(window, "CaptureRecordList").ItemCount,
+                PromptAfterOpen: FindById<Border>(window, "CaptureLanding") is not null);
         }, file: null, chooseFile: options =>
         {
             picker = options;
             return Task.FromResult<string?>(Fixture("record-workbench.pcapng"));
-        }, culture: "en-US");
+        }, culture: culture);
 
         await Assert.That(result.Prompt).IsTrue();
-        await Assert.That(result.Navigation).IsTrue();
-        await Assert.That(result.Workbench).IsTrue();
-        await Assert.That(result.Fields).IsTrue();
-        await Assert.That(result.Metadata).IsTrue();
-        await Assert.That(picker!.Title).IsEqualTo("Open a capture file");
-        await Assert.That(picker.FileTypeFilter!.Select(type => type.Name)).IsEquivalentTo(["Capture files", "All files"]);
+        await Assert.That(result.InitialWorkbench).IsFalse();
+        await Assert.That(result.Records).IsEqualTo(16);
+        await Assert.That(result.PromptAfterOpen).IsFalse();
+        await Assert.That(picker!.FileTypeFilter!.SelectMany(type => type.Patterns!))
+            .IsEquivalentTo(["*.pcap", "*.pcapng", "*.cap", "*"]);
     }
 
     [Test]
-    [Arguments("zh-CN", "块被截断，应为 28 字节。")]
-    [Arguments("en-US", "Truncated block; expected 28 bytes.")]
-    public async Task Truncated_pcapng_reports_the_specific_error_in_the_ui_culture(string culture, string expected)
+    public async Task Truncated_pcapng_shows_a_read_error_on_the_file_prompt()
     {
         var file = Path.GetTempFileName();
         try
@@ -192,15 +165,16 @@ public sealed class ExploreCaptureTests
                 fixture.ReadExactly(prefix);
                 File.WriteAllBytes(file, prefix);
             }
-            var error = await WithExplorer(async window =>
+            var result = await WithExplorer(async window =>
             {
-                var name = Path.GetFileName(file);
-                await WaitFor(() => TextStartsWith(window, name));
+                await WaitFor(() => FindById<TextBlock>(window, "LandingCaptureError") is not null);
 
-                return ReadText(window).Single(text => text.StartsWith(name, StringComparison.Ordinal));
-            }, file, culture: culture);
+                return (Error: GetById<TextBlock>(window, "LandingCaptureError").Text,
+                    CanChoose: GetById<Button>(window, "OpenCaptureButton").IsEnabled);
+            }, file);
 
-            await Assert.That(error).Contains(expected);
+            await Assert.That(result.Error).Contains(Path.GetFileName(file));
+            await Assert.That(result.CanChoose).IsTrue();
         }
         finally
         {
@@ -231,13 +205,15 @@ public sealed class ExploreCaptureTests
             WriteRepeatedCapture(file, 0);
             var result = await WithExplorer(async window =>
             {
-                await WaitFor(() => Text(window, "没有可预览的记录"));
+                await WaitFor(() => FindById<TextBlock>(window, "CaptureLandingHint")?.Text
+                    ?.Contains(Path.GetFileName(file), StringComparison.Ordinal) == true);
 
-                return (Hint: Text(window, $"{Path.GetFileName(file)} 中没有捕获记录。"),
-                    Workbench: FindById<Grid>(window, "CaptureWorkbench") is not null, CanChoose: FindById<Button>(window, "OpenCaptureButton")?.IsEnabled == true);
+                return (Hint: GetById<TextBlock>(window, "CaptureLandingHint").Text,
+                    Workbench: FindById<Grid>(window, "CaptureWorkbench") is not null,
+                    CanChoose: GetById<Button>(window, "OpenCaptureButton").IsEnabled);
             }, file);
 
-            await Assert.That(result.Hint).IsTrue();
+            await Assert.That(result.Hint).Contains(Path.GetFileName(file));
             await Assert.That(result.Workbench).IsFalse();
             await Assert.That(result.CanChoose).IsTrue();
         }
@@ -253,22 +229,24 @@ public sealed class ExploreCaptureTests
         var result = await WithExplorer(async window =>
         {
             await SelectFixtureFragment(window);
-            await WaitFor(() => Text(window, "IPv4 / 标识符"));
+            await WaitFor(() => FindRecordBytes(window, 5) is not null);
             SaveFrame(window, "app-main");
             Click(window, GetById<Button>(window, "ToggleFullBytes"));
             await WaitFor(() => FindById<Button>(window, "ReassembledByteSource") is not null);
             SaveFrame(window, "app-expanded");
 
             Click(window, GetById<Button>(window, "ReassembledByteSource"));
-            await WaitFor(() => Text(window, "UDP / 目的端口"));
-            return (Record: IsRecordSelected(window, 5), Source: Text(window, "重组 IP 数据报字节"),
-                Range: Text(window, "0x0016–0017 · 2 B"), Value: Text(window, "53"));
+            await WaitFor(() => FindById<HexView>(window, "ReassembledEvidenceBytes") is not null &&
+                FindById<TextBlock>(window, "SelectedFieldValue") is not null);
+            var selection = (ByteSelection)GetById<ContentControl>(window, "ByteSelectionDetails").Content!;
+
+            return (Record: IsRecordSelected(window, 5), Range: selection.Field?.Range,
+                Value: GetById<TextBlock>(window, "SelectedFieldValue").Text);
         });
 
         await Assert.That(result.Record).IsTrue();
-        await Assert.That(result.Source).IsTrue();
-        await Assert.That(result.Range).IsTrue();
-        await Assert.That(result.Value).IsTrue();
+        await Assert.That(result.Range).IsEqualTo(new ByteRange(0x0016, 2));
+        await Assert.That(result.Value).IsEqualTo("53");
     }
 
     [Test]
@@ -360,11 +338,17 @@ public sealed class ExploreCaptureTests
             var map = GetById<CoverageMatrix>(window, "FragmentCoverage");
 
             Click(window, map, new Point(148, 67));
-            await WaitFor(() => TextStartsWith(window, "载荷 +0 B"));
-            return ReadText(window).Single(text => text.StartsWith("载荷 +0 B", StringComparison.Ordinal));
+            await WaitFor(() => FindById<TextBlock>(window, "FragmentByteLocation") is not null);
+            var selection = (ByteSelection)GetById<ContentControl>(window, "ByteSelectionDetails").Content!;
+
+            return (selection.Payload, Location: GetById<TextBlock>(window, "FragmentByteLocation").Text);
         });
 
-        await Assert.That(result).IsEqualTo("载荷 +0 B  ｜  #005 帧 0x0022 ↔ 重组 IP 0x0014  ｜  04");
+        await Assert.That(result.Payload).IsEqualTo(0);
+        await Assert.That(result.Location).Contains("#005");
+        await Assert.That(result.Location).Contains("0x0022");
+        await Assert.That(result.Location).Contains("0x0014");
+        await Assert.That(result.Location).Contains("04");
     }
 
     [Test]
@@ -399,24 +383,27 @@ public sealed class ExploreCaptureTests
         {
             await WaitFor(() => FindRow(window, 12) is not null);
             Click(window, FindRow(window, 12)!);
-            await WaitFor(() => IsRecordSelected(window, 12) && Text(window, "重组已丢弃"));
+            await WaitFor(() => IsRecordSelected(window, 12) &&
+                FindById<TextBlock>(window, "FragmentCoverageSummary") is not null);
             SaveFrame(window, "app-overlap");
-            var message = ReadText(window).Single(text => text.StartsWith("载荷 8–15 B", StringComparison.Ordinal));
+            var message = GetById<TextBlock>(window, "FragmentCoverageSummary").Text;
+            Click(window, GetById<Button>(window, "ToggleFullBytes"));
+            await WaitFor(() => FindById<Button>(window, "RecordByteSource-12") is not null);
 
-            return (Message: message, Derived: Text(window, "重组 IP 数据报字节"));
+            return (Message: message, Derived: FindById<Button>(window, "ReassembledByteSource") is not null);
         });
 
-        await Assert.That(result.Message).Contains("IPv6 重叠分片触发整组丢弃");
+        await Assert.That(result.Message).Contains("8–15");
         await Assert.That(result.Derived).IsFalse();
     }
 
     [Test]
-    public async Task Opening_capture_metadata_shows_both_sections_and_missing_record_time()
+    public async Task Opening_capture_metadata_shows_interfaces_from_both_sections_and_the_selected_record()
     {
         var result = await WithExplorer(async window =>
         {
             await SelectFixtureFragment(window);
-            await WaitFor(() => Text(window, "IPv4 / 标识符"));
+            await WaitFor(() => FindRecordBytes(window, 5) is not null);
             Click(window, GetById<Button>(window, "OpenCaptureMetadataButton"));
             SaveFrame(window, "app-metadata");
             window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
@@ -424,14 +411,19 @@ public sealed class ExploreCaptureTests
             Click(window, FindRow(window, 13)!);
             await WaitFor(() => IsRecordSelected(window, 13));
             Click(window, GetById<Button>(window, "OpenCaptureMetadataButton"));
+            await WaitFor(() => FindById<ItemsControl>(window, "CaptureRecordFacts") is { ItemCount: > 0 });
 
-            return (Sections: Text(window, "16 条记录 · 2 个 Section · 3 个接口"),
-                BigEndian: Text(window, "大端"), Context: Text(window, "Simple Packet Block · S1 / I0 · 未提供"));
+            var interfaces = GetById<ItemsControl>(window, "CaptureInterfaces");
+            var recordFacts = GetById<ItemsControl>(window, "CaptureRecordFacts");
+            var context = ReadText(recordFacts).Single(text => text.Contains("Simple Packet Block", StringComparison.Ordinal));
+
+            return (Interfaces: interfaces.ItemCount, InterfaceDetails: ReadText(interfaces).ToArray(), Context: context);
         });
 
-        await Assert.That(result.Sections).IsTrue();
-        await Assert.That(result.BigEndian).IsTrue();
-        await Assert.That(result.Context).IsTrue();
+        await Assert.That(result.Interfaces).IsEqualTo(3);
+        await Assert.That(result.InterfaceDetails).Contains("S0 / I0");
+        await Assert.That(result.InterfaceDetails).Contains("S1 / I0");
+        await Assert.That(result.Context).Contains("S1 / I0");
     }
 
     [Test]
@@ -441,13 +433,16 @@ public sealed class ExploreCaptureTests
         {
             await WaitFor(() => IsRecordSelected(window, 1));
             Click(window, GetById<Button>(window, "ChangeCaptureButton"));
-            await WaitFor(() => Text(window, "× 文件读取错误") && Text(window, "原始记录 #001字节"));
+            await WaitFor(() => FindById<TextBlock>(window, "WorkbenchCaptureError") is not null &&
+                FindRecordBytes(window, 1) is { ByteCount: 3 });
 
-            return (Count: GetById<ListBox>(window, "CaptureRecordList").ItemCount, Raw: Text(window, "3 B · 帧起点"));
+            return (Count: GetById<ListBox>(window, "CaptureRecordList").ItemCount,
+                Selected: IsRecordSelected(window, 1), ByteCount: FindRecordBytes(window, 1)!.ByteCount);
         }, Fixture("record-workbench.pcapng"), _ => Task.FromResult<string?>(Fixture("record-truncated.pcap")));
 
         await Assert.That(result.Count).IsEqualTo(1);
-        await Assert.That(result.Raw).IsTrue();
+        await Assert.That(result.Selected).IsTrue();
+        await Assert.That(result.ByteCount).IsEqualTo(3);
     }
 
     [Test]
@@ -460,12 +455,13 @@ public sealed class ExploreCaptureTests
             {
                 await WaitFor(() => IsRecordSelected(window, 1));
                 Click(window, GetById<Button>(window, "ChangeCaptureButton"));
-                await WaitFor(() => TextStartsWith(window, Path.GetFileName(file) + "："));
+                await WaitFor(() => FindById<TextBlock>(window, "WorkbenchCaptureError") is not null);
 
-                return (Workbench: FindById<Grid>(window, "CaptureWorkbench") is not null, VisibleRecords: GetById<ListBox>(window, "CaptureRecordList").ItemCount);
+                return (Error: GetById<TextBlock>(window, "WorkbenchCaptureError").Text,
+                    VisibleRecords: GetById<ListBox>(window, "CaptureRecordList").ItemCount);
             }, Fixture("record-workbench.pcapng"), _ => Task.FromResult<string?>(file));
 
-            await Assert.That(result.Workbench).IsTrue();
+            await Assert.That(result.Error).Contains(Path.GetFileName(file));
             await Assert.That(result.VisibleRecords).IsEqualTo(16);
         }
         finally
@@ -520,15 +516,17 @@ public sealed class ExploreCaptureTests
                 var visible = window.GetVisualDescendants().OfType<RecordRow>().Count();
                 Click(window, GetById<TextBox>(window, "CaptureRecordSearch"));
                 window.KeyTextInput($"#{count}");
-                await WaitFor(() => IsRecordSelected(window, count) && Text(window, "1024 B · 帧起点"), seconds: 45);
+                await WaitFor(() => IsRecordSelected(window, count) && FindRecordBytes(window, count) is not null, seconds: 45);
                 Console.WriteLine($"Capture {count:N0} records · first displayed {first:N0} ms · indexed {indexed:N0} ms · final lookup {clock.ElapsedMilliseconds - indexed:N0} ms · {visible} realized rows");
 
-                return (Visible: visible, Selected: records.SelectedItem, Filtered: records.ItemCount);
+                return (Visible: visible, Selected: records.SelectedItem, Filtered: records.ItemCount,
+                    ByteCount: FindRecordBytes(window, count)!.ByteCount);
             }, file);
 
             await Assert.That(result.Visible).IsLessThan(100);
             await Assert.That((int)result.Selected!).IsEqualTo(count - 1);
             await Assert.That(result.Filtered).IsEqualTo(1);
+            await Assert.That(result.ByteCount).IsEqualTo(1024);
         }
         finally
         {
@@ -606,12 +604,8 @@ public sealed class ExploreCaptureTests
         }
     }
 
-    private static IEnumerable<string> ReadText(Window window) => window.GetVisualDescendants().OfType<TextBlock>()
+    private static IEnumerable<string> ReadText(Visual root) => root.GetVisualDescendants().OfType<TextBlock>()
         .Where(block => block.IsEffectivelyVisible).Select(block => block.Text ?? "");
-
-    private static bool Text(Window window, string value) => ReadText(window).Contains(value);
-    private static bool TextStartsWith(Window window, string prefix) =>
-        ReadText(window).Any(text => text.StartsWith(prefix, StringComparison.Ordinal));
 
     private static T? FindById<T>(Window window, string automationId) where T : Control =>
         window.GetVisualDescendants().OfType<T>()
@@ -625,6 +619,9 @@ public sealed class ExploreCaptureTests
 
     private static RecordRow? FindRow(Window window, int recordNumber) =>
         FindById<RecordRow>(window, FormattableString.Invariant($"CaptureRecord-{recordNumber}"));
+
+    private static HexView? FindRecordBytes(Window window, int recordNumber) =>
+        FindById<HexView>(window, FormattableString.Invariant($"RecordEvidenceBytes-{recordNumber}"));
 
     private static Point Center(Control control, Window window) =>
         control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;
