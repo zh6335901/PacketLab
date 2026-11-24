@@ -272,7 +272,8 @@ internal sealed class RecordInspectorViewModel : ObservableObject
         if (group.Status == IpReassemblyStatus.Conflict && data.Overlap.Count > 0)
         {
             var same = data.Identical ? Strings.OverlapIdenticalBytes : Strings.OverlapDifferentBytes;
-            var reason = group.Version == 6 ? Strings.Ipv6OverlapDiscarded : GroupDiagnostic(group);
+            var reason = group is { Version: 6, DiagnosticCode: IpReassemblyDiagnosticCode.OverlapDiscarded }
+                ? Strings.Ipv6OverlapDiscarded : GroupDiagnostic(group);
             var ranges = data.Overlap.Take(4).Select(range => range.Length == 1 ? $"{range.Start}" : $"{range.Start}–{range.End}");
             var label = string.Join(Strings.ListSeparator, ranges);
             if (data.Overlap.Count > 4)

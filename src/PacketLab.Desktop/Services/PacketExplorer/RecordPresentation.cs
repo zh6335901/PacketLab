@@ -84,7 +84,7 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone, bool
         }
         if (fragment.Offset == 0)
         {
-            if (group?.Status == IpReassemblyStatus.Conflict)
+            if (group?.DiagnosticCode == IpReassemblyDiagnosticCode.OverlapDiscarded)
                 return UIText.Format(Strings.OverlapFirstFragment, name);
 
             return name == "IPv6" && summary.Detail > 1 ? Strings.Ipv6FirstFragmentWithExtensions : UIText.Format(Strings.FirstFragmentOf, name);
@@ -98,7 +98,8 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone, bool
     private static string OutcomeTitle(string name, FragmentSlice fragment, FragmentGroup group) => group.Status switch
     {
         IpReassemblyStatus.Complete => UIText.Format(Strings.ReassemblyCompletion, name, (fragment.Offset == 0 ? Strings.FirstFragment : Strings.FinalFragment)),
-        IpReassemblyStatus.Conflict => UIText.Format(Strings.FragmentOverlap, name),
+        IpReassemblyStatus.Conflict when group.DiagnosticCode == IpReassemblyDiagnosticCode.OverlapDiscarded =>
+            UIText.Format(Strings.FragmentOverlap, name),
         IpReassemblyStatus.Incomplete when fragment.Offset == 0 => UIText.Format(Strings.AwaitingMoreFragments, name),
         IpReassemblyStatus.Incomplete => UIText.Format(Strings.MissingFragments, name),
         IpReassemblyStatus.Truncated => UIText.Format(Strings.FragmentTruncated, name),
@@ -156,15 +157,15 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone, bool
         _ => throw new ArgumentOutOfRangeException(nameof(issue))
     };
 
-    internal static string GroupDiagnostic(FragmentGroup group) => (group.Reason, group.Status) switch
+    internal static string GroupDiagnostic(FragmentGroup group) => (group.Reason, group.Status, group.DiagnosticCode) switch
     {
-        (IpReassemblyAnalysisReason.EndOfCapture, _) => Strings.MissingAtEndOfCapture,
-        (IpReassemblyAnalysisReason.EndOfSection, _) => Strings.MissingAtEndOfSection,
-        (IpReassemblyAnalysisReason.Aborted, _) => Strings.ReassemblyAborted,
-        (IpReassemblyAnalysisReason.RecordAgeLimit, _) => Strings.RecordSpanLimit,
-        (IpReassemblyAnalysisReason.RecordAssociationLimit, _) => Strings.AssociationLimitDiscarded,
-        (_, IpReassemblyStatus.Conflict) => Strings.OverlappingFragmentRanges,
-        (_, IpReassemblyStatus.Truncated) => Strings.TruncatedFragmentPayload,
+        (IpReassemblyAnalysisReason.EndOfCapture, _, _) => Strings.MissingAtEndOfCapture,
+        (IpReassemblyAnalysisReason.EndOfSection, _, _) => Strings.MissingAtEndOfSection,
+        (IpReassemblyAnalysisReason.Aborted, _, _) => Strings.ReassemblyAborted,
+        (IpReassemblyAnalysisReason.RecordAgeLimit, _, _) => Strings.RecordSpanLimit,
+        (IpReassemblyAnalysisReason.RecordAssociationLimit, _, _) => Strings.AssociationLimitDiscarded,
+        (_, IpReassemblyStatus.Conflict, IpReassemblyDiagnosticCode.OverlapDiscarded) => Strings.OverlappingFragmentRanges,
+        (_, IpReassemblyStatus.Truncated, _) => Strings.TruncatedFragmentPayload,
         _ => Strings.ResourceManager.GetString($"Reassembly{group.DiagnosticCode}") ?? Strings.ReassemblyIncomplete
     };
 

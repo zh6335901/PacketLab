@@ -112,6 +112,7 @@ internal sealed partial class RecordInspector : UserControl
         recordHeading.Content = MakeRecordHeading(row);
         var status = ForRecord(row.Record, row.Group, row.Index);
         var why = Label(Describe(row.Record, row.Group), 12, Muted, mono: false, weight: FontWeight.Normal);
+        AutomationProperties.SetAutomationId(why, "RecordExplanation");
         why.TextWrapping = Avalonia.Media.TextWrapping.Wrap;
         var explanation = LayoutGrid("Auto,*", Badge(status, size: 11), why);
         explanation.ColumnSpacing = 9;

@@ -1,9 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
 using PacketLab.Desktop.Controls.PacketExplorer;
+using PacketLab.Desktop.Localization;
 using PacketLab.Desktop.Models.PacketExplorer;
 using PacketLab.Desktop.ViewModels.PacketExplorer;
 using static PacketLab.Desktop.E2ETests.ExplorerTestHost;
+using static PacketLab.Desktop.E2ETests.Fixtures.CaptureFiles;
 
 namespace PacketLab.Desktop.E2ETests.PacketExplorer;
 
@@ -76,5 +78,40 @@ public sealed class InspectFragmentCoverageTests
 
         await Assert.That(result.Message).Contains("8–15");
         await Assert.That(result.Derived).IsFalse();
+    }
+
+    [Test]
+    [Arguments((ushort)8)]
+    [Arguments((ushort)16)]
+    public async Task Incompatible_ipv6_headers_show_the_header_conflict_in_the_record_and_coverage(ushort tailOffset)
+    {
+        var file = Path.GetTempFileName();
+        try
+        {
+            WriteIpv6HeaderConflictCapture(file, tailOffset);
+            var result = await WithExplorer(async window =>
+            {
+                await WaitFor(() => FindRow(window, 2) is not null);
+                Click(window, FindRow(window, 2)!);
+                await WaitFor(() => IsRecordSelected(window, 2) &&
+                    FindById<TextBlock>(window, "FragmentCoverageSummary") is not null);
+
+                return (Explanation: GetById<TextBlock>(window, "RecordExplanation").Text,
+                    Coverage: GetById<TextBlock>(window, "FragmentCoverageSummary").Text,
+                    Diagnostic: Strings.ReassemblyIncompatibleHeaders,
+                    VisibleText: ReadText(window).ToArray(),
+                    FirstOverlapTitle: UIText.Format(Strings.OverlapFirstFragment, "IPv6"),
+                    ConflictOverlapTitle: UIText.Format(Strings.FragmentOverlap, "IPv6"));
+            }, file);
+
+            await Assert.That(result.Explanation).Contains(result.Diagnostic);
+            await Assert.That(result.Coverage).Contains(result.Diagnostic);
+            await Assert.That(result.VisibleText).DoesNotContain(result.FirstOverlapTitle);
+            await Assert.That(result.VisibleText).DoesNotContain(result.ConflictOverlapTitle);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
     }
 }
