@@ -26,7 +26,7 @@
     </DataTemplate>
   </UserControl.Resources>
   <ScrollViewer x:Name="inspector" Margin="0,0,4,0" Focusable="True" HorizontalScrollBarVisibility="Disabled"
-                AutomationProperties.Name="{x:Static text:Strings.RecordInspector}">
+                AutomationProperties.AutomationId="RecordDetails" AutomationProperties.Name="{x:Static text:Strings.RecordInspector}">
     <StackPanel x:Name="inspectionContent" Spacing="9" Margin="0,0,0,12" IsVisible="False">
       <ContentControl x:Name="recordHeading" />
       <ContentControl x:Name="recordExplanation" />

@@ -48,6 +48,7 @@ internal sealed class CoverageMatrix : Control
         Height = Header + Row * data.Lanes.Count + gap;
         Focusable = true;
         ClipToBounds = true;
+        AutomationProperties.SetAutomationId(this, "FragmentCoverage");
         AutomationProperties.SetName(this, Strings.FragmentCoverageAndBytes);
     }
 

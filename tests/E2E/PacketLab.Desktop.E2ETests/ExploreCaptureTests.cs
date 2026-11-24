@@ -33,25 +33,25 @@ public sealed class ExploreCaptureTests
         var result = await WithExplorer(async window =>
         {
             await SelectFixtureFragment(window);
-            var rail = Find<ToolNavigation>(window)!;
-            var simulator = ButtonNamed(window, "Network Simulator · 规划中");
+            var rail = GetById<ToolNavigation>(window, "ToolNavigation");
+            var simulator = GetById<Button>(window, "NetworkSimulatorTool");
             var section = simulator.GetVisualAncestors().OfType<Border>().Single(border => border.Classes.Contains("nav-entries"));
-            Click(window, ButtonNamed(window, "网络实验"));
+            Click(window, GetById<Button>(window, "NetworkExperimentsGroup"));
             await WaitFor(() => section.Bounds.Height == 0);
             SaveFrame(window, "app-folded");
 
-            Click(window, ButtonNamed(window, "收起工具导航"));
+            Click(window, GetById<Button>(window, "ToggleNavigationRail"));
             await WaitFor(() => rail.Bounds.Width == 63 && section.Bounds.Height > 0);
-            var disabled = new[] { "实时抓包", "Network Simulator", "Network Benchmark" }
-                .All(tool => ButtonNamed(window, tool + " · 规划中") is { IsEffectivelyEnabled: false });
+            var disabled = new[] { "LiveCaptureTool", "NetworkSimulatorTool", "NetworkBenchmarkTool" }
+                .All(id => GetById<Button>(window, id) is { IsEffectivelyEnabled: false });
             SaveFrame(window, "app-compact");
 
-            Click(window, ButtonNamed(window, "展开工具导航"));
+            Click(window, GetById<Button>(window, "ToggleNavigationRail"));
             await WaitFor(() => rail.Bounds.Width == 254 && section.Bounds.Height == 0);
-            Click(window, ButtonNamed(window, "网络实验"));
+            Click(window, GetById<Button>(window, "NetworkExperimentsGroup"));
             await WaitFor(() => section.Bounds.Height > 0);
 
-            return (Disabled: disabled, Selection: Text(window, "记录 #005"));
+            return (Disabled: disabled, Selection: IsRecordSelected(window, 5));
         });
 
         await Assert.That(result.Disabled).IsTrue();
@@ -65,9 +65,9 @@ public sealed class ExploreCaptureTests
         {
             window.Width = 620;
             await SelectFixtureFragment(window);
-            var rail = Find<ToolNavigation>(window)!;
+            var rail = GetById<ToolNavigation>(window, "ToolNavigation");
             await WaitFor(() => !rail.IsHitTestVisible);
-            var toggle = ButtonNamed(window, "打开工具导航");
+            var toggle = GetById<Button>(window, "NavigationDrawerToggle");
 
             async Task OpenDrawer()
             {
@@ -86,10 +86,9 @@ public sealed class ExploreCaptureTests
             await WaitFor(() => !rail.IsHitTestVisible);
             await OpenDrawer();
 
-            Click(window, rail.GetVisualDescendants().OfType<Button>()
-                .Single(button => AutomationProperties.GetName(button) == "Packet Explorer"));
+            Click(window, GetById<Button>(window, "PacketExplorerTool"));
             await WaitFor(() => !rail.IsHitTestVisible && toggle.IsFocused);
-            return Text(window, "记录 #005");
+            return IsRecordSelected(window, 5);
         });
 
         await Assert.That(result).IsTrue();
@@ -100,15 +99,15 @@ public sealed class ExploreCaptureTests
     {
         var result = await WithExplorer(window =>
         {
-            Click(window, ButtonNamed(window, "最大化"));
+            Click(window, GetById<Button>(window, "WindowToggleSize"));
             var maximized = window.WindowState;
-            Click(window, ButtonNamed(window, "向下还原"));
+            Click(window, GetById<Button>(window, "WindowToggleSize"));
             var restored = window.WindowState;
-            Click(window, ButtonNamed(window, "最小化"));
+            Click(window, GetById<Button>(window, "WindowMinimize"));
             var minimized = window.WindowState;
             window.WindowState = WindowState.Normal;
             Dispatcher.UIThread.RunJobs();
-            Click(window, ButtonNamed(window, "关闭窗口"));
+            Click(window, GetById<Button>(window, "WindowClose"));
 
             return Task.FromResult((Maximized: maximized, Restored: restored, Minimized: minimized, Visible: window.IsVisible));
         }, file: null);
@@ -126,13 +125,14 @@ public sealed class ExploreCaptureTests
         {
             var prompt = Text(window, "打开抓包文件");
             var hint = Text(window, "选择本地 PCAP 或 PCAPNG 文件以查看捕获记录。");
-            var workbench = Text(window, "记录工作台");
+            var workbench = FindById<Grid>(window, "CaptureWorkbench") is not null;
             SaveFrame(window, "app-landing");
-            Click(window, ButtonNamed(window, "选择文件"));
-            await WaitFor(() => Text(window, "记录 #001"));
+            Click(window, GetById<Button>(window, "OpenCaptureButton"));
+            await WaitFor(() => IsRecordSelected(window, 1));
 
             return (Prompt: prompt, Hint: hint, InitialWorkbench: workbench,
-                Records: Find<ListBox>(window)!.ItemCount, PromptAfterOpen: Text(window, "打开抓包文件"));
+                Records: GetById<ListBox>(window, "CaptureRecordList").ItemCount,
+                PromptAfterOpen: FindById<Border>(window, "CaptureLanding") is not null);
         }, file: null, chooseFile: _ => Task.FromResult<string?>(Fixture("record-workbench.pcapng")));
 
         await Assert.That(result.Prompt).IsTrue();
@@ -151,13 +151,13 @@ public sealed class ExploreCaptureTests
             var prompt = Text(window, "Open a capture file");
             var navigation = Text(window, "Traffic analysis");
             SaveFrame(window, "app-en-landing");
-            Click(window, ButtonNamed(window, "Choose file"));
+            Click(window, GetById<Button>(window, "OpenCaptureButton"));
             await WaitFor(() => Text(window, "RECORD #001") && Text(window, "ARP / Target IP"));
             var workbench = Text(window, "Record workbench");
             var fields = Text(window, "Protocol fields");
             SaveFrame(window, "app-en-workbench");
 
-            Click(window, ButtonNamed(window, "Capture metadata"));
+            Click(window, GetById<Button>(window, "OpenCaptureMetadataButton"));
             await WaitFor(() => Text(window, "16 records · 2 sections · 3 interfaces"));
             var metadata = Text(window, "Byte order") && Text(window, "Big-endian");
             SaveFrame(window, "app-en-metadata");
@@ -214,9 +214,9 @@ public sealed class ExploreCaptureTests
         var result = await WithExplorer(async window =>
         {
             window.KeyPress(Key.O, RawInputModifiers.Control, PhysicalKey.O, null);
-            await WaitFor(() => Text(window, "记录 #001"));
+            await WaitFor(() => IsRecordSelected(window, 1));
 
-            return Find<ListBox>(window)!.ItemCount;
+            return GetById<ListBox>(window, "CaptureRecordList").ItemCount;
         }, file: null, chooseFile: _ => Task.FromResult<string?>(Fixture("record-workbench.pcapng")));
 
         await Assert.That(result).IsEqualTo(16);
@@ -234,7 +234,7 @@ public sealed class ExploreCaptureTests
                 await WaitFor(() => Text(window, "没有可预览的记录"));
 
                 return (Hint: Text(window, $"{Path.GetFileName(file)} 中没有捕获记录。"),
-                    Workbench: Text(window, "记录工作台"), CanChoose: FindButton(window, "选择其他文件")?.IsEnabled == true);
+                    Workbench: FindById<Grid>(window, "CaptureWorkbench") is not null, CanChoose: FindById<Button>(window, "OpenCaptureButton")?.IsEnabled == true);
             }, file);
 
             await Assert.That(result.Hint).IsTrue();
@@ -255,13 +255,13 @@ public sealed class ExploreCaptureTests
             await SelectFixtureFragment(window);
             await WaitFor(() => Text(window, "IPv4 / 标识符"));
             SaveFrame(window, "app-main");
-            Click(window, ButtonNamed(window, "并排查看完整字节 ▾"));
-            await WaitFor(() => FindButton(window, "重组 IP") is not null);
+            Click(window, GetById<Button>(window, "ToggleFullBytes"));
+            await WaitFor(() => FindById<Button>(window, "ReassembledByteSource") is not null);
             SaveFrame(window, "app-expanded");
 
-            Click(window, ButtonNamed(window, "重组 IP"));
+            Click(window, GetById<Button>(window, "ReassembledByteSource"));
             await WaitFor(() => Text(window, "UDP / 目的端口"));
-            return (Record: Text(window, "记录 #005"), Source: Text(window, "重组 IP 数据报字节"),
+            return (Record: IsRecordSelected(window, 5), Source: Text(window, "重组 IP 数据报字节"),
                 Range: Text(window, "0x0016–0017 · 2 B"), Value: Text(window, "53"));
         });
 
@@ -280,8 +280,8 @@ public sealed class ExploreCaptureTests
         {
             window.Width = width;
             window.Height = height;
-            await WaitFor(() => Text(window, "ARP / 目标 IP"));
-            var fields = ProtocolFields(window);
+            await WaitFor(() => FindById<StackPanel>(window, "CurrentProtocolFields") is { Children.Count: > 0 });
+            var fields = GetById<StackPanel>(window, "CurrentProtocolFields");
             var lastRow = fields.Children[^1];
             await WaitFor(() => lastRow.Bounds.Height > 0);
             var arpHeight = fields.Bounds.Height;
@@ -294,8 +294,8 @@ public sealed class ExploreCaptureTests
             var stacked = byteCard.Bounds.Top >= fieldCard.Bounds.Bottom;
             SaveFrame(window, sideBySide ? "app-wide" : "app-stacked");
 
-            Click(window, ButtonNamed(window, "Ethernet"));
-            await WaitFor(() => fields.Bounds.Height < arpHeight && Text(window, "Ethernet / 目的 MAC"));
+            Click(window, GetById<Button>(window, "ProtocolLayer-Ethernet"));
+            await WaitFor(() => fields.Children.Count == 3 && fields.Bounds.Height < arpHeight);
 
             return (ArpRows: arpRows, EthernetRows: fields.Children.Count, AllFit: fits,
                 ScrollAreas: scrollAreas, Aligned: aligned, ValidLayout: aligned || stacked);
@@ -315,8 +315,8 @@ public sealed class ExploreCaptureTests
         var offset = await WithExplorer(async window =>
         {
             await SelectFixtureFragment(window);
-            await WaitFor(() => Text(window, "IPv4 / 标识符"));
-            var details = ProtocolFields(window).GetVisualAncestors().OfType<ScrollViewer>().Single();
+            await WaitFor(() => FindById<StackPanel>(window, "CurrentProtocolFields") is { Children.Count: > 0 });
+            var details = GetById<ScrollViewer>(window, "RecordDetails");
             await WaitFor(() => details.Extent.Height > details.Viewport.Height && details.Viewport.Height > 0);
             details.Focus(NavigationMethod.Tab);
             var initialOffset = details.Offset.Y;
@@ -336,9 +336,9 @@ public sealed class ExploreCaptureTests
         var offset = await WithExplorer(async window =>
         {
             window.Height = 630;
-            await WaitFor(() => Text(window, "ARP / 目标 IP"));
-            var fields = ProtocolFields(window);
-            var details = fields.GetVisualAncestors().OfType<ScrollViewer>().Single();
+            await WaitFor(() => FindById<StackPanel>(window, "CurrentProtocolFields") is { Children.Count: > 0 });
+            var fields = GetById<StackPanel>(window, "CurrentProtocolFields");
+            var details = GetById<ScrollViewer>(window, "RecordDetails");
             await WaitFor(() => details.Extent.Height > details.Viewport.Height && fields.Bounds.Height > 0);
             var initialOffset = details.Offset.Y;
 
@@ -357,7 +357,7 @@ public sealed class ExploreCaptureTests
         var result = await WithExplorer(async window =>
         {
             await SelectFixtureFragment(window);
-            var map = Find<CoverageMatrix>(window)!;
+            var map = GetById<CoverageMatrix>(window, "FragmentCoverage");
 
             Click(window, map, new Point(148, 67));
             await WaitFor(() => TextStartsWith(window, "载荷 +0 B"));
@@ -372,19 +372,20 @@ public sealed class ExploreCaptureTests
     {
         var result = await WithExplorer(async window =>
         {
-            await WaitFor(() => Text(window, "记录 #001"));
-            Click(window, ButtonNamed(window, "分片"));
-            var search = Find<TextBox>(window)!;
+            await WaitFor(() => IsRecordSelected(window, 1));
+            Click(window, GetById<Button>(window, "FilterFragments"));
+            var search = GetById<TextBox>(window, "CaptureRecordSearch");
             Click(window, search);
             window.KeyTextInput("#012");
-            await WaitFor(() => Text(window, "记录 #012") && Text(window, "1 / 16"));
-            var count = Find<ListBox>(window)!.ItemCount;
+            var records = GetById<ListBox>(window, "CaptureRecordList");
+            await WaitFor(() => records is { ItemCount: 1, SelectedItem: 11 });
+            var count = records.ItemCount;
 
             window.KeyTextInput("missing");
-            await WaitFor(() => Text(window, "没有匹配的记录。"));
-            Click(window, FindButtonWithContent(window, "清除筛选"));
-            await WaitFor(() => Text(window, "16 / 16"));
-            return (Count: count, Restored: Find<ListBox>(window)!.ItemCount);
+            await WaitFor(() => records.ItemCount == 0 && FindById<Button>(window, "ClearCaptureFilters") is not null);
+            Click(window, GetById<Button>(window, "ClearCaptureFilters"));
+            await WaitFor(() => records.ItemCount == 16);
+            return (Count: count, Restored: records.ItemCount);
         });
 
         await Assert.That(result.Count).IsEqualTo(1);
@@ -396,9 +397,9 @@ public sealed class ExploreCaptureTests
     {
         var result = await WithExplorer(async window =>
         {
-            await WaitFor(() => FindRow(window, "#012") is not null);
-            Click(window, FindRow(window, "#012")!);
-            await WaitFor(() => Text(window, "重组已丢弃") && Text(window, "记录 #012"));
+            await WaitFor(() => FindRow(window, 12) is not null);
+            Click(window, FindRow(window, 12)!);
+            await WaitFor(() => IsRecordSelected(window, 12) && Text(window, "重组已丢弃"));
             SaveFrame(window, "app-overlap");
             var message = ReadText(window).Single(text => text.StartsWith("载荷 8–15 B", StringComparison.Ordinal));
 
@@ -416,13 +417,13 @@ public sealed class ExploreCaptureTests
         {
             await SelectFixtureFragment(window);
             await WaitFor(() => Text(window, "IPv4 / 标识符"));
-            Click(window, ButtonNamed(window, "捕获元数据"));
+            Click(window, GetById<Button>(window, "OpenCaptureMetadataButton"));
             SaveFrame(window, "app-metadata");
             window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
-            await WaitFor(() => FindButton(window, "关闭") is null);
-            Click(window, FindRow(window, "#013")!);
-            await WaitFor(() => Text(window, "记录 #013"));
-            Click(window, ButtonNamed(window, "捕获元数据"));
+            await WaitFor(() => FindById<Button>(window, "CloseCaptureMetadataButton") is null);
+            Click(window, FindRow(window, 13)!);
+            await WaitFor(() => IsRecordSelected(window, 13));
+            Click(window, GetById<Button>(window, "OpenCaptureMetadataButton"));
 
             return (Sections: Text(window, "16 条记录 · 2 个 Section · 3 个接口"),
                 BigEndian: Text(window, "大端"), Context: Text(window, "Simple Packet Block · S1 / I0 · 未提供"));
@@ -438,11 +439,11 @@ public sealed class ExploreCaptureTests
     {
         var result = await WithExplorer(async window =>
         {
-            await WaitFor(() => Text(window, "记录 #001"));
-            Click(window, ButtonNamed(window, "选择其他抓包文件"));
+            await WaitFor(() => IsRecordSelected(window, 1));
+            Click(window, GetById<Button>(window, "ChangeCaptureButton"));
             await WaitFor(() => Text(window, "× 文件读取错误") && Text(window, "原始记录 #001字节"));
 
-            return (Count: Find<ListBox>(window)!.ItemCount, Raw: Text(window, "3 B · 帧起点"));
+            return (Count: GetById<ListBox>(window, "CaptureRecordList").ItemCount, Raw: Text(window, "3 B · 帧起点"));
         }, Fixture("record-workbench.pcapng"), _ => Task.FromResult<string?>(Fixture("record-truncated.pcap")));
 
         await Assert.That(result.Count).IsEqualTo(1);
@@ -457,11 +458,11 @@ public sealed class ExploreCaptureTests
         {
             var result = await WithExplorer(async window =>
             {
-                await WaitFor(() => Text(window, "记录 #001"));
-                Click(window, ButtonNamed(window, "选择其他抓包文件"));
+                await WaitFor(() => IsRecordSelected(window, 1));
+                Click(window, GetById<Button>(window, "ChangeCaptureButton"));
                 await WaitFor(() => TextStartsWith(window, Path.GetFileName(file) + "："));
 
-                return (Workbench: Text(window, "记录工作台"), VisibleRecords: Find<ListBox>(window)!.ItemCount);
+                return (Workbench: FindById<Grid>(window, "CaptureWorkbench") is not null, VisibleRecords: GetById<ListBox>(window, "CaptureRecordList").ItemCount);
             }, Fixture("record-workbench.pcapng"), _ => Task.FromResult<string?>(file));
 
             await Assert.That(result.Workbench).IsTrue();
@@ -478,10 +479,9 @@ public sealed class ExploreCaptureTests
     {
         var result = await WithExplorer(async window =>
         {
-            await WaitFor(() => Text(window, "记录 #001"));
-            var list = Find<ListBox>(window)!;
-            var grip = window.GetVisualDescendants().OfType<Control>()
-                .Single(control => AutomationProperties.GetName(control) == "调整捕获记录列表宽度");
+            await WaitFor(() => IsRecordSelected(window, 1));
+            var list = GetById<ListBox>(window, "CaptureRecordList");
+            var grip = GetById<Control>(window, "ResizeCaptureRecordList");
             var startWidth = list.Bounds.Width;
             var point = Center(grip, window);
             var target = point + new Vector(72, 0);
@@ -511,15 +511,16 @@ public sealed class ExploreCaptureTests
             var result = await WithExplorer(async window =>
             {
                 var clock = Stopwatch.StartNew();
-                var records = Find<ListBox>(window)!;
-                await WaitFor(() => records.ItemCount > 0, seconds: 45);
+                await WaitFor(() => FindById<ListBox>(window, "CaptureRecordList") is { ItemCount: > 0 }, seconds: 45);
                 var first = clock.ElapsedMilliseconds;
-                await WaitFor(() => records.ItemCount == count && !Text(window, "正在索引捕获记录…"), seconds: 45);
+                var records = GetById<ListBox>(window, "CaptureRecordList");
+                var status = GetById<TextBlock>(window, "CaptureStatus");
+                await WaitFor(() => records.ItemCount == count && status.Text == file, seconds: 45);
                 var indexed = clock.ElapsedMilliseconds;
                 var visible = window.GetVisualDescendants().OfType<RecordRow>().Count();
-                Click(window, Find<TextBox>(window)!);
+                Click(window, GetById<TextBox>(window, "CaptureRecordSearch"));
                 window.KeyTextInput($"#{count}");
-                await WaitFor(() => Text(window, $"记录 #{count}") && Text(window, "1024 B · 帧起点"), seconds: 45);
+                await WaitFor(() => IsRecordSelected(window, count) && Text(window, "1024 B · 帧起点"), seconds: 45);
                 Console.WriteLine($"Capture {count:N0} records · first displayed {first:N0} ms · indexed {indexed:N0} ms · final lookup {clock.ElapsedMilliseconds - indexed:N0} ms · {visible} realized rows");
 
                 return (Visible: visible, Selected: records.SelectedItem, Filtered: records.ItemCount);
@@ -564,9 +565,9 @@ public sealed class ExploreCaptureTests
 
     private static async Task SelectFixtureFragment(ExplorerWindow window)
     {
-        await WaitFor(() => FindRow(window, "#005") is not null);
-        Click(window, FindRow(window, "#005")!);
-        await WaitFor(() => Find<CoverageMatrix>(window) is not null && Text(window, "记录 #005"));
+        await WaitFor(() => FindRow(window, 5) is not null);
+        Click(window, FindRow(window, 5)!);
+        await WaitFor(() => IsRecordSelected(window, 5) && FindById<CoverageMatrix>(window, "FragmentCoverage") is not null);
     }
 
     private static Task<T> WithExplorer<T>(Func<ExplorerWindow, Task<T>> interact) =>
@@ -612,17 +613,18 @@ public sealed class ExploreCaptureTests
     private static bool TextStartsWith(Window window, string prefix) =>
         ReadText(window).Any(text => text.StartsWith(prefix, StringComparison.Ordinal));
 
-    private static T? Find<T>(Window window) where T : Visual => window.GetVisualDescendants().OfType<T>().FirstOrDefault();
-    private static StackPanel ProtocolFields(Window window) => window.GetVisualDescendants().OfType<StackPanel>()
-        .Single(scroll => AutomationProperties.GetName(scroll) == "当前协议字段");
-    private static Button? FindButton(Window window, string name) => window.GetVisualDescendants().OfType<Button>()
-        .FirstOrDefault(button => button.IsEffectivelyVisible && AutomationProperties.GetName(button) == name);
-    private static Button ButtonNamed(Window window, string name) => FindButton(window, name)!;
-    private static Button FindButtonWithContent(Window window, string text) => window.GetVisualDescendants().OfType<Button>()
-        .Single(button => button.IsEffectivelyVisible && button.Content is TextBlock content && content.Text == text);
+    private static T? FindById<T>(Window window, string automationId) where T : Control =>
+        window.GetVisualDescendants().OfType<T>()
+            .SingleOrDefault(control => control.IsEffectivelyVisible && AutomationProperties.GetAutomationId(control) == automationId);
 
-    private static RecordRow? FindRow(Window window, string id) => window.GetVisualDescendants().OfType<RecordRow>()
-        .FirstOrDefault(row => AutomationProperties.GetName(row)?.StartsWith(id + " ·", StringComparison.Ordinal) == true);
+    private static T GetById<T>(Window window, string automationId) where T : Control =>
+        FindById<T>(window, automationId) ?? throw new InvalidOperationException($"Visible {typeof(T).Name} '{automationId}' was not found.");
+
+    private static bool IsRecordSelected(Window window, int recordNumber) =>
+        FindById<ListBox>(window, "CaptureRecordList")?.SelectedItem is int index && index == recordNumber - 1;
+
+    private static RecordRow? FindRow(Window window, int recordNumber) =>
+        FindById<RecordRow>(window, FormattableString.Invariant($"CaptureRecord-{recordNumber}"));
 
     private static Point Center(Control control, Window window) =>
         control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;

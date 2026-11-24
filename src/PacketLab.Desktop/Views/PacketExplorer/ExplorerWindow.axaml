@@ -106,7 +106,7 @@
           <Border Width="1" Height="14" Background="#42454B" VerticalAlignment="Center" />
           <Button x:Name="MobileNavigation" Classes="caption menu" CornerRadius="4" IsVisible="{Binding Navigation.IsNarrow}" Width="30" Height="29"
                   chrome:WindowDecorationProperties.ElementRole="User" Command="{Binding Navigation.ToggleDrawerCommand}"
-                  AutomationProperties.Name="{Binding Navigation.DrawerAction}" ToolTip.Tip="{Binding Navigation.DrawerAction}">
+                  AutomationProperties.AutomationId="NavigationDrawerToggle" AutomationProperties.Name="{Binding Navigation.DrawerAction}" ToolTip.Tip="{Binding Navigation.DrawerAction}">
             <Viewbox Width="19" Height="19">
               <Canvas Width="24" Height="24">
                 <Path Data="M3 6H21 M3 12H21 M3 18H21" Stroke="#B6BBC3" StrokeThickness="1.5" StrokeLineCap="Round" />
@@ -120,15 +120,15 @@
           </StackPanel>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal">
-          <Button x:Name="MinimizeButton" Classes="caption" Click="MinimizeWindow" AutomationProperties.Name="{x:Static text:Strings.MinimizeWindow}" ToolTip.Tip="{x:Static text:Strings.MinimizeWindow}"
+          <Button x:Name="MinimizeButton" Classes="caption" Click="MinimizeWindow" AutomationProperties.AutomationId="WindowMinimize" AutomationProperties.Name="{x:Static text:Strings.MinimizeWindow}" ToolTip.Tip="{x:Static text:Strings.MinimizeWindow}"
                   chrome:WindowDecorationProperties.ElementRole="MinimizeButton">
             <Path Classes="caption-glyph" Data="M1.5 6.5H10.5" />
           </Button>
-          <Button x:Name="SizeButton" Classes="caption" Click="ToggleWindowSize" AutomationProperties.Name="{x:Static text:Strings.MaximizeWindow}" ToolTip.Tip="{x:Static text:Strings.MaximizeWindow}"
+          <Button x:Name="SizeButton" Classes="caption" Click="ToggleWindowSize" AutomationProperties.AutomationId="WindowToggleSize" AutomationProperties.Name="{x:Static text:Strings.MaximizeWindow}" ToolTip.Tip="{x:Static text:Strings.MaximizeWindow}"
                   chrome:WindowDecorationProperties.ElementRole="MaximizeButton">
             <Path Classes="caption-glyph" x:Name="SizeGlyph" />
           </Button>
-          <Button x:Name="CloseWindowButton" Classes="caption close" Click="CloseWindow" AutomationProperties.Name="{x:Static text:Strings.CloseWindow}" ToolTip.Tip="{x:Static text:Strings.Close}"
+          <Button x:Name="CloseWindowButton" Classes="caption close" Click="CloseWindow" AutomationProperties.AutomationId="WindowClose" AutomationProperties.Name="{x:Static text:Strings.CloseWindow}" ToolTip.Tip="{x:Static text:Strings.Close}"
                   chrome:WindowDecorationProperties.ElementRole="CloseButton">
             <Path Classes="caption-glyph" Data="M1.5 1.5L10.5 10.5 M10.5 1.5L1.5 10.5" />
           </Button>
@@ -139,14 +139,14 @@
     <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ClipToBounds="True">
       <shell:ToolNavigation x:Name="ToolRail" ZIndex="2" DataContext="{Binding Navigation}" />
       <Grid x:Name="ContentArea" Grid.Column="1">
-        <Border x:Name="Landing" IsVisible="{Binding !Header.HasRecords}" Padding="20,28,20,100">
+        <Border x:Name="Landing" AutomationProperties.AutomationId="CaptureLanding" IsVisible="{Binding !Header.HasRecords}" Padding="20,28,20,100">
           <StackPanel MaxWidth="400" HorizontalAlignment="Center" VerticalAlignment="Center">
             <controls:OpenCaptureIcon Width="54" Height="54" Margin="0,0,0,18" />
             <TextBlock Classes="landing" Text="{Binding Header.LandingTitle}" FontSize="24" LineHeight="32"
                        FontWeight="SemiBold" FontFamily="{x:Static controls:ViewStyle.Display}" />
             <TextBlock Classes="landing" Text="{Binding Header.LandingHint}" Foreground="{x:Static controls:ViewStyle.Muted}" Margin="0,7,0,0" />
             <Button Classes="choose-capture" HorizontalAlignment="Center" Margin="0,23,0,0" Command="{Binding ChooseFileCommand}"
-                    AutomationProperties.Name="{Binding Header.LandingAction}">
+                    AutomationProperties.AutomationId="OpenCaptureButton" AutomationProperties.Name="{Binding Header.LandingAction}">
               <TextBlock Text="{Binding Header.LandingAction}" Classes="landing" LineHeight="18" Foreground="#102333" FontWeight="SemiBold" />
             </Button>
             <TextBlock Classes="landing" Text="{Binding Header.Error}" IsVisible="{Binding Header.HasError}"
@@ -154,7 +154,7 @@
           </StackPanel>
         </Border>
 
-        <Grid x:Name="Workbench" RowDefinitions="Auto,Auto,*,22" MaxWidth="1730" IsVisible="{Binding Header.HasRecords}">
+        <Grid x:Name="Workbench" AutomationProperties.AutomationId="CaptureWorkbench" RowDefinitions="Auto,Auto,*,22" MaxWidth="1730" IsVisible="{Binding Header.HasRecords}">
           <Border Padding="0,14,0,17">
             <Grid x:Name="CaptureHeading" ColumnDefinitions="1.15*,0.85*" RowDefinitions="Auto,Auto" ColumnSpacing="26" RowSpacing="9">
               <Grid x:Name="CaptureSummary" ColumnDefinitions="*,Auto">
@@ -175,7 +175,7 @@
               <Border x:Name="FileBar" Grid.Column="1" Background="{x:Static controls:ViewStyle.PanelBrush}" BorderBrush="{x:Static controls:ViewStyle.Line}"
                       BorderThickness="1" CornerRadius="6" Padding="9,5" MinHeight="41" VerticalAlignment="Center">
                 <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
-                  <Button x:Name="FileButton" Classes="explorer" Command="{Binding ChooseFileCommand}" AutomationProperties.Name="{x:Static text:Strings.ChooseAnotherCapture}"
+                  <Button x:Name="FileButton" Classes="explorer" Command="{Binding ChooseFileCommand}" AutomationProperties.AutomationId="ChangeCaptureButton" AutomationProperties.Name="{x:Static text:Strings.ChooseAnotherCapture}"
                           ToolTip.Tip="{x:Static text:Strings.ChooseAnotherCapture}">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" VerticalAlignment="Center">
                       <Path Data="M6 3H14L18 7V21H6Z M14 3V8H18 M9 12H15 M9 16H15"
@@ -188,7 +188,7 @@
                   <Border Grid.Column="1" Width="1" Height="15" Background="{x:Static controls:ViewStyle.Line}" VerticalAlignment="Center" />
                   <TextBlock Grid.Column="2" Text="{Binding Header.Format}" FontSize="12" FontFamily="{x:Static controls:ViewStyle.Mono}"
                              Foreground="{x:Static controls:ViewStyle.Muted}" VerticalAlignment="Center" />
-                  <Button Grid.Column="3" Classes="explorer" Command="{Binding ShowMetadataCommand}" AutomationProperties.Name="{x:Static text:Strings.CaptureMetadata}"
+                  <Button Grid.Column="3" Classes="explorer" Command="{Binding ShowMetadataCommand}" AutomationProperties.AutomationId="OpenCaptureMetadataButton" AutomationProperties.Name="{x:Static text:Strings.CaptureMetadata}"
                           ToolTip.Tip="{x:Static text:Strings.CaptureMetadata}">
                     <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
                       <Path Data="M2 4H20V18H2Z M8 4V18 M11 8H17 M11 12H16" Width="16" Height="16" Stretch="Uniform"
@@ -224,16 +224,16 @@
                       <Border x:Name="RecordFilters" Grid.Column="1" BorderBrush="{x:Static controls:ViewStyle.Line}" BorderThickness="1"
                               CornerRadius="4" Padding="2" Background="{x:Static controls:ViewStyle.Bg}" HorizontalAlignment="Left">
                         <WrapPanel ItemSpacing="2" VerticalAlignment="Center">
-                          <Button Classes="explorer filter" Classes.selected="{Binding AllSelected}" Content="{x:Static text:Strings.AllRecords}" AutomationProperties.Name="{x:Static text:Strings.AllRecords}"
+                          <Button Classes="explorer filter" Classes.selected="{Binding AllSelected}" Content="{x:Static text:Strings.AllRecords}" AutomationProperties.AutomationId="FilterAllRecords" AutomationProperties.Name="{x:Static text:Strings.AllRecords}"
                                   Command="{Binding SetFilterCommand}" CommandParameter="{x:Static models:RecordFilter.All}" />
-                          <Button Classes="explorer filter" Classes.selected="{Binding DiagnosticsSelected}" Content="{x:Static text:Strings.Diagnostics}" AutomationProperties.Name="{x:Static text:Strings.Diagnostics}"
+                          <Button Classes="explorer filter" Classes.selected="{Binding DiagnosticsSelected}" Content="{x:Static text:Strings.Diagnostics}" AutomationProperties.AutomationId="FilterDiagnostics" AutomationProperties.Name="{x:Static text:Strings.Diagnostics}"
                                   Command="{Binding SetFilterCommand}" CommandParameter="{x:Static models:RecordFilter.Diagnostics}" />
-                          <Button Classes="explorer filter" Classes.selected="{Binding FragmentsSelected}" Content="{x:Static text:Strings.Fragments}" AutomationProperties.Name="{x:Static text:Strings.Fragments}"
+                          <Button Classes="explorer filter" Classes.selected="{Binding FragmentsSelected}" Content="{x:Static text:Strings.Fragments}" AutomationProperties.AutomationId="FilterFragments" AutomationProperties.Name="{x:Static text:Strings.Fragments}"
                                   Command="{Binding SetFilterCommand}" CommandParameter="{x:Static models:RecordFilter.Fragments}" />
                         </WrapPanel>
                       </Border>
                     </Grid>
-                    <TextBox Classes="explorer" PlaceholderText="{x:Static text:Strings.SearchRecordsHint}" AutomationProperties.Name="{x:Static text:Strings.SearchRecords}"
+                    <TextBox Classes="explorer" PlaceholderText="{x:Static text:Strings.SearchRecordsHint}" AutomationProperties.AutomationId="CaptureRecordSearch" AutomationProperties.Name="{x:Static text:Strings.SearchRecords}"
                              Text="{Binding Query, Mode=TwoWay}">
                       <TextBox.InnerLeftContent>
                         <Path Margin="9,0,3,0" Width="13" Height="13" Data="M12 12L17 17 M14 8A6 6 0 1 1 2 8A6 6 0 0 1 14 8"
@@ -244,12 +244,12 @@
                 </Border>
                 <Grid Grid.Row="1">
                   <ListBox x:Name="RecordList" Classes="records" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
-                           AutomationProperties.Name="{x:Static text:Strings.CaptureRecordList}">
+                           AutomationProperties.AutomationId="CaptureRecordList" AutomationProperties.Name="{x:Static text:Strings.CaptureRecordList}">
                     <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
                   </ListBox>
                   <WrapPanel ItemSpacing="2" VerticalAlignment="Top" IsVisible="{Binding NoMatches}">
                     <TextBlock Text="{x:Static text:Strings.NoMatchingRecords}" FontSize="12" Foreground="{x:Static controls:ViewStyle.Muted}" Margin="12" VerticalAlignment="Center" />
-                    <Button Classes="explorer" Command="{Binding ClearFilterCommand}">
+                    <Button Classes="explorer" Command="{Binding ClearFilterCommand}" AutomationProperties.AutomationId="ClearCaptureFilters">
                       <TextBlock Text="{x:Static text:Strings.ClearFilters}" FontSize="12" Foreground="{x:Static controls:ViewStyle.Accent}" />
                     </Button>
                   </WrapPanel>
@@ -262,7 +262,7 @@
           </Grid>
           <Border Grid.Row="3" BorderBrush="{x:Static controls:ViewStyle.Line}" BorderThickness="0,1,0,0" Margin="0,8,0,0">
             <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Text="{Binding Header.Footer}" FontSize="11" Foreground="{x:Static controls:ViewStyle.Soft}" TextTrimming="CharacterEllipsis" />
+              <TextBlock AutomationProperties.AutomationId="CaptureStatus" Text="{Binding Header.Footer}" FontSize="11" Foreground="{x:Static controls:ViewStyle.Soft}" TextTrimming="CharacterEllipsis" />
               <TextBlock Grid.Column="1" Text="{Binding FooterCount}" FontSize="11" Foreground="{x:Static controls:ViewStyle.Soft}" />
             </Grid>
           </Border>
@@ -281,7 +281,7 @@
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Text="{x:Static text:Strings.CaptureMetadata}" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" />
               <Button x:Name="CloseButton" Grid.Column="1" Classes="explorer outline" Width="32" Height="32"
-                      HorizontalContentAlignment="Center" Command="{Binding CloseMetadataCommand}" AutomationProperties.Name="{x:Static text:Strings.Close}">
+                      HorizontalContentAlignment="Center" Command="{Binding CloseMetadataCommand}" AutomationProperties.AutomationId="CloseCaptureMetadataButton" AutomationProperties.Name="{x:Static text:Strings.Close}">
                 <TextBlock Text="×" FontSize="18" />
               </Button>
             </Grid>

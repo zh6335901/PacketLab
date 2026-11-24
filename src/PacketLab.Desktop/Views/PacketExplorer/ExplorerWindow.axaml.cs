@@ -240,6 +240,7 @@ internal sealed partial class ExplorerWindow : Window
         grip.Children.Add(rule);
         grip.Children.Add(handle);
         var hint = Strings.ResizeRecordListHint;
+        AutomationProperties.SetAutomationId(grip, "ResizeCaptureRecordList");
         AutomationProperties.SetName(grip, Strings.ResizeRecordList);
         ToolTip.SetTip(grip, hint);
         double? start = null;

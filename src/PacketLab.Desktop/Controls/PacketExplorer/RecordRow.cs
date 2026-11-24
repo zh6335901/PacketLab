@@ -1,4 +1,5 @@
 using PacketLab.Desktop.Localization;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -57,7 +58,8 @@ internal sealed class RecordRow : Border
         BorderThickness = new Avalonia.Thickness(0, 0, 0, 1);
         var tooltip = UIText.Format(Strings.RecordTooltip, number.Text, summary.Name, title, status.Label, timeText, record.Context, route.Text, record.Length, record.OriginalLength);
         ToolTip.SetTip(this, tooltip);
-        Avalonia.Automation.AutomationProperties.SetName(this, tooltip);
+        AutomationProperties.SetAutomationId(this, FormattableString.Invariant($"CaptureRecord-{index + 1}"));
+        AutomationProperties.SetName(this, tooltip);
         Refresh(selected, selectedGroup);
         SizeChanged += (_, _) =>
         {

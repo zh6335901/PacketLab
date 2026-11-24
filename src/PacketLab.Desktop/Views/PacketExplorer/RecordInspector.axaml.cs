@@ -192,12 +192,16 @@ internal sealed partial class RecordInspector : UserControl
         {
             var first = view.Fields.First(item => item.Layer == layer);
             var button = CommandButton(Label(layer, 11, Muted, mono: true, weight: FontWeight.Normal), model!.ChooseFieldCommand, layer, first);
+            if (layer is "Ethernet" or "ARP" or "IPv4" or "IPv6" or "TCP" or "UDP")
+                AutomationProperties.SetAutomationId(button, $"ProtocolLayer-{layer}");
+
             button.Classes.Add("layer");
             button.Padding = new Thickness(7, 3);
             button.MinHeight = 24;
             layerTabs.Children.Add(button);
         }
         fieldList = new StackPanel();
+        AutomationProperties.SetAutomationId(fieldList, "CurrentProtocolFields");
         AutomationProperties.SetName(fieldList, Strings.CurrentProtocolFields);
 
         var tabBorder = LineBelow(layerTabs, default);
@@ -341,6 +345,7 @@ internal sealed partial class RecordInspector : UserControl
             Label(group.Identity, 12, Muted, mono: true, weight: FontWeight.Normal),
             Badge(status, size: 11));
         toggle = CommandButton(Label(model!.ToggleLabel, size: 12, brush: null, mono: false, weight: FontWeight.Normal), model.ToggleFullCommand, model.ToggleLabel, parameter: null);
+        AutomationProperties.SetAutomationId(toggle, "ToggleFullBytes");
         toggle.Classes.Add("outline");
         var top = LayoutGrid("*,Auto", name, toggle);
         var scroll = new ScrollViewer
@@ -432,6 +437,8 @@ internal sealed partial class RecordInspector : UserControl
         var heading = Horizontal(8, swatch, Label(laneLabel, 13, mono: true, weight: Demi, brush: null));
         var title = LayoutGrid("*,Auto", heading, Label($"{bytes.Length} B", 10, Muted, mono: false, weight: FontWeight.Normal));
         var button = CommandButton(title, model!.ChooseSourceCommand, laneLabel, lane.Record);
+        var automationId = lane.Derived ? "ReassembledByteSource" : FormattableString.Invariant($"RecordByteSource-{lane.Record + 1}");
+        AutomationProperties.SetAutomationId(button, automationId);
         button.HorizontalAlignment = HorizontalAlignment.Stretch;
         button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
         var origin = Label(UIText.Format(Strings.FragmentStartsAt, (lane.Derived ? "IP" : Strings.Frame), lane.Slice.Start), 10, Muted, mono: false, weight: FontWeight.Normal);

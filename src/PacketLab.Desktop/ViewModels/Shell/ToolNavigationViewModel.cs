@@ -15,12 +15,12 @@ internal sealed class ToolNavigationViewModel : ObservableObject
         CloseDrawerCommand = new RelayCommand(() => DrawerOpen = false, () => DrawerOpen);
         var activateExplorer = new RelayCommand(() => DrawerOpen = false);
         var planned = new RelayCommand(static () => { }, static () => false);
-        var explorer = new ToolEntry("Packet Explorer", "M5 3H14L19 8V21H5Z M14 3V9H19 M8 13H16 M8 16H14", true, activateExplorer);
-        var live = new ToolEntry(Strings.LiveCapture, "M2 13H6L9 6L13 19L16 10L18 13H22", false, planned);
-        var simulator = new ToolEntry("Network Simulator", "M2 10H7V15H2Z M16 3H21V8H16Z M16 16H21V21H16Z M7 12H11L16 6 M11 12L16 18", false, planned);
-        var benchmark = new ToolEntry("Network Benchmark", "M3 20H21 M6 16V12 M11 16V8 M16 16V5 M20 16V9", false, planned);
-        var traffic = new ToolGroup(Strings.TrafficAnalysis, [explorer, live]);
-        var experiments = new ToolGroup(Strings.NetworkExperiments, [simulator, benchmark]);
+        var explorer = new ToolEntry("PacketExplorerTool", "Packet Explorer", "M5 3H14L19 8V21H5Z M14 3V9H19 M8 13H16 M8 16H14", true, activateExplorer);
+        var live = new ToolEntry("LiveCaptureTool", Strings.LiveCapture, "M2 13H6L9 6L13 19L16 10L18 13H22", false, planned);
+        var simulator = new ToolEntry("NetworkSimulatorTool", "Network Simulator", "M2 10H7V15H2Z M16 3H21V8H16Z M16 16H21V21H16Z M7 12H11L16 6 M11 12L16 18", false, planned);
+        var benchmark = new ToolEntry("NetworkBenchmarkTool", "Network Benchmark", "M3 20H21 M6 16V12 M11 16V8 M16 16V5 M20 16V9", false, planned);
+        var traffic = new ToolGroup("TrafficAnalysisGroup", Strings.TrafficAnalysis, [explorer, live]);
+        var experiments = new ToolGroup("NetworkExperimentsGroup", Strings.NetworkExperiments, [simulator, benchmark]);
         Groups = [traffic, experiments];
 
         ToggleRailCommand = new RelayCommand(ToggleRail);
@@ -82,13 +82,15 @@ internal sealed class ToolGroup : ObservableObject
     private bool compact;
     private bool expanded = true;
 
-    internal ToolGroup(string name, IReadOnlyList<ToolEntry> entries)
+    internal ToolGroup(string automationId, string name, IReadOnlyList<ToolEntry> entries)
     {
+        AutomationId = automationId;
         Name = name;
         Entries = entries;
         ToggleCommand = new RelayCommand(Toggle, () => !compact);
     }
 
+    public string AutomationId { get; }
     public string Name { get; }
     public IReadOnlyList<ToolEntry> Entries { get; }
     public IRelayCommand ToggleCommand { get; }
@@ -115,7 +117,7 @@ internal sealed class ToolGroup : ObservableObject
     }
 }
 
-internal sealed record ToolEntry(string Name, string Glyph, bool Available, IRelayCommand Command)
+internal sealed record ToolEntry(string AutomationId, string Name, string Glyph, bool Available, IRelayCommand Command)
 {
     public bool Planned => !Available;
     public string Tooltip => Available ? Name : UIText.Format(Strings.PlannedTool, Name);
