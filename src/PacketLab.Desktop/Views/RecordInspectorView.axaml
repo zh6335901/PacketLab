@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:PacketLab.Desktop"
+             xmlns:text="using:PacketLab.Desktop.Localization"
              x:Class="PacketLab.Desktop.RecordInspectorView"
              x:DataType="local:RecordInspectorViewModel">
   <UserControl.Resources>
@@ -23,7 +24,8 @@
       </Border>
     </DataTemplate>
   </UserControl.Resources>
-  <ScrollViewer x:Name="inspector" Margin="0,0,4,0" HorizontalScrollBarVisibility="Disabled">
+  <ScrollViewer x:Name="inspector" Margin="0,0,4,0" Focusable="True" HorizontalScrollBarVisibility="Disabled"
+                AutomationProperties.Name="{x:Static text:Strings.RecordInspector}">
     <StackPanel x:Name="inspectionContent" Spacing="9" Margin="0,0,0,12" IsVisible="False">
       <ContentControl x:Name="recordHeading" />
       <ContentControl x:Name="recordExplanation" />

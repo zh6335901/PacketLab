@@ -8,7 +8,6 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.Threading;
 using static PacketLab.Desktop.ViewStyle;
 using static PacketLab.Desktop.RecordStatus;
 
@@ -17,7 +16,6 @@ namespace PacketLab.Desktop;
 [SuppressMessage("Design", "PL0001", Justification = "Layout elements exist only for the currently displayed inspector panels.")]
 internal sealed partial class RecordInspectorView : UserControl
 {
-    private const double FieldRowHeight = 25;
     private readonly List<(CoverageLane Lane, HexView View)> fullViews = [];
     private readonly List<(PacketField Field, Border Row)> fieldRows = [];
     private RecordInspectorViewModel? model;
@@ -27,7 +25,7 @@ internal sealed partial class RecordInspectorView : UserControl
     private Button? toggle;
     private CoverageMatrix? matrix;
     private HexView? hexView;
-    private ScrollViewer? fieldScroll;
+    private StackPanel? fieldList;
     private WrapPanel? layerTabs;
     private ContentControl? selectionDetails;
     private string? renderedLayer;
@@ -90,7 +88,7 @@ internal sealed partial class RecordInspectorView : UserControl
         fullSlot = null;
         toggle = null;
         locationLabel = null;
-        fieldScroll = null;
+        fieldList = null;
         selectionDetails = null;
         layerTabs = null;
         fieldRows.Clear();
@@ -195,17 +193,12 @@ internal sealed partial class RecordInspectorView : UserControl
             button.MinHeight = 24;
             layerTabs.Children.Add(button);
         }
-        var fields = new ScrollViewer
-        {
-            Content = new StackPanel(), Focusable = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-        };
-        fieldScroll = fields;
-        AutomationProperties.SetName(fields, Strings.CurrentProtocolFields);
+        fieldList = new StackPanel();
+        AutomationProperties.SetName(fieldList, Strings.CurrentProtocolFields);
 
         var tabBorder = LineBelow(layerTabs, default);
-        var fieldContent = Vertical(0, fieldHeader, tabBorder, fields);
+        var fieldContent = Vertical(0, fieldHeader, tabBorder, fieldList);
         var fieldCard = Card(fieldContent);
-        fieldCard.VerticalAlignment = VerticalAlignment.Top;
         var bytesHeader = PanelHeading("M8 3L2 10L8 17 M16 3L22 10L16 17 M14 1L10 19", UiText.Format(Strings.EvidenceBytes, origin), $"{view.Bytes.Length} B · {coordinates}");
         hexView = new HexView(view.Bytes, compact: false, model!.PickByteCommand.Execute)
         {
@@ -241,8 +234,6 @@ internal sealed partial class RecordInspectorView : UserControl
             panels.RowDefinitions = narrow ? new RowDefinitions("Auto,Auto") : new RowDefinitions("Auto");
             Grid.SetColumn(byteCard, narrow ? 0 : 1);
             Grid.SetRow(byteCard, narrow ? 1 : 0);
-            fieldCard.VerticalAlignment = narrow ? VerticalAlignment.Top : VerticalAlignment.Stretch;
-            fields.MaxHeight = FieldRowHeight * (narrow ? 4 : 6);
         }
     }
 
@@ -258,11 +249,10 @@ internal sealed partial class RecordInspectorView : UserControl
 
     private void ShowFieldLayer(string layer)
     {
-        if (fieldScroll?.Content is not StackPanel fieldList || layerTabs is null || model?.Evidence is not { } source)
+        if (fieldList is null || layerTabs is null || model?.Evidence is not { } source)
             return;
 
         renderedLayer = layer;
-        fieldScroll.Offset = default;
         fieldRows.Clear();
         fieldList.Children.Clear();
         foreach (var button in layerTabs.Children.OfType<Button>())
@@ -282,7 +272,7 @@ internal sealed partial class RecordInspectorView : UserControl
             button.HorizontalAlignment = HorizontalAlignment.Stretch;
             button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
             button.Padding = new Thickness(12, 3, 10, 3);
-            button.MinHeight = FieldRowHeight - 1;
+            button.MinHeight = 24;
             button.CornerRadius = default;
             var row = LineBelow(button, default);
             fieldList.Children.Add(row);
@@ -335,21 +325,7 @@ internal sealed partial class RecordInspectorView : UserControl
                 ((TextBlock)cells.Children[0]).Foreground = focused ? Accent : Text;
                 ((TextBlock)cells.Children[1]).Foreground = focused ? Accent : Text;
             }
-            if (focused && fieldScroll is { } scroll)
-                Dispatcher.UIThread.Post(() => RevealField(scroll, row, item), DispatcherPriority.Loaded);
         }
-    }
-
-    private void RevealField(ScrollViewer scroll, Border row, PacketField field)
-    {
-        if (fieldScroll != scroll || model?.Selection.Field != field || row.Parent != scroll.Content || scroll.Viewport.Height <= 0)
-            return;
-
-        var offset = scroll.Offset.Y;
-        var bounds = row.Bounds;
-        var top = bounds.Y;
-        var bottom = bounds.Bottom - scroll.Viewport.Height;
-        scroll.Offset = new Vector(0, Math.Clamp(offset, Math.Min(top, bottom), top));
     }
 
     private Control MakeCoverage(FragmentCoverage coverage)

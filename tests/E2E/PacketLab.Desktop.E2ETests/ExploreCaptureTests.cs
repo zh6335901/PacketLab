@@ -269,78 +269,83 @@ public sealed class ExploreCaptureTests
     }
 
     [Test]
-    [Arguments(false, 100d)]
-    [Arguments(true, 150d)]
-    public async Task Scrolling_protocol_fields_leaves_the_byte_panel_in_place(bool compactNavigation, double expectedHeight)
+    [Arguments(1325d, 885d, false)]
+    [Arguments(1752d, 941d, true)]
+    public async Task Protocol_field_panel_resizes_to_the_active_layer(double width, double height, bool sideBySide)
     {
         var result = await WithExplorer(async window =>
         {
-            if (compactNavigation)
-            {
-                Click(window, ButtonNamed(window, "收起工具导航"));
-                await WaitFor(() => Find<ToolNavigationView>(window)!.Bounds.Width == 63);
-            }
-
-            await SelectFixtureFragment(window);
-            await WaitFor(() => Text(window, "IPv4 / 标识符"));
+            window.Width = width;
+            window.Height = height;
+            await WaitFor(() => Text(window, "ARP / 目标 IP"));
             var fields = ProtocolFields(window);
-            await WaitFor(() => fields.Viewport.Height > 0);
-            var bytes = Find<HexSurface>(window)!;
-            var fieldHeight = fields.Bounds.Height;
-            var bytesOrigin = bytes.TranslatePoint(default, window);
-            SaveFrame(window, compactNavigation ? "app-side-by-side" : "app-stacked");
+            var lastRow = fields.Children[^1];
+            await WaitFor(() => lastRow.Bounds.Height > 0);
+            var arpHeight = fields.Bounds.Height;
+            var arpRows = fields.Children.Count;
+            var fits = lastRow.Bounds.Bottom <= arpHeight;
+            var scrollAreas = fields.GetVisualAncestors().OfType<ScrollViewer>().Count();
+            var fieldCard = fields.GetVisualAncestors().OfType<Border>().First();
+            var byteCard = ((Grid)fieldCard.Parent!).Children.OfType<Border>().Single(card => card != fieldCard);
+            var aligned = fieldCard.Bounds.Top == byteCard.Bounds.Top && fieldCard.Bounds.Bottom == byteCard.Bounds.Bottom;
+            var stacked = byteCard.Bounds.Top >= fieldCard.Bounds.Bottom;
+            SaveFrame(window, sideBySide ? "app-wide" : "app-stacked");
 
-            window.MouseWheel(Center(fields, window), new Vector(0, -1));
-            await WaitFor(() => fields.Offset.Y > 0);
+            Click(window, ButtonNamed(window, "Ethernet"));
+            await WaitFor(() => fields.Bounds.Height < arpHeight && Text(window, "Ethernet / 目的 MAC"));
 
-            return (FieldHeight: fieldHeight, Overflow: fields.Extent.Height > fields.Viewport.Height,
-                BytesStayed: bytes.TranslatePoint(default, window) == bytesOrigin);
+            return (ArpRows: arpRows, EthernetRows: fields.Children.Count, AllFit: fits,
+                ScrollAreas: scrollAreas, Aligned: aligned, ValidLayout: aligned || stacked);
         });
 
-        await Assert.That(result.FieldHeight).IsEqualTo(expectedHeight);
-        await Assert.That(result.Overflow).IsTrue();
-        await Assert.That(result.BytesStayed).IsTrue();
+        await Assert.That(result.ArpRows).IsEqualTo(9);
+        await Assert.That(result.EthernetRows).IsEqualTo(3);
+        await Assert.That(result.AllFit).IsTrue();
+        await Assert.That(result.ScrollAreas).IsEqualTo(1);
+        await Assert.That(result.Aligned).IsEqualTo(sideBySide);
+        await Assert.That(result.ValidLayout).IsTrue();
     }
 
     [Test]
-    public async Task Arrow_keys_scroll_the_focused_protocol_field_list()
+    public async Task Arrow_keys_scroll_the_focused_record_details()
     {
         var offset = await WithExplorer(async window =>
         {
             await SelectFixtureFragment(window);
             await WaitFor(() => Text(window, "IPv4 / 标识符"));
-            var fields = ProtocolFields(window);
-            await WaitFor(() => fields.Extent.Height > fields.Viewport.Height && fields.Viewport.Height > 0);
-            fields.Focus(NavigationMethod.Tab);
-            var initialOffset = fields.Offset.Y;
+            var details = ProtocolFields(window).GetVisualAncestors().OfType<ScrollViewer>().Single();
+            await WaitFor(() => details.Extent.Height > details.Viewport.Height && details.Viewport.Height > 0);
+            details.Focus(NavigationMethod.Tab);
+            var initialOffset = details.Offset.Y;
 
             window.KeyPress(Key.Down, RawInputModifiers.None, PhysicalKey.ArrowDown, null);
-            await WaitFor(() => fields.Offset.Y > initialOffset);
+            await WaitFor(() => details.Offset.Y > initialOffset);
 
-            return fields.Offset.Y - initialOffset;
+            return details.Offset.Y - initialOffset;
         });
 
         await Assert.That(offset).IsGreaterThan(0);
     }
 
     [Test]
-    public async Task An_initially_selected_field_below_the_viewport_is_scrolled_into_view()
+    public async Task Mouse_wheel_over_protocol_fields_scrolls_the_record_details()
     {
         var offset = await WithExplorer(async window =>
         {
+            window.Height = 630;
             await WaitFor(() => Text(window, "ARP / 目标 IP"));
             var fields = ProtocolFields(window);
-            await WaitFor(() => fields.Offset.Y > 0);
+            var details = fields.GetVisualAncestors().OfType<ScrollViewer>().Single();
+            await WaitFor(() => details.Extent.Height > details.Viewport.Height && fields.Bounds.Height > 0);
+            var initialOffset = details.Offset.Y;
 
-            var target = fields.GetVisualDescendants().OfType<Button>().Single(button =>
-                AutomationProperties.GetName(button)?.StartsWith("目标 IP ·", StringComparison.Ordinal) == true);
+            window.MouseWheel(Center(fields, window), new Vector(0, -1));
+            await WaitFor(() => details.Offset.Y > initialOffset);
 
-            return target.TranslatePoint(default, fields)?.Y;
+            return details.Offset.Y - initialOffset;
         });
 
-        await Assert.That(offset).IsNotNull();
-        await Assert.That(offset!.Value).IsGreaterThanOrEqualTo(0);
-        await Assert.That(offset.Value).IsLessThan(100);
+        await Assert.That(offset).IsGreaterThan(0);
     }
 
     [Test]
@@ -605,7 +610,7 @@ public sealed class ExploreCaptureTests
         ReadText(window).Any(text => text.StartsWith(prefix, StringComparison.Ordinal));
 
     private static T? Find<T>(Window window) where T : Visual => window.GetVisualDescendants().OfType<T>().FirstOrDefault();
-    private static ScrollViewer ProtocolFields(Window window) => window.GetVisualDescendants().OfType<ScrollViewer>()
+    private static StackPanel ProtocolFields(Window window) => window.GetVisualDescendants().OfType<StackPanel>()
         .Single(scroll => AutomationProperties.GetName(scroll) == "当前协议字段");
     private static Button? FindButton(Window window, string name) => window.GetVisualDescendants().OfType<Button>()
         .FirstOrDefault(button => button.IsEffectivelyVisible && AutomationProperties.GetName(button) == name);

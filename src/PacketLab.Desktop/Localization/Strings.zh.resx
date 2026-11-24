@@ -984,6 +984,9 @@
   <data name="RecordHeading" xml:space="preserve">
     <value>记录 {0}</value>
   </data>
+  <data name="RecordInspector" xml:space="preserve">
+    <value>记录详情</value>
+  </data>
   <data name="RecordLocationTooltip" xml:space="preserve">
     <value>{0} · {1} · 文件偏移 0x{2:X}</value>
   </data>
