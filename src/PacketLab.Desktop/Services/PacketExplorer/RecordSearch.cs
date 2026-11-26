@@ -43,7 +43,7 @@ internal static class RecordSearch
     {
         var text = string.Join(' ', RecordStatus.Number(index),
             (index + 1).ToString(), record.Summary.Name,
-            RecordStatus.Title(record, group, index), record.Context, record.Summary.SourceAddress, record.Summary.DestinationAddress,
+            RecordStatus.Title(record, group, index).Text, record.Context, record.Summary.SourceAddress, record.Summary.DestinationAddress,
             RecordStatus.ForRecord(record, group, index).Label, group?.Identity);
 
         return text.Contains(query, StringComparison.OrdinalIgnoreCase) ||

@@ -142,7 +142,11 @@ internal sealed partial class RecordInspector : UserControl
     {
         var anchor = row.Record;
         var summary = anchor.Summary;
-        var name = Label(RecordStatus.Title(anchor, row.Group, row.Index), 20, weight: Demi, brush: null, mono: false);
+        var title = RecordStatus.Title(anchor, row.Group, row.Index);
+        var name = Label(title.Text, 20, weight: Demi, brush: null, mono: false);
+        if (title.AutomationId is { } headingId)
+            AutomationProperties.SetAutomationId(name, headingId);
+
         name.FontFamily = Display;
         name.LineHeight = 28;
         var detailText = UIText.Format(Strings.RecordDetails, anchor.Time.Format(date: false), anchor.Context, anchor.Length, anchor.OriginalLength);

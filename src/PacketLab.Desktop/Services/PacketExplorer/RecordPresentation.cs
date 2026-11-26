@@ -7,6 +7,11 @@ namespace PacketLab.Desktop.Services.PacketExplorer;
 
 internal enum RecordTone { Good, Bad, Warn, Blue, Neutral }
 
+internal readonly record struct RecordTitle(string Text, string? AutomationId)
+{
+    internal RecordTitle(string text) : this(text, null) { }
+}
+
 internal readonly record struct RecordStatus(string Label, RecordTone Tone, bool ShowBadge)
 {
     internal static RecordStatus ForGroup(FragmentGroup group) => group.Status switch
@@ -62,21 +67,21 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone, bool
     internal static bool IsDiagnostic(CaptureRecord record, FragmentGroup? group, int index) =>
         record.Summary.Issue != PacketIssue.None || group is { Failed: true } && IsOutcome(group, index);
 
-    internal static string Title(CaptureRecord record, FragmentGroup? group, int index)
+    internal static RecordTitle Title(CaptureRecord record, FragmentGroup? group, int index)
     {
         if (record.Kind == PacketLab.Pcap.PcapNgPacketKind.Simple && record.Summary is { Protocol: Protocol.Arp, Detail: 1 })
-            return Strings.ArpSimplePacket;
+            return new(Strings.ArpSimplePacket);
         if (record.Fragment is not { } fragment)
-            return record.Summary.Title;
+            return new(record.Summary.Title);
 
         return FragmentTitle(record.Summary, fragment, group, index);
     }
 
-    private static string FragmentTitle(PacketSummary summary, FragmentSlice fragment, FragmentGroup? group, int index)
+    private static RecordTitle FragmentTitle(PacketSummary summary, FragmentSlice fragment, FragmentGroup? group, int index)
     {
         var name = summary.IpVersion == 6 ? "IPv6" : "IPv4";
         if (group is { Failed: true } && index > group.Records[^1])
-            return UIText.Format(Strings.FragmentGroupDiscarded, name);
+            return new(UIText.Format(Strings.FragmentGroupDiscarded, name));
 
         if (group is not null && IsOutcome(group, index))
         {
@@ -85,34 +90,41 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone, bool
         if (fragment.Offset == 0)
         {
             if (group?.DiagnosticCode == IpReassemblyDiagnosticCode.OverlapDiscarded)
-                return UIText.Format(Strings.OverlapFirstFragment, name);
+                return new(UIText.Format(Strings.OverlapFirstFragment, name));
 
-            return name == "IPv6" && summary.Detail > 1 ? Strings.Ipv6FirstFragmentWithExtensions : UIText.Format(Strings.FirstFragmentOf, name);
+            return new(name == "IPv6" && summary.Detail > 1 ? Strings.Ipv6FirstFragmentWithExtensions : UIText.Format(Strings.FirstFragmentOf, name));
         }
         if (!fragment.More && group is not null && group.Records[0] == index)
-            return UIText.Format(Strings.FinalFragmentFirst, name);
+            return new(UIText.Format(Strings.FinalFragmentFirst, name));
 
-        return $"{name} {(fragment.More ? Strings.MiddleFragment : Strings.FinalFragment)} · +{fragment.Offset} B";
+        return new($"{name} {(fragment.More ? Strings.MiddleFragment : Strings.FinalFragment)} · +{fragment.Offset} B");
     }
 
-    private static string OutcomeTitle(string name, FragmentSlice fragment, FragmentGroup group) => group.Status switch
+    private static RecordTitle OutcomeTitle(string name, FragmentSlice fragment, FragmentGroup group) => group.Status switch
     {
-        IpReassemblyStatus.Complete => UIText.Format(Strings.ReassemblyCompletion, name, fragment switch
-        {
-            { Offset: 0 } => Strings.FirstFragment,
-            { More: true } => Strings.MiddleFragment,
-            _ => Strings.FinalFragment
-        }),
+        IpReassemblyStatus.Complete => CompletionTitle(name, fragment),
         IpReassemblyStatus.Conflict when group.DiagnosticCode == IpReassemblyDiagnosticCode.OverlapDiscarded =>
-            UIText.Format(Strings.FragmentOverlap, name),
-        IpReassemblyStatus.Incomplete when fragment.Offset == 0 => UIText.Format(Strings.AwaitingMoreFragments, name),
-        IpReassemblyStatus.Incomplete => UIText.Format(Strings.MissingFragments, name),
-        IpReassemblyStatus.Truncated => UIText.Format(Strings.FragmentTruncated, name),
-        IpReassemblyStatus.ResourceLimit => Strings.ReassemblyLimitReached,
-        IpReassemblyStatus.Atomic => Strings.Ipv6AtomicFragment,
-        _ when group.Reason == IpReassemblyAnalysisReason.RecordAssociationLimit => Strings.AssociationLimitReached,
-        _ => $"{name} {ForGroup(group).Label[2..]}"
+            new(UIText.Format(Strings.FragmentOverlap, name)),
+        IpReassemblyStatus.Incomplete when fragment.Offset == 0 => new(UIText.Format(Strings.AwaitingMoreFragments, name)),
+        IpReassemblyStatus.Incomplete => new(UIText.Format(Strings.MissingFragments, name)),
+        IpReassemblyStatus.Truncated => new(UIText.Format(Strings.FragmentTruncated, name)),
+        IpReassemblyStatus.ResourceLimit => new(Strings.ReassemblyLimitReached),
+        IpReassemblyStatus.Atomic => new(Strings.Ipv6AtomicFragment),
+        _ when group.Reason == IpReassemblyAnalysisReason.RecordAssociationLimit => new(Strings.AssociationLimitReached),
+        _ => new($"{name} {ForGroup(group).Label[2..]}")
     };
+
+    private static RecordTitle CompletionTitle(string name, FragmentSlice fragment)
+    {
+        var (position, automationId) = fragment switch
+        {
+            { Offset: 0 } => (Strings.FirstFragment, "ReassemblyCompletedByFirstFragment"),
+            { More: true } => (Strings.MiddleFragment, "ReassemblyCompletedByMiddleFragment"),
+            _ => (Strings.FinalFragment, "ReassemblyCompletedByFinalFragment")
+        };
+
+        return new(UIText.Format(Strings.ReassemblyCompletion, name, position), automationId);
+    }
 
     internal static string Describe(CaptureRecord record, FragmentGroup? group)
     {

@@ -39,7 +39,9 @@ internal sealed class RecordRow : Border
         fragment.VerticalAlignment = VerticalAlignment.Top;
         fragment.HorizontalAlignment = HorizontalAlignment.Left;
         fragment.Margin = new Avalonia.Thickness(6, 3, 0, 0);
-        var subtitle = Label(title, 12, weight: Demi, brush: null, mono: false);
+        var subtitle = Label(title.Text, 12, weight: Demi, brush: null, mono: false);
+        if (title.AutomationId is { } subtitleId)
+            AutomationProperties.SetAutomationId(subtitle, subtitleId);
         route = Label($"{summary.SourceAddress} → {summary.DestinationAddress}", 10, Muted, mono: true, weight: FontWeight.Normal);
         route.MaxWidth = 190;
         var tag = Badge(status, 10);
@@ -56,7 +58,7 @@ internal sealed class RecordRow : Border
         Height = 40;
         BorderBrush = Line;
         BorderThickness = new Avalonia.Thickness(0, 0, 0, 1);
-        var tooltip = UIText.Format(Strings.RecordTooltip, number.Text, summary.Name, title, status.Label, timeText, record.Context, route.Text, record.Length, record.OriginalLength);
+        var tooltip = UIText.Format(Strings.RecordTooltip, number.Text, summary.Name, title.Text, status.Label, timeText, record.Context, route.Text, record.Length, record.OriginalLength);
         ToolTip.SetTip(this, tooltip);
         AutomationProperties.SetAutomationId(this, FormattableString.Invariant($"CaptureRecord-{index + 1}"));
         AutomationProperties.SetName(this, tooltip);

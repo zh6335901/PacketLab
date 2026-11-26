@@ -32,21 +32,32 @@ internal static class ExplorerTestHost
         Func<FilePickerOpenOptions, Task<string?>>? chooseFile = null, string culture = "zh-CN") => Session.Dispatch<T>(async () =>
     {
         var previousCulture = CultureInfo.CurrentUICulture;
-        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(culture);
-        var window = new ExplorerWindow(file, chooseFile: chooseFile, preferencesPath: null);
-        window.Show();
+        var previousDefaultCulture = CultureInfo.DefaultThreadCurrentUICulture;
+        var uiCulture = CultureInfo.GetCultureInfo(culture);
+        CultureInfo.CurrentUICulture = uiCulture;
+        // Deferred layout can create record rows outside the test callback's execution context.
+        CultureInfo.DefaultThreadCurrentUICulture = uiCulture;
         try
         {
-            return await interact(window);
-        }
-        catch (OperationCanceledException error)
-        {
-            SaveFrame(window, "app-failure");
-            throw new InvalidOperationException(string.Join(" | ", ReadText(window)), error);
+            var window = new ExplorerWindow(file, chooseFile: chooseFile, preferencesPath: null);
+            try
+            {
+                window.Show();
+                return await interact(window);
+            }
+            catch (OperationCanceledException error)
+            {
+                SaveFrame(window, "app-failure");
+                throw new InvalidOperationException(string.Join(" | ", ReadText(window)), error);
+            }
+            finally
+            {
+                window.Close();
+            }
         }
         finally
         {
-            window.Close();
+            CultureInfo.DefaultThreadCurrentUICulture = previousDefaultCulture;
             CultureInfo.CurrentUICulture = previousCulture;
         }
     }, CancellationToken.None);
@@ -64,8 +75,8 @@ internal static class ExplorerTestHost
     internal static IEnumerable<string> ReadText(Visual root) => root.GetVisualDescendants().OfType<TextBlock>()
         .Where(block => block.IsEffectivelyVisible).Select(block => block.Text ?? "");
 
-    internal static T? FindById<T>(Window window, string automationId) where T : Control =>
-        window.GetVisualDescendants().OfType<T>()
+    internal static T? FindById<T>(Visual root, string automationId) where T : Control =>
+        root.GetVisualDescendants().OfType<T>()
             .SingleOrDefault(control => control.IsEffectivelyVisible && AutomationProperties.GetAutomationId(control) == automationId);
 
     internal static T GetById<T>(Window window, string automationId) where T : Control =>

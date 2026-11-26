@@ -9,7 +9,7 @@ using static PacketLab.Desktop.E2ETests.Fixtures.CaptureFiles;
 
 namespace PacketLab.Desktop.E2ETests.PacketExplorer;
 
-public sealed class InspectFragmentCoverageTests
+public sealed class InspectFragmentsTests
 {
     [Test]
     public async Task Selecting_reassembled_bytes_preserves_the_capture_record_and_reveals_the_field()
@@ -52,13 +52,14 @@ public sealed class InspectFragmentCoverageTests
 
                 var row = FindRow(window, 3)!;
                 var details = GetById<ScrollViewer>(window, "RecordDetails");
-                var title = UIText.Format(Strings.ReassemblyCompletion, "IPv6", Strings.MiddleFragment);
+                const string titleId = "ReassemblyCompletedByMiddleFragment";
 
-                return (Row: ReadText(row).ToArray(), Details: ReadText(details).ToArray(), Title: title);
+                return (Row: FindById<TextBlock>(row, titleId) is not null,
+                    Details: FindById<TextBlock>(details, titleId) is not null);
             }, file);
 
-            await Assert.That(result.Row).Contains(result.Title);
-            await Assert.That(result.Details).Contains(result.Title);
+            await Assert.That(result.Row).IsTrue();
+            await Assert.That(result.Details).IsTrue();
         }
         finally
         {
