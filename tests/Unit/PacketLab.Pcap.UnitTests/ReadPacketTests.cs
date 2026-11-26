@@ -16,7 +16,7 @@ public class ReadPacketTests
     {
         // Arrange
         using var stream = new MemoryStream(PcapSamples.Single(sample));
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
 
         // Act
         var result = reader.ReadNext();
@@ -41,7 +41,7 @@ public class ReadPacketTests
     {
         // Arrange
         using var stream = new MemoryStream(Convert.FromHexString(PcapSamples.Multiple));
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
         for (int i = 0; i < preceding; i++) reader.ReadNext();
 
         // Act
@@ -64,7 +64,7 @@ public class ReadPacketTests
     {
         // Arrange
         using var stream = new MemoryStream(Convert.FromHexString(PcapSamples.Multiple));
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
         for (int i = 0; i < 3 + previousEofReads; i++) reader.ReadNext();
 
         // Act
@@ -79,7 +79,7 @@ public class ReadPacketTests
     {
         // Arrange
         using var stream = new MemoryStream(Convert.FromHexString(PcapSamples.LittleMicroHeader));
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
         var reader = openResult is PcapReader opened ? opened : throw new InvalidOperationException();
 
         // Act
@@ -103,7 +103,7 @@ public class ReadPacketTests
         var bytes = PcapSamples.Replace(PcapSamples.Single(sample), 24, "FFFFFFFF");
         bytes = PcapSamples.Replace(bytes, 28, fractionHex.Replace(" ", ""));
         using var stream = new MemoryStream(bytes);
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
         var reader = openResult is PcapReader opened ? opened : throw new InvalidOperationException();
 
         // Act
@@ -123,7 +123,7 @@ public class ReadPacketTests
     {
         // Arrange
         using var stream = new MemoryStream(Convert.FromHexString(PcapSamples.Multiple)[..(43 + length)]);
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
         var reader = openResult is PcapReader opened ? opened : throw new InvalidOperationException();
         reader.ReadNext();
 
@@ -145,7 +145,7 @@ public class ReadPacketTests
             int received = selector % last.Length;
             int start = file.Length - last.Length;
             using var stream = new MemoryStream(file[..(start + received)]);
-            if (PcapReader.Open(stream) is not PcapReader reader) return false;
+            if (PcapReader.Open(stream, PcapReaderOptions.Default) is not PcapReader reader) return false;
             foreach (var _ in preceding) reader.ReadNext();
 
             // Act
@@ -162,7 +162,7 @@ public class ReadPacketTests
         {
             // Arrange
             using var stream = new MemoryStream(Records(records));
-            var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+            var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
             var packets = records.Select(_ => reader.ReadNext() is PcapPacket packet ? packet : throw new InvalidOperationException()).ToArray();
             reader.ReadNext();
 
@@ -194,7 +194,7 @@ public class ReadPacketTests
     {
         // Arrange
         using var stream = new MemoryStream(Convert.FromHexString(PcapSamples.Multiple)[..60]);
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
         var reader = openResult is PcapReader opened ? opened : throw new InvalidOperationException();
         reader.ReadNext();
 
@@ -216,7 +216,7 @@ public class ReadPacketTests
         bytes = PcapSamples.Replace(bytes, 36, "FFFFFFFF");
         using var stream = new MemoryStream(bytes);
 
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
 
         // Act
         var result = reader.ReadNext();
@@ -235,7 +235,7 @@ public class ReadPacketTests
         bytes = PcapSamples.Replace(bytes, 36, "FFFFFFFF");
         using var stream = new MemoryStream(bytes);
 
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
 
         // Act
         var result = reader.ReadNext();
@@ -290,7 +290,7 @@ public class ReadPacketTests
         var bytes = PcapSamples.Replace(PcapSamples.Single("little-micro"), 16, "FFFFFFFF");
         bytes = PcapSamples.Replace(bytes, 32, captured);
         using var stream = new MemoryStream(bytes);
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
         var reader = openResult is PcapReader opened ? opened : throw new InvalidOperationException();
         var before = GC.GetAllocatedBytesForCurrentThread();
 
@@ -316,7 +316,7 @@ public class ReadPacketTests
         bytes[40] = 0xde;
         bytes[^1] = 0xbe;
         using var stream = new MemoryStream(bytes);
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
         var reader = openResult is PcapReader opened ? opened : throw new InvalidOperationException();
 
         // Act

@@ -1,0 +1,82 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PacketLab.Desktop.App"
+             RequestedThemeVariant="Dark">
+  <Application.Styles>
+    <Fluent2Theme>
+      <Fluent2Theme.Palettes>
+        <ColorPaletteResources x:Key="Dark" Accent="#76B9ED" />
+      </Fluent2Theme.Palettes>
+    </Fluent2Theme>
+    <Style Selector="Button.explorer">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Button.explorer:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#333539" />
+    </Style>
+    <Style Selector="Button.explorer.selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="#3D3F43" />
+    </Style>
+    <Style Selector="Button.explorer.outline">
+      <Setter Property="BorderBrush" Value="#46484C" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.explorer.layer.selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="#35383C" />
+      <Setter Property="BorderThickness" Value="0,0,0,2" />
+      <Setter Property="BorderBrush" Value="#76B9ED" />
+    </Style>
+    <Style Selector="Button.choose-capture">
+      <Setter Property="Background" Value="#76B9ED" />
+      <Setter Property="BorderBrush" Value="#91C8EF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="Padding" Value="21,7" />
+      <Setter Property="MinHeight" Value="34" />
+    </Style>
+    <Style Selector="Button.choose-capture:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#94CBF2" />
+    </Style>
+    <Style Selector="TextBox.explorer">
+      <Setter Property="Background" Value="#343539" />
+      <Setter Property="BorderBrush" Value="#4C4E52" />
+      <Setter Property="PlaceholderForeground" Value="#AFB3BA" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="MinHeight" Value="30" />
+    </Style>
+    <Style Selector="ListBox.records">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+    </Style>
+    <Style Selector="ListBox.records ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="ListBox.records ListBoxItem /template/ Panel">
+      <Setter Property="Margin" Value="0" />
+    </Style>
+    <Style Selector="ListBox.records ListBoxItem /template/ Rectangle#SelectionIndicator">
+      <Setter Property="Margin" Value="4,0,0,0" />
+    </Style>
+    <Style Selector="ListBox.records ListBoxItem /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.records ListBoxItem:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#333539" />
+    </Style>
+    <Style Selector="ListBox.records ListBoxItem:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="#2B3946" />
+    </Style>
+  </Application.Styles>
+</Application>

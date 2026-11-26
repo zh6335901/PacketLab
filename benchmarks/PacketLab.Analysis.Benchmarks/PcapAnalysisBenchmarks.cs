@@ -54,7 +54,7 @@ public class PcapAnalysisBenchmarks
     private void ReadToEnd(int frameSize)
     {
         capture.Position = 0;
-        var reader = PcapReader.Open(capture) switch
+        var reader = PcapReader.Open(capture, PcapReaderOptions.Default) switch
         {
             PcapReader opened => opened,
             PcapError error => throw new InvalidDataException(error.Message),
@@ -86,7 +86,7 @@ public class PcapAnalysisBenchmarks
         }
     }
 
-    private PcapReader OpenCapture() => PcapReader.Open(capture) switch
+    private PcapReader OpenCapture() => PcapReader.Open(capture, PcapReaderOptions.Default) switch
     {
         PcapReader opened => opened,
         PcapError error => throw new InvalidDataException(error.Message),

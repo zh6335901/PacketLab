@@ -10,7 +10,7 @@ public partial class ReassembleIpTests
     public async Task Matching_numeric_addresses_in_different_ip_versions_remain_separate()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var ipv4 = Fragment(4, 0, true, Payload[..16], nextHeader: 0);
         var ipv6 = Fragment(6, 0, true, Payload[..16]);
         ipv6.AsSpan(8, 32).Clear();
@@ -171,7 +171,7 @@ public partial class ReassembleIpTests
             // Arrange
             var tail = Fragment(version, 16, false, Payload[16..]);
             tail[field + index % width] ^= (byte)(1 + difference % 255);
-            using var reassembler = new IpFragmentReassembler();
+            using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
             var first = reassembler.Process(Fragment(version, 0, true, Payload[..16]));
 
             // Act
@@ -234,7 +234,7 @@ public partial class ReassembleIpTests
     public async Task Atomic_fragment_is_independent_of_a_conflicting_ipv6_identity()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(Fragment(6, 0, true, Payload[..16]));
         reassembler.Process(Fragment(6, 8, true, Payload[8..]));
 
@@ -251,7 +251,7 @@ public partial class ReassembleIpTests
     public async Task A_fragment_still_conflicts_after_an_atomic_packet_with_the_same_identity()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(Fragment(6, 0, true, Payload[..16]));
         reassembler.Process(Fragment(6, 8, true, Payload[8..]));
         reassembler.Process(Fragment(6, 0, false, Payload));
@@ -266,7 +266,7 @@ public partial class ReassembleIpTests
     private static bool Conflicts(byte[] first, byte[] second)
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(first);
 
         // Act

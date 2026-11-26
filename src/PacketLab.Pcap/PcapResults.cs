@@ -13,7 +13,13 @@ public union PcapError(
     PcapError.CapturedLengthExceedsSnapLen,
     PcapError.PacketLimitExceeded)
 {
-    public sealed record InvalidPcapNg(long BlockOffset, long ErrorOffset, long? PacketNumber, string Detail);
+    public sealed record InvalidPcapNg(long BlockOffset, long ErrorOffset, long? PacketNumber, string Detail)
+    {
+        internal InvalidPcapNg(long blockOffset, long errorOffset, PcapNgDiagnostic diagnostic)
+            : this(blockOffset, errorOffset, null, diagnostic.Detail) => Diagnostic = diagnostic;
+
+        public PcapNgDiagnostic Diagnostic { get; init; }
+    }
     public sealed record UnsupportedFormat(uint Magic);
     public sealed record PcapNgNotSupported;
     public sealed record UnsupportedVersion(ushort Major, ushort Minor);

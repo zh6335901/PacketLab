@@ -27,7 +27,7 @@ internal static class PacketSamples
         return frame;
     }
 
-    internal static byte[] Udp(int payloadLength, bool checksum, ulong addressSum, bool ipv6 = false)
+    internal static byte[] Udp(int payloadLength, bool checksum, ulong addressSum, bool ipv6)
     {
         var bytes = new byte[8 + payloadLength];
         Write16(bytes, 0, 12345);
@@ -61,8 +61,8 @@ internal static class PacketSamples
         return bytes;
     }
 
-    internal static byte[] IPv4(ReadOnlySpan<byte> payload, int optionBytes = 0,
-        int identification = 1, int offset = 0, bool more = false)
+    internal static byte[] IPv4(ReadOnlySpan<byte> payload, int optionBytes,
+        int identification, int offset, bool more)
     {
         int headerLength = 20 + optionBytes;
         var packet = new byte[headerLength + payload.Length];
@@ -74,7 +74,7 @@ internal static class PacketSamples
         packet[9] = 17;
         IPv4Addresses.CopyTo(packet, 12);
         packet.AsSpan(20, optionBytes).Fill(1); // One-byte NOP options.
-        var headerChecksum = Checksum(packet.AsSpan(0, headerLength));
+        var headerChecksum = Checksum(packet.AsSpan(0, headerLength), initial: 0);
         Write16(packet, 10, headerChecksum);
         payload.CopyTo(packet.AsSpan(headerLength));
 
@@ -133,7 +133,7 @@ internal static class PacketSamples
         return sum;
     }
 
-    private static ushort Checksum(ReadOnlySpan<byte> bytes, ulong initial = 0)
+    private static ushort Checksum(ReadOnlySpan<byte> bytes, ulong initial)
     {
         ulong sum = initial + SumWords(bytes);
         while (sum > ushort.MaxValue)

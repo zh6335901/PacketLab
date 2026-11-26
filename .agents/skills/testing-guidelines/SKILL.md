@@ -13,6 +13,7 @@ description: Use when writing, changing, organizing, or reviewing tests.
 - Write separate tests for distinct behaviors; use parameterization or loops for input variations of the same behavior, without branching between unrelated expectations.
 - Add tests only when they provide additional verification value; avoid redundant or speculative coverage.
 - For correctness checks, assert observable behavior rather than implementation details.
+- In UI E2E tests, locate controls by stable UI identifiers such as `AutomationId`. Prefer observable state or data for waits and assertions. Assert text only when it is part of the expected behavior.
 - Keep tests and fixtures simple, allowing small duplication rather than unnecessary abstractions. Prefer explicit expected data; do not duplicate production logic to compute expected results.
 
 ## Test Scope

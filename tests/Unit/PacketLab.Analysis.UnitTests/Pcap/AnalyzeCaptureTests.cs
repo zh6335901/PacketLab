@@ -15,7 +15,7 @@ public class AnalyzeCaptureTests
     public async Task Packets_can_be_decoded_after_reading_and_stream_disposal()
     {
         var stream = new MemoryStream(Convert.FromHexString(Header + Records));
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
         var first = reader.ReadNext() is PcapPacket packet ? packet : throw new InvalidOperationException();
         _ = reader.ReadPackets().ToArray();
         stream.Dispose();
@@ -33,7 +33,7 @@ public class AnalyzeCaptureTests
         var bytes = Convert.FromHexString(Header + Records);
         bytes[20] = 101;
         using var stream = new MemoryStream(bytes);
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
         var packet = reader.ReadNext() is PcapPacket read ? read : throw new InvalidOperationException();
 
         var decoding = PcapAnalysis.Decode(reader.Header, packet);
@@ -50,7 +50,7 @@ public class AnalyzeCaptureTests
         var bytes = Convert.FromHexString(Header);
         bytes[20] = linkType;
         using var stream = new MemoryStream(bytes);
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
 
         var linkLayer = PcapAnalysis.GetLinkLayer(reader.Header);
 

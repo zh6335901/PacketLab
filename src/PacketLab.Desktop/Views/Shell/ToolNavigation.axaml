@@ -1,0 +1,269 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:text="using:PacketLab.Desktop.Localization"
+             xmlns:local="using:PacketLab.Desktop.Views.Shell"
+             xmlns:vm="using:PacketLab.Desktop.ViewModels.Shell"
+             x:Class="PacketLab.Desktop.Views.Shell.ToolNavigation"
+             x:DataType="vm:ToolNavigationViewModel"
+             Width="254" HorizontalAlignment="Left" ClipToBounds="True"
+             Classes.compact="{Binding IsCompactDesktop}" Classes.narrow="{Binding IsNarrow}"
+             AutomationProperties.AutomationId="ToolNavigation" AutomationProperties.Name="{x:Static text:Strings.ToolNavigation}">
+  <UserControl.Resources>
+    <ControlTheme x:Key="NavigationButtonTheme" TargetType="Button">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}" Padding="{TemplateBinding Padding}"
+                            Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+  </UserControl.Resources>
+  <UserControl.Styles>
+    <Style Selector="Button.nav-button">
+      <Setter Property="Theme" Value="{StaticResource NavigationButtonTheme}" />
+    </Style>
+    <Style Selector="Button.nav-button:pointerover:not(:disabled):not(.current):not(.nav-group)">
+      <Setter Property="Background" Value="#32363A" />
+    </Style>
+    <Style Selector="Button.nav-button:focus-visible /template/ ContentPresenter">
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="#83C6F6" />
+    </Style>
+    <Style Selector="Border.nav-padding">
+      <Setter Property="Padding" Value="13,21,13,14" />
+    </Style>
+    <Style Selector=":is(UserControl).mid-width Border.nav-padding">
+      <Setter Property="Padding" Value="8,21,8,14" />
+    </Style>
+    <Style Selector=":is(UserControl).compact Border.nav-padding">
+      <Setter Property="Padding" Value="9,21,9,14" />
+    </Style>
+    <Style Selector=":is(UserControl).narrow Border.nav-padding">
+      <Setter Property="Padding" Value="12,8" />
+    </Style>
+    <Style Selector=":is(UserControl).motion Border.nav-padding, :is(UserControl).motion Border.nav-title">
+      <Setter Property="Transitions">
+        <Transitions><ThicknessTransition Property="Padding" Duration="0:0:0.25" Easing="{x:Static local:NavigationMotion.EasyEase}" /></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector=":is(UserControl).motion.compact Border.nav-padding, :is(UserControl).motion.compact Border.nav-title">
+      <Setter Property="Transitions">
+        <Transitions><ThicknessTransition Property="Padding" Duration="0:0:0.2" Easing="{x:Static local:NavigationMotion.EasyEase}" /></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.nav-title">
+      <Setter Property="Height" Value="47" />
+      <Setter Property="Padding" Value="9,0,5,17" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="BorderBrush" Value="#34373B" />
+    </Style>
+    <Style Selector=":is(UserControl).compact Border.nav-title">
+      <Setter Property="Padding" Value="0,0,7,17" />
+    </Style>
+    <Style Selector=":is(UserControl).narrow Border.nav-title">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Button.nav-group">
+      <Setter Property="Height" Value="18" />
+      <Setter Property="Margin" Value="0,23,0,6" />
+      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#B6BBC3" />
+      <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+    <Style Selector=":is(UserControl).compact Button.nav-group">
+      <Setter Property="Height" Value="0" />
+      <Setter Property="Margin" Value="0,13,0,0" />
+      <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector=":is(UserControl).narrow StackPanel.nav-section">
+      <Setter Property="Margin" Value="0,4,0,12" />
+    </Style>
+    <Style Selector=":is(UserControl).motion Button.nav-group">
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Height" Duration="0:0:0.25" Easing="{x:Static local:NavigationMotion.EasyEase}" />
+          <ThicknessTransition Property="Margin" Duration="0:0:0.25" Easing="{x:Static local:NavigationMotion.EasyEase}" />
+          <DoubleTransition Property="Opacity" Duration="0:0:0.1" Delay="0:0:0.05" Easing="{x:Static local:NavigationMotion.EasyEase}" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector=":is(UserControl).motion.compact Button.nav-group">
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Height" Duration="0:0:0.2" Easing="{x:Static local:NavigationMotion.EasyEase}" />
+          <ThicknessTransition Property="Margin" Duration="0:0:0.2" Easing="{x:Static local:NavigationMotion.EasyEase}" />
+          <DoubleTransition Property="Opacity" Duration="0:0:0.1" Easing="{x:Static local:NavigationMotion.EasyEase}" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Viewbox.nav-chevron">
+      <Setter Property="RenderTransform" Value="rotate(0deg)" />
+    </Style>
+    <Style Selector="Button.nav-group.folded Viewbox.nav-chevron">
+      <Setter Property="RenderTransform" Value="rotate(-90deg)" />
+    </Style>
+    <Style Selector=":is(UserControl).motion Viewbox.nav-chevron">
+      <Setter Property="Transitions">
+        <Transitions>
+          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" Easing="{x:Static local:NavigationMotion.EasyEase}" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.nav-entries">
+      <Setter Property="Height" Value="76" />
+      <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+    <Style Selector="Border.nav-entries.folded">
+      <Setter Property="Height" Value="0" />
+      <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector=":is(UserControl).motion Border.nav-entries">
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Height" Duration="0:0:0.2" Easing="{x:Static local:NavigationMotion.EasyEase}" />
+          <DoubleTransition Property="Opacity" Duration="0:0:0.2" Easing="{x:Static local:NavigationMotion.EasyEase}" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector=":is(UserControl).motion Border.nav-entries.folded">
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Height" Duration="0:0:0.15" Easing="{x:Static local:NavigationMotion.EasyEase}" />
+          <DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="{x:Static local:NavigationMotion.EasyEase}" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.tool-item">
+      <Setter Property="Height" Value="38" />
+      <Setter Property="Foreground" Value="#C1C4CB" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+    <Style Selector="Button.tool-item:disabled">
+      <Setter Property="Foreground" Value="#B0B4BB" />
+    </Style>
+    <Style Selector="Button.tool-item.current">
+      <Setter Property="Foreground" Value="#E9F3FC" />
+      <Setter Property="Background" Value="#303943" />
+    </Style>
+    <Style Selector="Path.tool-icon">
+      <Setter Property="Stroke" Value="#B0B4BB" />
+    </Style>
+    <Style Selector="Button.tool-item.current Path.tool-icon">
+      <Setter Property="Stroke" Value="#83C6F6" />
+    </Style>
+    <Style Selector="Grid.tool-content">
+      <Setter Property="Margin" Value="9,0" />
+    </Style>
+    <Style Selector=":is(UserControl).compact Grid.tool-content">
+      <Setter Property="Margin" Value="12,0,9,0" />
+    </Style>
+    <Style Selector=":is(UserControl).motion Grid.tool-content">
+      <Setter Property="Transitions">
+        <Transitions><ThicknessTransition Property="Margin" Duration="0:0:0.25" Easing="{x:Static local:NavigationMotion.EasyEase}" /></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector=":is(UserControl).motion.compact Grid.tool-content">
+      <Setter Property="Transitions">
+        <Transitions><ThicknessTransition Property="Margin" Duration="0:0:0.2" Easing="{x:Static local:NavigationMotion.EasyEase}" /></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector=":is(UserControl).compact TextBlock.nav-label, :is(UserControl).compact Border.nav-label">
+      <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector=":is(UserControl).motion TextBlock.nav-label, :is(UserControl).motion Border.nav-label">
+      <Setter Property="Transitions">
+        <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.1" Delay="0:0:0.05" Easing="{x:Static local:NavigationMotion.EasyEase}" /></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector=":is(UserControl).motion.compact TextBlock.nav-label, :is(UserControl).motion.compact Border.nav-label">
+      <Setter Property="Transitions">
+        <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.1" Easing="{x:Static local:NavigationMotion.EasyEase}" /></Transitions>
+      </Setter>
+    </Style>
+  </UserControl.Styles>
+
+  <Border Background="#202226" BorderBrush="#393C41" BorderThickness="0,0,1,0" Classes="nav-padding">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel>
+        <Border Classes="nav-title">
+          <Grid ColumnDefinitions="*,29" ColumnSpacing="5">
+            <TextBlock Text="{x:Static text:Strings.ToolNavigation}" Classes="nav-label" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
+            <Button Grid.Column="1" Classes="nav-button" Width="29" Height="29" HorizontalContentAlignment="Center"
+                    Command="{Binding ToggleRailCommand}" ToolTip.Tip="{Binding RailAction}" AutomationProperties.AutomationId="ToggleNavigationRail" AutomationProperties.Name="{Binding RailAction}">
+              <Viewbox Width="19" Height="19">
+                <Canvas Width="24" Height="24">
+                  <Path Stroke="#B6BBC3" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                        Data="M3 4H21V20H3Z M9 4V20 M14 9L11 12L14 15" />
+                </Canvas>
+              </Viewbox>
+            </Button>
+          </Grid>
+        </Border>
+        <ItemsControl ItemsSource="{Binding Groups}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ToolGroup">
+              <StackPanel Classes="nav-section">
+                <Button Classes="nav-button nav-group" Classes.folded="{Binding Folded}" Command="{Binding ToggleCommand}"
+                        AutomationProperties.AutomationId="{Binding AutomationId}" AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding ActionHint}">
+                  <Grid ColumnDefinitions="*,12" ClipToBounds="True">
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <Viewbox Grid.Column="1" Classes="nav-chevron" Width="12" Height="12">
+                      <Canvas Width="24" Height="24">
+                        <Path Data="M6 9L12 15L18 9" Stroke="#B6BBC3" StrokeThickness="1.5"
+                              StrokeJoin="Round" StrokeLineCap="Round" />
+                      </Canvas>
+                    </Viewbox>
+                  </Grid>
+                </Button>
+                <Border Classes="nav-entries" Classes.folded="{Binding !ItemsVisible}" IsEnabled="{Binding ItemsVisible}">
+                  <ItemsControl ItemsSource="{Binding Entries}" VerticalAlignment="Top">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ToolEntry">
+                        <Button Classes="nav-button tool-item" Classes.current="{Binding Available}" IsEnabled="{Binding Available}"
+                                Command="{Binding Command}" AutomationProperties.AutomationId="{Binding AutomationId}" AutomationProperties.Name="{Binding Tooltip}"
+                                ToolTip.Tip="{Binding Tooltip}" ToolTip.ShowOnDisabled="True">
+                          <Grid>
+                            <Border IsVisible="{Binding Available}" Width="3" Height="16" CornerRadius="2" Background="#83C6F6"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center" />
+                            <Grid Classes="tool-content" ColumnDefinitions="19,*,Auto" ColumnSpacing="9">
+                              <Viewbox Width="19" Height="19" VerticalAlignment="Center">
+                                <Canvas Width="24" Height="24">
+                                  <Path Classes="tool-icon" StrokeThickness="1.5" Data="{Binding Glyph, Converter={x:Static local:ToolNavigation.IconGeometry}}"
+                                        StrokeLineCap="Round" StrokeJoin="Round" />
+                                </Canvas>
+                              </Viewbox>
+                              <TextBlock Grid.Column="1" Classes="nav-label" Text="{Binding Name}"
+                                         TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                              <Border Grid.Column="2" Classes="nav-label" IsVisible="{Binding Planned}" Padding="3,0" Height="17"
+                                      BorderBrush="#484D53" BorderThickness="1" CornerRadius="4" VerticalAlignment="Center">
+                                <TextBlock Text="{x:Static text:Strings.Planned}" FontSize="9" Foreground="#B5BBC3" VerticalAlignment="Center" />
+                              </Border>
+                            </Grid>
+                          </Grid>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Border>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+  </Border>
+</UserControl>

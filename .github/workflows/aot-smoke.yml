@@ -31,3 +31,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & ./artifacts/aot-smoke/PacketLab.AotSmoke.exe
           exit $LASTEXITCODE
+
+      - name: Publish Packet Explorer as Native AOT
+        run: dotnet publish src/PacketLab.Desktop/PacketLab.Desktop.csproj --configuration Release --runtime win-x64 --output artifacts/desktop-aot

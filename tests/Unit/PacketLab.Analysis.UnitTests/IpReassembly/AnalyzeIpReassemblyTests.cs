@@ -10,7 +10,7 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Out_of_order_fragments_preserve_bytes_and_nonconsecutive_record_numbers()
     {
-        using var analyzer = new IpReassemblyAnalyzer();
+        using var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
         var tail = IPv4Fragment(16, false, Payload[16..]);
         var first = IPv4Fragment(0, true, Payload[..16]);
         analyzer.AddIPv4Fragment(100, tail.Bytes, tail.Packet, tail.Payload);
@@ -26,7 +26,7 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task IPv6_fragments_preserve_record_associations_and_payload()
     {
-        using var analyzer = new IpReassemblyAnalyzer();
+        using var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
         var tail = IPv6Fragment(16, false, Payload[16..]);
         var first = IPv6Fragment(0, true, Payload[..16]);
         analyzer.AddIPv6Fragment(1, tail.Bytes, tail.Packet, tail.Extension, tail.Fragment);
@@ -43,7 +43,7 @@ public partial class AnalyzeIpReassemblyTests
         Prop.ForAll((byte count, byte[] order) =>
         {
             int total = 2 + count % 7;
-            using var analyzer = new IpReassemblyAnalyzer();
+            using var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
             for (int i = 0; i < total; i++)
             {
                 var first = IPv4Fragment(0, true, Payload[..16], (ushort)(i + 1));
@@ -65,7 +65,7 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Duplicate_records_are_included_in_the_completed_datagram()
     {
-        using var analyzer = new IpReassemblyAnalyzer();
+        using var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
         var first = IPv4Fragment(0, true, Payload[..16]);
         var tail = IPv4Fragment(16, false, Payload[16..]);
         analyzer.AddIPv4Fragment(1, first.Bytes, first.Packet, first.Payload);
@@ -84,7 +84,7 @@ public partial class AnalyzeIpReassemblyTests
             int limit = 1 + size % 16;
             int preceding = limit + extra % 8;
             var fragment = IPv4Fragment(0, true, Payload[..16]);
-            using var analyzer = new IpReassemblyAnalyzer(new(maxRecordsPerDatagram: limit));
+            using var analyzer = new IpReassemblyAnalyzer(new(maxRecordsPerDatagram: limit, reassembly: IpReassemblyOptions.Default, maxRecordAge: 100000));
             for (int i = 1; i <= preceding; i++)
                 analyzer.AddIPv4Fragment(i, fragment.Bytes, fragment.Packet, fragment.Payload);
             long[] expected = preceding == limit ? Enumerable.Range(1, limit + 1).Select(i => (long)i).ToArray() : [preceding + 1];
@@ -99,7 +99,7 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Record_limit_discards_a_completing_fragment_and_preserves_the_reason_for_later_records()
     {
-        using var analyzer = new IpReassemblyAnalyzer(new(maxRecordsPerDatagram: 1));
+        using var analyzer = new IpReassemblyAnalyzer(new(maxRecordsPerDatagram: 1, reassembly: IpReassemblyOptions.Default, maxRecordAge: 100000));
         var first = IPv4Fragment(0, true, Payload[..16]);
         var tail = IPv4Fragment(16, false, Payload[16..]);
         analyzer.AddIPv4Fragment(1, first.Bytes, first.Packet, first.Payload);
@@ -117,7 +117,7 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Atomic_datagram_does_not_inherit_another_identitys_record_limit()
     {
-        using var analyzer = new IpReassemblyAnalyzer(new(maxRecordsPerDatagram: 1));
+        using var analyzer = new IpReassemblyAnalyzer(new(maxRecordsPerDatagram: 1, reassembly: IpReassemblyOptions.Default, maxRecordAge: 100000));
         var first = IPv4Fragment(0, true, Payload[..16]);
         var tail = IPv4Fragment(16, false, Payload[16..]);
         analyzer.AddIPv4Fragment(1, first.Bytes, first.Packet, first.Payload);
@@ -133,7 +133,7 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Conflicted_datagrams_release_prior_associations_and_are_not_reported_again_at_finish()
     {
-        using var analyzer = new IpReassemblyAnalyzer();
+        using var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
         var first = IPv4Fragment(0, true, Payload[..16]);
         var overlap = IPv4Fragment(8, true, Payload[8..]);
         var tail = IPv4Fragment(16, false, Payload[16..]);
@@ -154,7 +154,7 @@ public partial class AnalyzeIpReassemblyTests
     [Arguments(IpReassemblyAnalysisReason.EndOfSection)]
     public async Task Finish_reports_pending_records_once_with_the_supplied_reason(IpReassemblyAnalysisReason reason)
     {
-        using var analyzer = new IpReassemblyAnalyzer();
+        using var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
         var first = IPv4Fragment(0, true, Payload[..8]);
         var tail = IPv4Fragment(16, false, Payload[16..]);
         analyzer.AddIPv4Fragment(1, first.Bytes, first.Packet, first.Payload);
@@ -171,7 +171,7 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Completed_bytes_survive_disposal()
     {
-        var analyzer = new IpReassemblyAnalyzer();
+        var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
         var first = IPv4Fragment(0, true, Payload[..16]);
         var tail = IPv4Fragment(16, false, Payload[16..]);
         analyzer.AddIPv4Fragment(1, first.Bytes, first.Packet, first.Payload);
@@ -185,7 +185,7 @@ public partial class AnalyzeIpReassemblyTests
     [Test]
     public async Task Finish_rejects_non_terminal_reasons()
     {
-        using var analyzer = new IpReassemblyAnalyzer();
+        using var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
         Action finish = () => analyzer.Finish(IpReassemblyAnalysisReason.RecordAgeLimit);
 
         await Assert.That(finish).Throws<ArgumentOutOfRangeException>();

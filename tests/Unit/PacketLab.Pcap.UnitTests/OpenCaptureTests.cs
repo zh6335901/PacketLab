@@ -75,7 +75,7 @@ public class OpenCaptureTests
     {
         using var stream = new MemoryStream(PcapSamples.Single("little-micro"));
 
-        var result = PcapNgReader.Open(stream);
+        var result = PcapNgReader.Open(stream, PcapNgReaderOptions.Default);
 
         await Assert.That(result is PcapError error && error.Offset == 0 && error.Message.Contains("Section Header Block")).IsTrue();
         await Assert.That(stream.CanRead).IsTrue();

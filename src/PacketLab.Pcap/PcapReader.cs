@@ -20,7 +20,7 @@ public sealed class PcapReader
     public PcapFileHeader Header { get; }
 
     // The caller retains stream ownership even when opening fails.
-    public static PcapOpenResult Open(Stream stream, PcapReaderOptions? options = null)
+    public static PcapOpenResult Open(Stream stream, PcapReaderOptions? options)
     {
         ArgumentNullException.ThrowIfNull(stream);
         if (!stream.CanRead)
@@ -140,7 +140,7 @@ public sealed class PcapReader
     {
         recordNumber++;
 
-        return new PcapPacket(packet.Timestamp, packet.OriginalLength, data);
+        return new PcapPacket(packet.Timestamp, packet.OriginalLength, data, input.Offset - data.Length);
     }
 
     private PcapReadResult Fail(PcapError error)

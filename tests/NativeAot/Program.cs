@@ -77,7 +77,7 @@ internal static class Program
     private static void ReassembleFragments()
     {
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", "ip-reassembly-little.pcap"));
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
         var records = reader.ReadPackets().Take(4).Select(result => result is PcapPacket packet ? packet : throw new InvalidOperationException()).ToArray();
         var first4 = DecodedIPv4.Decode(records[0].Data[14..]) is DecodedIPv4 v4 ? v4 : throw new InvalidOperationException();
         var first6 = DecodedIPv6.Decode(records[1].Data[14..]) is DecodedIPv6 v6 ? v6 : throw new InvalidOperationException();
@@ -87,7 +87,7 @@ internal static class Program
         var last4 = tail4.Payload is IPv4FragmentPayload l4 ? l4 : throw new InvalidOperationException();
         var extension6 = first6.Extensions.Single(header => header.Fragment is not null);
         var last6 = tail6.Extensions.Single(header => header.Fragment is not null);
-        using var analyzer = new IpReassemblyAnalyzer();
+        using var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
         analyzer.AddIPv4Fragment(1, records[0].Data[14..], first4, fragment4);
         analyzer.AddIPv6Fragment(2, records[1].Data[14..], first6, extension6, extension6.Fragment!);
         var complete4 = analyzer.AddIPv4Fragment(3, records[2].Data[14..], tail4, last4).Single();

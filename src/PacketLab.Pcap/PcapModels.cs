@@ -53,26 +53,28 @@ public sealed record PcapFileHeader
 
 public sealed class PcapPacket
 {
-    internal PcapPacket(PcapTimestamp timestamp, uint originalLength, byte[] data)
+    internal PcapPacket(PcapTimestamp timestamp, uint originalLength, byte[] data, long dataOffset)
     {
         Timestamp = timestamp;
         OriginalLength = originalLength;
         Data = data;
+        DataOffset = dataOffset;
     }
 
     public PcapTimestamp Timestamp { get; }
     public uint CapturedLength => (uint)Data.Length;
     public uint OriginalLength { get; }
     public ReadOnlyMemory<byte> Data { get; }
+    public long DataOffset { get; }
     public bool OriginalLengthIsLessThanCaptured => OriginalLength < CapturedLength;
 }
 
 public sealed class PcapReaderOptions
 {
     public const int DefaultMaxPacketBytes = 16 * 1024 * 1024;
-    public static PcapReaderOptions Default { get; } = new();
+    public static PcapReaderOptions Default { get; } = new(DefaultMaxPacketBytes);
 
-    public PcapReaderOptions(int maxPacketBytes = DefaultMaxPacketBytes)
+    public PcapReaderOptions(int maxPacketBytes)
     {
         if (maxPacketBytes <= 0 || maxPacketBytes > Array.MaxLength)
             throw new ArgumentOutOfRangeException(nameof(maxPacketBytes),

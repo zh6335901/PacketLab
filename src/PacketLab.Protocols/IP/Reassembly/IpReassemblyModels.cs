@@ -12,6 +12,8 @@ public enum IpReassemblyStatus
 public sealed record IpReassemblyUpdate(long DatagramId, int IpVersion, uint Identification,
     string Message, IpReassemblyOutcome Outcome)
 {
+    public IpReassemblyDiagnosticCode DiagnosticCode { get; init; }
+
     public IpReassemblyStatus Status => Outcome switch
     {
         IpReassemblyDiagnostic diagnostic => diagnostic.Status,
@@ -48,8 +50,12 @@ public sealed record ReassembledIpPacket(ReadOnlyMemory<byte> Bytes, Reassembled
 
 public sealed class IpReassemblyOptions
 {
-    public IpReassemblyOptions(int maxDatagrams = 1024, int maxBufferedBytes = 16 * 1024 * 1024,
-        int maxDatagramBytes = 65575, int maxFragmentsPerDatagram = 1024, int timeoutSeconds = 60)
+    public static IpReassemblyOptions Default { get; } = new(
+        maxDatagrams: 1024, maxBufferedBytes: 16 * 1024 * 1024, maxDatagramBytes: 65575,
+        maxFragmentsPerDatagram: 1024, timeoutSeconds: 60);
+
+    public IpReassemblyOptions(int maxDatagrams, int maxBufferedBytes,
+        int maxDatagramBytes, int maxFragmentsPerDatagram, int timeoutSeconds)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxDatagrams);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBufferedBytes);

@@ -17,7 +17,7 @@ public class ReassembleCaptureTests
     public async Task Reference_fragments_reassemble_udp_and_tcp_with_valid_checksums(string order)
     {
         using var stream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", $"ip-reassembly-{order}.pcap"));
-        var reader = PcapReader.Open(stream) is PcapReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader opened ? opened : throw new InvalidOperationException();
         var records = reader.ReadPackets().Select(result => result is PcapPacket packet ? packet : throw new InvalidOperationException()).ToArray();
         var first4 = IPv4(reader.Header, records[0]);
         var first6 = IPv6(reader.Header, records[1]);
@@ -27,7 +27,7 @@ public class ReassembleCaptureTests
         var last4 = tail4.Payload is IPv4FragmentPayload t4 ? t4 : throw new InvalidOperationException();
         var extension6 = first6.Extensions.Single(header => header.Fragment is not null);
         var last6 = tail6.Extensions.Single(header => header.Fragment is not null);
-        using var analyzer = new IpReassemblyAnalyzer();
+        using var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
 
         analyzer.AddIPv4Fragment(1, records[0].Data[14..], first4, fragment4);
         analyzer.AddIPv6Fragment(2, records[1].Data[14..], first6, extension6, extension6.Fragment!);

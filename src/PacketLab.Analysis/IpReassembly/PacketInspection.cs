@@ -1,18 +1,17 @@
 using System.Collections.Immutable;
-using PacketLab.Analysis.IpReassembly;
 using PacketLab.Protocols;
 using PacketLab.Protocols.Ethernet;
 using PacketLab.Protocols.IP.IPv4;
 using PacketLab.Protocols.IP.IPv6;
 
-namespace PacketLab.Cli;
+namespace PacketLab.Analysis.IpReassembly;
 
-internal sealed class PacketInspection : IDisposable
+public sealed class PacketInspection : IDisposable
 {
     private IpReassemblyAnalyzer? reassembly;
     private ulong clock;
 
-    internal void AdvanceTime(ulong? timestamp)
+    public void AdvanceTime(ulong? timestamp)
     {
         if (timestamp is not { } time)
             return;
@@ -21,13 +20,17 @@ internal sealed class PacketInspection : IDisposable
         reassembly?.AdvanceTime(clock);
     }
 
-    internal ImmutableArray<IpReassemblyEvent> Expire(long recordNumber) => reassembly?.Expire(recordNumber) ?? [];
+    public ImmutableArray<IpReassemblyEvent> Expire(long recordNumber) => reassembly?.Expire(recordNumber) ?? [];
 
-    internal ImmutableArray<IpReassemblyEvent> AnalyzePacket(long recordNumber, ProtocolDecodeResult decoding) => decoding.Value switch
+    public ImmutableArray<IpReassemblyEvent> AnalyzePacket(long recordNumber, ProtocolDecodeResult decoding) => decoding.Value switch
     {
         EthernetDecodeResult { Value: DecodedEthernet frame } => AnalyzeEthernet(recordNumber, frame),
         _ => []
     };
+
+    public ImmutableArray<IpReassemblyEvent> Finish(IpReassemblyAnalysisReason reason) => reassembly?.Finish(reason) ?? [];
+
+    public void Dispose() => reassembly?.Dispose();
 
     private ImmutableArray<IpReassemblyEvent> AnalyzeEthernet(long recordNumber, DecodedEthernet frame) => frame.Payload.Value switch
     {
@@ -50,13 +53,9 @@ internal sealed class PacketInspection : IDisposable
 
     private static IpReassemblyAnalyzer CreateReassemblyAt(ulong timestamp)
     {
-        var analyzer = new IpReassemblyAnalyzer();
+        var analyzer = new IpReassemblyAnalyzer(IpReassemblyAnalysisOptions.Default);
         analyzer.AdvanceTime(timestamp);
 
         return analyzer;
     }
-
-    internal ImmutableArray<IpReassemblyEvent> Finish(IpReassemblyAnalysisReason reason) => reassembly?.Finish(reason) ?? [];
-
-    public void Dispose() => reassembly?.Dispose();
 }

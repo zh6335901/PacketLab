@@ -206,7 +206,7 @@ public class AnalyzeUdpCaptureTests
     private static FileStream OpenSample(string sample) =>
         File.OpenRead(Path.Combine(AppContext.BaseDirectory, "TestData", "Pcap", sample + ".pcap"));
     private static PcapReader OpenReader(Stream stream) =>
-        PcapReader.Open(stream) is PcapReader reader ? reader : throw new InvalidOperationException("Expected a readable PCAP.");
+        PcapReader.Open(stream, PcapReaderOptions.Default) is PcapReader reader ? reader : throw new InvalidOperationException("Expected a readable PCAP.");
     private static PcapPacket ReadPacket(PcapReader reader) =>
         reader.ReadNext() is PcapPacket packet ? packet : throw new InvalidOperationException("Expected another packet.");
     private static DecodedEthernet ReadRecord(string sample, SampleRecord record)

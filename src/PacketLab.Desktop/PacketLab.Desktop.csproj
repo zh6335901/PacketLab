@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <ApplicationIcon>Assets/PacketLab.ico</ApplicationIcon>
+    <TargetFramework>net11.0</TargetFramework>
+    <IsAotCompatible>true</IsAotCompatible>
+    <PublishAot>true</PublishAot>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/PacketLab.ico" />
+    <EmbeddedResource Update="Localization/Strings.resx"
+                      Generator="MSBuild:Compile"
+                      StronglyTypedLanguage="C#"
+                      StronglyTypedNamespace="PacketLab.Desktop.Localization"
+                      StronglyTypedClassName="Strings"
+                      StronglyTypedFileName="$(IntermediateOutputPath)Strings.Designer.cs"
+                      PublicClass="true" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent2" Version="12.2.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <ProjectReference Include="../PacketLab.Analysis/PacketLab.Analysis.csproj" />
+    <ProjectReference Include="../../analyzers/PacketLab.Analyzers.Annotations/PacketLab.Analyzers.Annotations.csproj" />
+    <InternalsVisibleTo Include="PacketLab.Desktop.E2ETests" />
+  </ItemGroup>
+  <Target Name="GenerateLocalizationForDesignTime"
+          BeforeTargets="CoreCompile"
+          DependsOnTargets="PrepareResourceNames;CoreResGen"
+          Condition="'$(DesignTimeBuild)' == 'true'" />
+</Project>

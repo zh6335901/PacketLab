@@ -16,10 +16,10 @@ public class UnfragmentedPacketBenchmarks
     [GlobalSetup]
     public void Prepare()
     {
-        var udp = PacketSamples.Udp(1400, true, PacketSamples.IPv4AddressSum);
-        frame = PacketSamples.Ethernet(0x0800, PacketSamples.IPv4(udp));
+        var udp = PacketSamples.Udp(1400, true, PacketSamples.IPv4AddressSum, ipv6: false);
+        frame = PacketSamples.Ethernet(0x0800, PacketSamples.IPv4(udp, optionBytes: 0, identification: 1, offset: 0, more: false));
         ip = frame[14..];
-        reassembler = new();
+        reassembler = new(IpReassemblyOptions.Default);
         if (DecodeFrame() is not EthernetDecodeResult ethernet || ethernet is not DecodedEthernet decoded ||
             decoded.Payload is not IPv4DecodeResult ipv4 || ipv4 is not DecodedIPv4 packet ||
             packet.Payload is not UdpParseResult result || result is not UdpDatagram datagram ||

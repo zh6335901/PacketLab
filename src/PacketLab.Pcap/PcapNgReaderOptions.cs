@@ -3,11 +3,15 @@ namespace PacketLab.Pcap;
 public sealed class PcapNgReaderOptions
 {
     public const int DefaultMaxPacketBytes = 16 * 1024 * 1024;
-    public static PcapNgReaderOptions Default { get; } = new();
+    public static PcapNgReaderOptions Default { get; } = new(
+        DefaultMaxPacketBytes,
+        maxBlockBytes: 32 * 1024 * 1024,
+        maxMetadataBytes: 64 * 1024 * 1024,
+        maxOptionsPerBlock: 65536);
 
-    public PcapNgReaderOptions(int maxPacketBytes = DefaultMaxPacketBytes,
-        int maxBlockBytes = 32 * 1024 * 1024, int maxMetadataBytes = 64 * 1024 * 1024,
-        int maxOptionsPerBlock = 65536)
+    public PcapNgReaderOptions(int maxPacketBytes,
+        int maxBlockBytes, int maxMetadataBytes,
+        int maxOptionsPerBlock)
     {
         if (maxPacketBytes <= 0 || maxPacketBytes > Array.MaxLength)
             throw new ArgumentOutOfRangeException(nameof(maxPacketBytes),

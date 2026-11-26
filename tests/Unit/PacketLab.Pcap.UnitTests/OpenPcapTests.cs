@@ -44,7 +44,7 @@ public class OpenPcapTests
         using var stream = new MemoryStream(PcapSamples.Single(sample));
 
         // Act
-        var result = PcapReader.Open(stream);
+        var result = PcapReader.Open(stream, PcapReaderOptions.Default);
 
         // Assert
         var reader = await result.ShouldSucceed();
@@ -70,7 +70,7 @@ public class OpenPcapTests
         using var stream = new MemoryStream(bytes);
 
         // Act
-        var result = PcapReader.Open(stream);
+        var result = PcapReader.Open(stream, PcapReaderOptions.Default);
 
         // Assert
         return result is PcapReader reader && reader.Header.Reserved1 == reserved1
@@ -95,7 +95,7 @@ public class OpenPcapTests
         using var stream = new MemoryStream(PcapSamples.Replace(PcapSamples.Single("little-micro"), 20, link));
 
         // Act
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
 
         // Assert
         var reader = await openResult.ShouldSucceed();
@@ -117,7 +117,7 @@ public class OpenPcapTests
             : new PcapError.UnsupportedFormat(0);
 
         // Act
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
 
         // Assert
         var error = await openResult.ShouldFail(expectedError);
@@ -134,7 +134,7 @@ public class OpenPcapTests
         using var stream = new MemoryStream(PcapSamples.Replace(PcapSamples.Single(sample), 4, version));
 
         // Act
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
 
         // Assert
         var error = await openResult.ShouldFail(new PcapError.UnsupportedVersion((ushort)major, (ushort)minor));
@@ -149,7 +149,7 @@ public class OpenPcapTests
         using var stream = new MemoryStream(PcapSamples.Replace(PcapSamples.Single("little-micro"), 16, "00000000"));
 
         // Act
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
 
         // Assert
         var error = await openResult.ShouldFail(new PcapError.InvalidSnapLen());
@@ -167,7 +167,7 @@ public class OpenPcapTests
         using var stream = new MemoryStream(PcapSamples.Replace(PcapSamples.Single("little-micro"), 20, raw));
 
         // Act
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
 
         // Assert
         var error = await openResult.ShouldFail(new PcapError.InvalidLinkTypeReservedBits(expected));
@@ -184,7 +184,7 @@ public class OpenPcapTests
         using var stream = new MemoryStream(PcapSamples.Single("little-micro")[..length]);
 
         // Act
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
 
         // Assert
         var error = await openResult.ShouldFail(new PcapError.IncompleteFileHeader(length));
@@ -198,7 +198,7 @@ public class OpenPcapTests
         using var stream = new ProbeStream([]);
 
         // Act
-        var openResult = PcapReader.Open(stream);
+        var openResult = PcapReader.Open(stream, PcapReaderOptions.Default);
 
         // Assert
         await openResult.ShouldFail();
@@ -209,7 +209,7 @@ public class OpenPcapTests
     public async Task Opening_a_null_stream_throws()
     {
         // Act
-        Action act = () => PcapReader.Open(null!);
+        Action act = () => PcapReader.Open(null!, PcapReaderOptions.Default);
 
         // Assert
         await Assert.That(act).Throws<ArgumentNullException>();
@@ -223,7 +223,7 @@ public class OpenPcapTests
         stream.Dispose();
 
         // Act
-        Action act = () => PcapReader.Open(stream);
+        Action act = () => PcapReader.Open(stream, PcapReaderOptions.Default);
 
         // Assert
         await Assert.That(act).Throws<ArgumentException>();

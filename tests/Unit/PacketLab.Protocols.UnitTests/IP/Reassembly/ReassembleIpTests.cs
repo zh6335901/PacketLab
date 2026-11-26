@@ -20,7 +20,7 @@ public partial class ReassembleIpTests
     public async Task Processing_unfragmented_ipv4_returns_no_update_even_when_its_identity_is_pending(byte flags)
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(Fragment(4, 0, true, Payload[..16]));
         var packet = Fragment(4, 0, false, Payload);
         packet[6] = flags;
@@ -36,7 +36,7 @@ public partial class ReassembleIpTests
     public async Task Looking_up_unfragmented_ipv4_returns_no_datagram_even_when_its_identity_is_pending()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(Fragment(4, 0, true, Payload[..16]));
         var packet = Fragment(4, 0, false, Payload);
 
@@ -51,7 +51,7 @@ public partial class ReassembleIpTests
     public async Task A_final_fragment_completes_the_pending_datagram_after_an_unfragmented_packet_with_the_same_identity()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         reassembler.Process(Fragment(4, 0, false, Payload));
 
@@ -68,7 +68,7 @@ public partial class ReassembleIpTests
         Prop.ForAll((byte length, bool more) =>
         {
             // Arrange
-            using var reassembler = new IpFragmentReassembler();
+            using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
             var packet = Fragment(4, 0, more, Payload).AsMemory(0, length % 20);
 
             // Act
@@ -83,7 +83,7 @@ public partial class ReassembleIpTests
         Prop.ForAll((byte length, bool more) =>
         {
             // Arrange
-            using var reassembler = new IpFragmentReassembler();
+            using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
             var packet = Fragment(4, 0, more, Payload).AsMemory(0, length % 20);
 
             // Act
@@ -120,7 +120,7 @@ public partial class ReassembleIpTests
         Prop.ForAll((byte blocks, byte tail) =>
         {
             // Arrange
-            using var reassembler = new IpFragmentReassembler();
+            using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
             int remainder = 1 + tail % 7;
             var fragment = Fragment(version, 8, true, new byte[(blocks + 1) * 8 + remainder]);
 
@@ -283,7 +283,7 @@ public partial class ReassembleIpTests
         // Arrange
         var packets = Packets(Fragment(4, 0, true, Payload[..16]), Fragment(4, 0, true, Payload[..16], 2),
             Fragment(4, 16, false, Payload[16..]));
-        using var sequence = new FragmentSequence(packets, new(maxDatagrams: 1));
+        using var sequence = new FragmentSequence(packets, new(maxDatagrams: 1, maxBufferedBytes: 16 * 1024 * 1024, maxDatagramBytes: 65575, maxFragmentsPerDatagram: 1024, timeoutSeconds: 60));
         for (int i = 0; i < preceding; i++) sequence.Next();
 
         // Act
@@ -302,7 +302,7 @@ public partial class ReassembleIpTests
         // Arrange
         var packets = Packets(Fragment(4, 0, true, Payload[..16]), Fragment(4, 16, false, Payload[16..]),
             Fragment(4, 16, false, Payload[16..], 2));
-        using var sequence = new FragmentSequence(packets, new(maxBufferedBytes: 56));
+        using var sequence = new FragmentSequence(packets, new(maxBufferedBytes: 56, maxDatagrams: 1024, maxDatagramBytes: 65575, maxFragmentsPerDatagram: 1024, timeoutSeconds: 60));
         for (int i = 0; i < preceding; i++) sequence.Next();
 
         // Act
@@ -317,7 +317,7 @@ public partial class ReassembleIpTests
     {
         // Arrange
         var packets = Packets(Fragment(4, 16, false, Payload[16..]));
-        using var sequence = new FragmentSequence(packets, new(maxDatagramBytes: 40));
+        using var sequence = new FragmentSequence(packets, new(maxDatagramBytes: 40, maxDatagrams: 1024, maxBufferedBytes: 16 * 1024 * 1024, maxFragmentsPerDatagram: 1024, timeoutSeconds: 60));
 
         // Act
         sequence.Next();
@@ -355,7 +355,7 @@ public partial class ReassembleIpTests
         // Arrange
         var packets = Packets(Fragment(4, 0, true, Payload[..16]), Fragment(4, 16, false, Payload[16..]),
             Fragment(4, 0, true, Payload[..16], 2), Fragment(4, 16, false, Payload[16..], 2));
-        using var sequence = new FragmentSequence(packets, new(maxBufferedBytes: 64));
+        using var sequence = new FragmentSequence(packets, new(maxBufferedBytes: 64, maxDatagrams: 1024, maxDatagramBytes: 65575, maxFragmentsPerDatagram: 1024, timeoutSeconds: 60));
         sequence.Next();
         sequence.Next();
         sequence.Next();
@@ -446,7 +446,7 @@ public partial class ReassembleIpTests
         first[0] = 0x46;
         first[3] += 4;
         var packets = Packets(Fragment(4, 16, false, Payload[16..]), first);
-        using var sequence = new FragmentSequence(packets, new(maxDatagramBytes: 44));
+        using var sequence = new FragmentSequence(packets, new(maxDatagramBytes: 44, maxDatagrams: 1024, maxBufferedBytes: 16 * 1024 * 1024, maxFragmentsPerDatagram: 1024, timeoutSeconds: 60));
         sequence.Next();
 
         // Act
@@ -461,7 +461,7 @@ public partial class ReassembleIpTests
     {
         // Arrange
         var packets = Packets(Fragment(4, 0, true, Payload[..16]), Fragment(4, 16, false, Payload[16..]));
-        using var sequence = new FragmentSequence(packets, new(maxDatagramBytes: 44));
+        using var sequence = new FragmentSequence(packets, new(maxDatagramBytes: 44, maxDatagrams: 1024, maxBufferedBytes: 16 * 1024 * 1024, maxFragmentsPerDatagram: 1024, timeoutSeconds: 60));
         sequence.Next();
 
         // Act
@@ -476,7 +476,7 @@ public partial class ReassembleIpTests
     {
         // Arrange
         var packets = Packets(Fragment(4, 16, false, Payload[16..]), Fragment(4, 16, false, Payload[16..], 2));
-        using var sequence = new FragmentSequence(packets, new(maxBufferedBytes: 55));
+        using var sequence = new FragmentSequence(packets, new(maxBufferedBytes: 55, maxDatagrams: 1024, maxDatagramBytes: 65575, maxFragmentsPerDatagram: 1024, timeoutSeconds: 60));
         sequence.Next();
 
         // Act
@@ -493,7 +493,7 @@ public partial class ReassembleIpTests
     {
         // Arrange
         var packets = Packets(Fragment(4, 0, true, Payload[..16]));
-        using var sequence = new FragmentSequence(packets, new(maxBufferedBytes: 55));
+        using var sequence = new FragmentSequence(packets, new(maxBufferedBytes: 55, maxDatagrams: 1024, maxDatagramBytes: 65575, maxFragmentsPerDatagram: 1024, timeoutSeconds: 60));
 
         // Act
         sequence.Next();
@@ -546,7 +546,7 @@ public partial class ReassembleIpTests
         var tail = Fragment(4, 16, false, Payload[16..]);
         tail[1] = tailEcn;
         var packets = tailArrivesFirst ? new[] { tail, first } : new[] { first, tail };
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(packets[0]);
 
         // Act
@@ -570,7 +570,7 @@ public partial class ReassembleIpTests
         duplicate[1] = 3;
         var tail = Fragment(4, 16, false, Payload[16..]);
         tail[1] = 2;
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(first);
         reassembler.Process(duplicate);
 
@@ -594,7 +594,7 @@ public partial class ReassembleIpTests
         var tail = Fragment(4, 16, false, Payload[16..]);
         tail[1] = tailEcn;
         byte[][] packets = [first, tail, first];
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         for (int i = 0; i < preceding; i++) reassembler.Process(packets[i]);
 
         // Act
@@ -610,7 +610,7 @@ public partial class ReassembleIpTests
     public async Task Fragment_limit_counts_new_fragments_but_ignores_duplicates(int preceding, IpReassemblyStatus expected)
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler(new(maxFragmentsPerDatagram: 1));
+        using var reassembler = new IpFragmentReassembler(new(maxFragmentsPerDatagram: 1, maxDatagrams: 1024, maxBufferedBytes: 16 * 1024 * 1024, maxDatagramBytes: 65575, timeoutSeconds: 60));
         var first = Fragment(4, 0, true, Payload[..16]);
         byte[][] packets = [first, first, Fragment(4, 16, false, Payload[16..])];
         for (int i = 0; i < preceding; i++) reassembler.Process(packets[i]);
@@ -626,7 +626,7 @@ public partial class ReassembleIpTests
     public async Task Supplied_time_expires_pending_and_discarded_identities_at_the_boundary()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler(new(maxDatagrams: 2));
+        using var reassembler = new IpFragmentReassembler(new(maxDatagrams: 2, maxBufferedBytes: 16 * 1024 * 1024, maxDatagramBytes: 65575, maxFragmentsPerDatagram: 1024, timeoutSeconds: 60));
         reassembler.AdvanceTime(1_000_000_000);
         reassembler.Expire();
         var first = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
@@ -649,7 +649,7 @@ public partial class ReassembleIpTests
     public async Task Timed_out_tombstone_is_no_longer_retained()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         reassembler.Discard(pending.DatagramId);
         reassembler.AdvanceTime(60_000_000_000);
@@ -668,7 +668,7 @@ public partial class ReassembleIpTests
     public async Task Processing_a_discarded_identity_depends_on_whether_it_has_expired(bool expired, IpReassemblyStatus expected)
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var first = reassembler.Process(Fragment(6, 0, true, Payload[..16]))!;
         reassembler.Discard(first.DatagramId);
         if (expired) reassembler.Expire(first.DatagramId);
@@ -685,7 +685,7 @@ public partial class ReassembleIpTests
     public async Task Lookup_finds_a_tombstone_only_until_it_expires()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var first = reassembler.Process(Fragment(6, 0, true, Payload[..16]))!;
         reassembler.Discard(first.DatagramId);
         var tail = Fragment(6, 16, false, Payload[16..]);
@@ -704,7 +704,7 @@ public partial class ReassembleIpTests
     public async Task Caller_buffer_mutation_does_not_change_reassembled_bytes()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var first = Fragment(4, 0, true, Payload[..16]);
         reassembler.Process(first);
         Array.Fill(first, (byte)0xff);
@@ -720,7 +720,7 @@ public partial class ReassembleIpTests
     public async Task Disposal_does_not_change_previously_returned_bytes()
     {
         // Arrange
-        var reassembler = new IpFragmentReassembler();
+        var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(Fragment(4, 0, true, Payload[..16]));
         var completed = reassembler.Process(Fragment(4, 16, false, Payload[16..]))!;
 
@@ -735,7 +735,7 @@ public partial class ReassembleIpTests
     public async Task Finish_reports_missing_bytes_without_assuming_a_capture_end_reason()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(Fragment(4, 16, false, Payload[16..]));
 
         // Act
@@ -749,7 +749,7 @@ public partial class ReassembleIpTests
     public async Task Finished_datagrams_are_no_longer_retained()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var pending = reassembler.Process(Fragment(4, 16, false, Payload[16..]))!;
         reassembler.Finish();
 
@@ -764,7 +764,7 @@ public partial class ReassembleIpTests
     public async Task Finishing_an_already_finished_reassembler_returns_no_updates()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(Fragment(4, 16, false, Payload[16..]));
         reassembler.Finish();
 
@@ -798,7 +798,7 @@ public partial class ReassembleIpTests
     public async Task Explicit_expiry_reports_the_requested_identity()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Process(Fragment(4, 0, true, Payload[..16], 1));
         var second = reassembler.Process(Fragment(4, 0, true, Payload[..16], 2))!;
 
@@ -813,7 +813,7 @@ public partial class ReassembleIpTests
     public async Task Explicit_expiry_only_removes_the_selected_identity()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var first = reassembler.Process(Fragment(4, 0, true, Payload[..16], 1))!;
         var second = reassembler.Process(Fragment(4, 0, true, Payload[..16], 2))!;
 
@@ -829,7 +829,7 @@ public partial class ReassembleIpTests
     public async Task Expiring_an_already_expired_identity_returns_no_update()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         reassembler.Expire(pending.DatagramId);
 
@@ -844,7 +844,7 @@ public partial class ReassembleIpTests
     public async Task Discarding_an_expired_identity_returns_no_update()
     {
         // Arrange
-        using var reassembler = new IpFragmentReassembler();
+        using var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var pending = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         reassembler.Expire(pending.DatagramId);
 
@@ -859,7 +859,7 @@ public partial class ReassembleIpTests
     public async Task Disposed_reassembler_retains_no_identities()
     {
         // Arrange
-        var reassembler = new IpFragmentReassembler();
+        var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         var first = reassembler.Process(Fragment(4, 0, true, Payload[..16]))!;
         reassembler.Dispose();
 
@@ -874,7 +874,7 @@ public partial class ReassembleIpTests
     public async Task Processing_after_disposal_throws()
     {
         // Arrange
-        var reassembler = new IpFragmentReassembler();
+        var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Dispose();
 
         // Act
@@ -888,7 +888,7 @@ public partial class ReassembleIpTests
     public async Task Advancing_time_after_disposal_throws()
     {
         // Arrange
-        var reassembler = new IpFragmentReassembler();
+        var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Dispose();
 
         // Act
@@ -902,7 +902,7 @@ public partial class ReassembleIpTests
     public async Task Expiring_after_disposal_throws()
     {
         // Arrange
-        var reassembler = new IpFragmentReassembler();
+        var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Dispose();
 
         // Act
@@ -916,7 +916,7 @@ public partial class ReassembleIpTests
     public async Task Discarding_after_disposal_throws()
     {
         // Arrange
-        var reassembler = new IpFragmentReassembler();
+        var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Dispose();
 
         // Act
@@ -930,7 +930,7 @@ public partial class ReassembleIpTests
     public async Task Looking_up_after_disposal_throws()
     {
         // Arrange
-        var reassembler = new IpFragmentReassembler();
+        var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Dispose();
 
         // Act
@@ -944,7 +944,7 @@ public partial class ReassembleIpTests
     public async Task Finishing_after_disposal_throws()
     {
         // Arrange
-        var reassembler = new IpFragmentReassembler();
+        var reassembler = new IpFragmentReassembler(IpReassemblyOptions.Default);
         reassembler.Dispose();
 
         // Act

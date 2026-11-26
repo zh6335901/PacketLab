@@ -14,7 +14,7 @@ public class AnalyzePcapNgTests
         byte[] frame = Convert.FromHexString("FFFFFFFFFFFF0200000000010806AABB");
         using var stream = new MemoryStream([.. Section(), .. Interface(link: 101), .. Interface(),
             .. Packet(frame, id: 0), .. Packet(frame, id: 1)]);
-        var reader = PcapNgReader.Open(stream) is PcapNgReader opened ? opened : throw new InvalidOperationException();
+        var reader = PcapNgReader.Open(stream, PcapNgReaderOptions.Default) is PcapNgReader opened ? opened : throw new InvalidOperationException();
         var first = reader.ReadNext() is PcapNgPacket packet1 ? packet1 : throw new InvalidOperationException();
         var second = reader.ReadNext() is PcapNgPacket packet2 ? packet2 : throw new InvalidOperationException();
 

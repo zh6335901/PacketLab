@@ -52,18 +52,20 @@ public enum PcapNgPacketKind { Enhanced, Simple, Obsolete }
 public sealed class PcapNgPacket
 {
     internal PcapNgPacket(PcapNgInterface captureInterface, uint originalLength, ReadOnlyMemory<byte> data,
-        ImmutableArray<PcapNgOption> options, PcapNgPacketDetails details)
+        ImmutableArray<PcapNgOption> options, PcapNgPacketDetails details, long dataOffset)
     {
         Interface = captureInterface;
         OriginalLength = originalLength;
         Data = data;
         Options = options;
         Details = details;
+        DataOffset = dataOffset;
     }
 
     public PcapNgInterface Interface { get; }
     public uint OriginalLength { get; }
     public ReadOnlyMemory<byte> Data { get; }
+    public long DataOffset { get; }
     public ImmutableArray<PcapNgOption> Options { get; }
     public PcapNgPacketDetails Details { get; }
     public PcapNgTimestamp? Timestamp => Details switch
