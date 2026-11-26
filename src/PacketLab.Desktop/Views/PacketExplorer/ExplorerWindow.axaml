@@ -99,8 +99,8 @@
       <Grid ColumnDefinitions="Auto,*,Auto">
         <StackPanel x:Name="TitlePath" Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
           <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-            <Path Fill="#83C6F6" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
-                  Data="M2 9L15 2L28 9L15 16Z M2 13L15 20L28 13V17L15 24L2 17Z M2 21L15 28L28 21V25L15 32L2 25Z" />
+            <Image Source="/Assets/PacketLab.ico" Width="18" Height="18" VerticalAlignment="Center"
+                   RenderOptions.BitmapInterpolationMode="HighQuality" />
             <TextBlock Text="PacketLab" FontSize="13" FontWeight="SemiBold" Foreground="#F1F4F5" VerticalAlignment="Center" />
           </StackPanel>
           <Border Width="1" Height="14" Background="#42454B" VerticalAlignment="Center" />
@@ -155,7 +155,7 @@
           </StackPanel>
         </Border>
 
-        <Grid x:Name="Workbench" AutomationProperties.AutomationId="CaptureWorkbench" RowDefinitions="Auto,Auto,*,22" MaxWidth="1730" IsVisible="{Binding Header.HasRecords}">
+        <Grid x:Name="Workbench" AutomationProperties.AutomationId="CaptureWorkbench" RowDefinitions="Auto,Auto,*,22" IsVisible="{Binding Header.HasRecords}">
           <Border Padding="0,14,0,17">
             <Grid x:Name="CaptureHeading" ColumnDefinitions="1.15*,0.85*" RowDefinitions="Auto,Auto" ColumnSpacing="26" RowSpacing="9">
               <Grid x:Name="CaptureSummary" ColumnDefinitions="*,Auto">

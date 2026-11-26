@@ -13,6 +13,30 @@ namespace PacketLab.Desktop.E2ETests.PacketExplorer;
 public sealed class BrowseRecordsTests
 {
     [Test]
+    public async Task Wide_workbench_fills_the_area_beside_navigation_with_even_margins()
+    {
+        var result = await WithExplorer(async window =>
+        {
+            window.Width = 2300;
+            window.Height = 1150;
+            await SelectFixtureFragment(window);
+            await WaitFor(() => window.ClientSize.Width == 2300 && FindRecordBytes(window, 5) is not null);
+
+            var navigation = GetById<Control>(window, "ToolNavigation");
+            var workbench = GetById<Grid>(window, "CaptureWorkbench");
+            var navigationRight = navigation.TranslatePoint(new Point(navigation.Bounds.Width, 0), window)!.Value.X;
+            var workbenchLeft = workbench.TranslatePoint(default, window)!.Value.X;
+            var workbenchRight = workbench.TranslatePoint(new Point(workbench.Bounds.Width, 0), window)!.Value.X;
+            SaveFrame(window, "app-wide-workbench");
+
+            return (Left: workbenchLeft - navigationRight, Right: window.ClientSize.Width - workbenchRight);
+        });
+
+        await Assert.That(result.Left).IsEqualTo(24d);
+        await Assert.That(result.Right).IsEqualTo(24d);
+    }
+
+    [Test]
     public async Task Search_and_fragment_filter_keep_only_matching_capture_records()
     {
         var result = await WithExplorer(async window =>

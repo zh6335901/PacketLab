@@ -139,8 +139,7 @@ internal sealed partial class ExplorerWindow : Window
         if (width <= 0)
             return;
 
-        var narrow = width <= 650;
-        var margin = narrow ? 12 : Math.Clamp(width * .034, 24, 52);
+        var margin = width <= 650 ? 12 : 24;
         Workbench.Margin = new Thickness(margin, 0, margin, 0);
         var contentWidth = width - 2 * margin;
         var (min, detail, initial) = contentWidth switch
