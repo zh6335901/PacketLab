@@ -28,6 +28,10 @@ public sealed class PacketInspection : IDisposable
         _ => []
     };
 
+    public ImmutableArray<IpReassemblyEvent> Finish(IpReassemblyAnalysisReason reason) => reassembly?.Finish(reason) ?? [];
+
+    public void Dispose() => reassembly?.Dispose();
+
     private ImmutableArray<IpReassemblyEvent> AnalyzeEthernet(long recordNumber, DecodedEthernet frame) => frame.Payload.Value switch
     {
         IPv4DecodeResult { Value: DecodedIPv4 { Payload.Value: IPv4FragmentPayload fragment } packet } =>
@@ -54,8 +58,4 @@ public sealed class PacketInspection : IDisposable
 
         return analyzer;
     }
-
-    public ImmutableArray<IpReassemblyEvent> Finish(IpReassemblyAnalysisReason reason) => reassembly?.Finish(reason) ?? [];
-
-    public void Dispose() => reassembly?.Dispose();
 }
