@@ -27,18 +27,31 @@ internal static class CaptureFiles
 
     internal static void WriteIpv6HeaderConflictCapture(string file, ushort tailOffset)
     {
+        var first = Convert.FromHexString("1100000100000001" + "04D20035001800000102030405060708");
+        var tail = Convert.FromHexString("0600000000000001" + "090A0B0C0D0E0F10");
+        BinaryPrimitives.WriteUInt16BigEndian(tail.AsSpan(2), tailOffset);
+        WriteIpv6FragmentCapture(file, [first, tail]);
+    }
+
+    internal static void WriteOutOfOrderIpv6Capture(string file)
+    {
+        var first = Convert.FromHexString("1100000100000001" + "04D2003500185EFA");
+        var tail = Convert.FromHexString("1100001000000001" + "090A0B0C0D0E0F10");
+        var middle = Convert.FromHexString("1100000900000001" + "0102030405060708");
+        WriteIpv6FragmentCapture(file, [first, tail, middle]);
+    }
+
+    private static void WriteIpv6FragmentCapture(string file, byte[][] fragments)
+    {
         var ethernetAndIpv6 = Convert.FromHexString(
             "02000000000202000000000186DD" +
             "6000000000002C40" +
             "20010DB8000000000000000000000001" +
             "20010DB8000000000000000000000002");
-        var first = Convert.FromHexString("1100000100000001" + "04D20035001800000102030405060708");
-        var tail = Convert.FromHexString("0600000000000001" + "090A0B0C0D0E0F10");
-        BinaryPrimitives.WriteUInt16BigEndian(tail.AsSpan(2), tailOffset);
 
         using var output = new BinaryWriter(File.Create(file));
         output.Write(Convert.FromHexString("D4C3B2A1020004000000000000000000FFFF000001000000"));
-        foreach (var fragment in new[] { first, tail })
+        foreach (var fragment in fragments)
         {
             BinaryPrimitives.WriteUInt16BigEndian(ethernetAndIpv6.AsSpan(18), (ushort)fragment.Length);
             var frameLength = ethernetAndIpv6.Length + fragment.Length;

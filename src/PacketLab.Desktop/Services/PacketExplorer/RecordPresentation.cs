@@ -97,7 +97,12 @@ internal readonly record struct RecordStatus(string Label, RecordTone Tone, bool
 
     private static string OutcomeTitle(string name, FragmentSlice fragment, FragmentGroup group) => group.Status switch
     {
-        IpReassemblyStatus.Complete => UIText.Format(Strings.ReassemblyCompletion, name, (fragment.Offset == 0 ? Strings.FirstFragment : Strings.FinalFragment)),
+        IpReassemblyStatus.Complete => UIText.Format(Strings.ReassemblyCompletion, name, fragment switch
+        {
+            { Offset: 0 } => Strings.FirstFragment,
+            { More: true } => Strings.MiddleFragment,
+            _ => Strings.FinalFragment
+        }),
         IpReassemblyStatus.Conflict when group.DiagnosticCode == IpReassemblyDiagnosticCode.OverlapDiscarded =>
             UIText.Format(Strings.FragmentOverlap, name),
         IpReassemblyStatus.Incomplete when fragment.Offset == 0 => UIText.Format(Strings.AwaitingMoreFragments, name),

@@ -38,6 +38,35 @@ public sealed class InspectFragmentCoverageTests
     }
 
     [Test]
+    public async Task A_middle_fragment_arriving_after_the_tail_is_labeled_as_completing_the_datagram()
+    {
+        var file = Path.GetTempFileName();
+        try
+        {
+            WriteOutOfOrderIpv6Capture(file);
+            var result = await WithExplorer(async window =>
+            {
+                await WaitFor(() => FindRow(window, 3) is not null);
+                Click(window, FindRow(window, 3)!);
+                await WaitFor(() => IsRecordSelected(window, 3) && FindRecordBytes(window, 3) is not null);
+
+                var row = FindRow(window, 3)!;
+                var details = GetById<ScrollViewer>(window, "RecordDetails");
+                var title = UIText.Format(Strings.ReassemblyCompletion, "IPv6", Strings.MiddleFragment);
+
+                return (Row: ReadText(row).ToArray(), Details: ReadText(details).ToArray(), Title: title);
+            }, file);
+
+            await Assert.That(result.Row).Contains(result.Title);
+            await Assert.That(result.Details).Contains(result.Title);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Test]
     public async Task Clicking_a_coverage_byte_reports_its_frame_and_reassembled_offsets()
     {
         var result = await WithExplorer(async window =>
