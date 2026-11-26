@@ -79,8 +79,8 @@ internal static class ExplorerTestHost
         root.GetVisualDescendants().OfType<T>()
             .SingleOrDefault(control => control.IsEffectivelyVisible && AutomationProperties.GetAutomationId(control) == automationId);
 
-    internal static T GetById<T>(Window window, string automationId) where T : Control =>
-        FindById<T>(window, automationId) ?? throw new InvalidOperationException($"Visible {typeof(T).Name} '{automationId}' was not found.");
+    internal static T GetById<T>(Visual root, string automationId) where T : Control =>
+        FindById<T>(root, automationId) ?? throw new InvalidOperationException($"Visible {typeof(T).Name} '{automationId}' was not found.");
 
     internal static bool IsRecordSelected(Window window, int recordNumber) =>
         FindById<ListBox>(window, "CaptureRecordList")?.SelectedItem is int index && index == recordNumber - 1;

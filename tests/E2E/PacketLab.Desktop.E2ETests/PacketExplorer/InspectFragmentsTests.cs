@@ -38,7 +38,7 @@ public sealed class InspectFragmentsTests
     }
 
     [Test]
-    public async Task A_middle_fragment_arriving_after_the_tail_is_labeled_as_completing_the_datagram()
+    public async Task A_middle_fragment_that_completes_reassembly_is_labeled_as_middle()
     {
         var file = Path.GetTempFileName();
         try
@@ -51,15 +51,14 @@ public sealed class InspectFragmentsTests
                 await WaitFor(() => IsRecordSelected(window, 3) && FindRecordBytes(window, 3) is not null);
 
                 var row = FindRow(window, 3)!;
-                var details = GetById<ScrollViewer>(window, "RecordDetails");
-                const string titleId = "ReassemblyCompletedByMiddleFragment";
+                var rowTitle = GetById<TextBlock>(row, "CaptureRecordTitle");
+                var selectedTitle = GetById<TextBlock>(window, "SelectedRecordTitle");
 
-                return (Row: FindById<TextBlock>(row, titleId) is not null,
-                    Details: FindById<TextBlock>(details, titleId) is not null);
+                return (Row: rowTitle.Text, Details: selectedTitle.Text, FragmentType: Strings.MiddleFragment);
             }, file);
 
-            await Assert.That(result.Row).IsTrue();
-            await Assert.That(result.Details).IsTrue();
+            await Assert.That(result.Row).Contains(result.FragmentType);
+            await Assert.That(result.Details).Contains(result.FragmentType);
         }
         finally
         {
