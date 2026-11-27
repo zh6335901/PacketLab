@@ -7,6 +7,7 @@
         xmlns:vm="using:PacketLab.Desktop.ViewModels.PacketExplorer"
         xmlns:models="using:PacketLab.Desktop.Models.PacketExplorer"
         xmlns:chrome="using:Avalonia.Controls.Chrome"
+        xmlns:smooth="using:SmoothScroll.Avalonia.Controls"
         x:Class="PacketLab.Desktop.Views.PacketExplorer.ExplorerWindow"
         x:DataType="vm:ExplorerViewModel"
         Title="PacketLab · Packet Explorer" Icon="/Assets/PacketLab.ico"
@@ -247,6 +248,9 @@
                 <Grid Grid.Row="1">
                   <ListBox x:Name="RecordList" Classes="records" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
                            AutomationProperties.AutomationId="CaptureRecordList" AutomationProperties.Name="{x:Static text:Strings.CaptureRecordList}">
+                    <ListBox.Styles>
+                      <smooth:ScrollViewerSmoothTheme />
+                    </ListBox.Styles>
                     <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
                   </ListBox>
                   <WrapPanel ItemSpacing="2" VerticalAlignment="Top" IsVisible="{Binding NoMatches}">
