@@ -19,7 +19,7 @@ public sealed class CallComplexityAnalyzer : DiagnosticAnalyzer
         "PL0008", "Complex argument expression",
         "Give this argument's calculation a descriptive name",
         "Readability", DiagnosticSeverity.Warning, isEnabledByDefault: true,
-        description: "Extract multi-stage queries, chains of two or more calls, or expressions with three or more binary operations in an argument or its expression-bodied lambda.");
+        description: "Extract multi-stage queries, chains of two or more calls, or expressions with three or more binary operations used as argument values or returned by expression-bodied lambdas.");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [NestedCalls, ComplexArgument];
 
@@ -61,10 +61,19 @@ public sealed class CallComplexityAnalyzer : DiagnosticAnalyzer
     {
         var argument = (ArgumentSyntax)context.Node;
         var expression = Unwrap(argument.Expression);
-        if (expression is LambdaExpressionSyntax { Body: ExpressionSyntax body })
+        var lambda = expression as LambdaExpressionSyntax;
+        if (lambda?.Body is ExpressionSyntax body)
             expression = Unwrap(body);
-        if (IsComplexArgument(expression))
-            context.ReportDiagnostic(Diagnostic.Create(ComplexArgument, expression.GetLocation()));
+
+        if (!IsComplexArgument(expression))
+            return;
+
+        // A void callback executes the outer invocation as a statement. Its arguments are analyzed separately.
+        if (lambda is not null && expression is InvocationExpressionSyntax &&
+            context.SemanticModel.GetSymbolInfo(lambda, context.CancellationToken).Symbol is IMethodSymbol { ReturnsVoid: true })
+            return;
+
+        context.ReportDiagnostic(Diagnostic.Create(ComplexArgument, expression.GetLocation()));
     }
 
     private static bool IsComplexArgument(ExpressionSyntax expression)

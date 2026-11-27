@@ -273,6 +273,35 @@ public class AnalyzeReadabilityTests
         await Assert.That(diagnostics).IsEmpty();
     }
 
+    [Test]
+    [Arguments("Configure(b => b.Append(1).Append(2));")]
+    [Arguments("Configure(b => { b.Append(1).Append(2); });")]
+    [Arguments("ConfigureCustom(b => b.Append(1).Append(2));")]
+    [Arguments("Configure((System.Action<System.Text.StringBuilder>)(b => b.Append(1).Append(2)));")]
+    public async Task Fluent_statements_in_void_callbacks_pass(string statement)
+    {
+        var diagnostics = await Analyze("0", statement);
+
+        await Assert.That(diagnostics).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("Transform(b => b.Append(1).Append(2));", "b.Append(1).Append(2)")]
+    [Arguments("System.GC.KeepAlive(new System.Text.StringBuilder().Append(1).Append(2));",
+        "new System.Text.StringBuilder().Append(1).Append(2)")]
+    [Arguments("Configure(b => b.Append(1).AppendJoin(',', values.Distinct().Reverse()));",
+        "values.Distinct().Reverse()")]
+    [Arguments("Configure(b => b.Append(1).Append(1 + 2 * (3 + 4)));", "1 + 2 * (3 + 4)")]
+    public async Task Consumed_values_still_report_at_the_complex_expression(string statement, string expected)
+    {
+        var diagnostics = await Analyze("0", statement);
+
+        var diagnostic = diagnostics.Single();
+        await Assert.That(diagnostic.Id).IsEqualTo("PL0008");
+        await Assert.That(diagnostic.Location.SourceTree!.GetText().ToString(diagnostic.Location.SourceSpan))
+            .IsEqualTo(expected);
+    }
+
     private static readonly ImmutableArray<MetadataReference> References =
         ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
         .Where(p => Path.GetFileName(p) is "System.Private.CoreLib.dll" or "System.Runtime.dll" or "System.Linq.dll")
@@ -283,6 +312,7 @@ public class AnalyzeReadabilityTests
         var source = $$"""
             using System.Collections.Generic;
             using System.Linq;
+            using System.Text;
             class Sample
             {
                 public int Value;
@@ -290,6 +320,10 @@ public class AnalyzeReadabilityTests
                 static int Read(int offset) => offset;
                 static int Header(int a, int b, int c, int d = 0) => a;
                 static int Total(IEnumerable<int> items) => items.Sum();
+                delegate void ConfigureCallback(StringBuilder builder);
+                static void Configure(System.Action<StringBuilder> configure) { }
+                static void ConfigureCustom(ConfigureCallback configure) { }
+                static StringBuilder Transform(System.Func<StringBuilder, StringBuilder> transform) => transform(new());
                 static int Parse(bool a, bool b, bool c, int[] values) => {{expression}};
                 static void Update(int x, int y, int z, int[] values) { {{statements}} }
             }
